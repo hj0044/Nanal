@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advanceDay, advanceDays, chooseEvent, createGame, generateContacts, getNpcReunionEvents, getPersonalStoryEvents, getRelationshipProfile, getWeeklyCashflowPlan, normalizeContactName, startNextWeek, takeDailyAction, type Character } from "./game";
+import { advanceDay, advanceDays, chooseEvent, createGame, generateBodyMetrics, generateContacts, getContactAffiliation, getNpcReunionEvents, getPersonalStoryEvents, getPlayerAffiliation, getRelationshipProfile, getWeeklyCashflowPlan, normalizeContactName, startNextWeek, takeDailyAction, type Character } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
 import { getPortrait, portraitCatalog } from "./portrait-catalog";
@@ -35,6 +35,19 @@ describe("first week simulation", () => {
     expect(new Set(first.map((contact) => contact.portraitId)).size).toBe(12);
     expect(first.every((contact) => getPortrait(contact.portraitId))).toBe(true);
     expect(first.every((contact) => getPortrait(contact.portraitId)?.gender === contact.gender)).toBe(true);
+  });
+
+  it("provides stable demographic and affiliation details for the protagonist and NPCs", () => {
+    const first = createGame(character, 7192);
+    const replay = createGame(character, 7192);
+    expect(first.character).toMatchObject({ heightCm: replay.character.heightCm, weightKg: replay.character.weightKg });
+    expect(first.character.heightCm).toBeGreaterThanOrEqual(153);
+    expect(first.character.weightKg).toBeGreaterThan(30);
+    expect(first.character.affiliation).toContain("대학생");
+    expect(first.contacts.every((person) => person.heightCm && person.weightKg && person.affiliation)).toBe(true);
+    expect(generateBodyMetrics("남성", 7192, 181).heightCm).toBe(181);
+    expect(getPlayerAffiliation({ ...character, affiliation: "서울대학교 경영학과" })).toBe("서울대학교 경영학과");
+    expect(getContactAffiliation("같은 팀 동료", "worker")).toContain("직장");
   });
 
   it("lets quiet relationships drift organically and keeps the roster uncapped", () => {
