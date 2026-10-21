@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advanceDay, advanceDays, chooseEvent, createGame, generateContacts, getPersonalStoryEvents, startNextWeek, type Character } from "./game";
+import { advanceDay, advanceDays, chooseEvent, createGame, generateContacts, getPersonalStoryEvents, startNextWeek, takeDailyAction, type Character } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
 import { getPortrait, portraitCatalog } from "./portrait-catalog";
@@ -129,6 +129,22 @@ describe("first week simulation", () => {
     if (paused.phase === "summary") expect(paused.day).toBe(7);
   });
 
+  it("makes one meaningful daily choice with bounded, persistent stat and relationship effects", () => {
+    const base = { ...createGame(character, 777), evaluatedDays: [1] };
+    const rested = takeDailyAction(base, "rest");
+    expect(rested.stats.energy).toBe(82);
+    expect(rested.stats.stress).toBe(19);
+    expect(rested.day).toBe(2);
+    expect(rested.actionDays).toContain("1-1");
+    const alreadyActed = { ...base, actionDays: ["1-1"] };
+    expect(takeDailyAction(alreadyActed, "focus")).toBe(alreadyActed);
+
+    const social = takeDailyAction(base, "social");
+    expect(social.contacts[1].warmth).toBe(base.contacts[1].warmth + 3);
+    expect(social.stats.mood).toBe(base.stats.mood + 4);
+    expect(social.log[1]).toContain(base.contacts[1].name);
+  });
+
   it("keeps a recent-event cooldown across week boundaries", () => {
     let state = createGame(character, 54321);
     for (let guard = 0; guard < 30 && state.phase !== "summary"; guard += 1) {
@@ -140,7 +156,27 @@ describe("first week simulation", () => {
       const next = startNextWeek(state);
       expect(next.recentEventIds).toEqual(state.recentEventIds ?? []);
       expect(next.seenEvents).toEqual([]);
+      expect(next.actionDays).toEqual([]);
+      expect(next.eventLastSeenWeek).toEqual(state.eventLastSeenWeek);
     }
+  });
+
+  it("avoids repeating authored events inside the three-week cooldown", () => {
+    let state = createGame(character, 662910);
+    let choicesMade = 0;
+    for (let guard = 0; guard < 140 && state.week <= 12; guard += 1) {
+      if (state.phase === "event" && state.pendingEvent) {
+        const previousWeek = state.eventLastSeenWeek?.[state.pendingEvent.id];
+        if (previousWeek !== undefined) expect(state.week - previousWeek).toBeGreaterThanOrEqual(3);
+        state = chooseEvent(state, state.pendingEvent.choices[0].id);
+        choicesMade += 1;
+      } else if (state.phase === "summary") {
+        state = startNextWeek(state);
+      } else {
+        state = advanceDay(state);
+      }
+    }
+    expect(choicesMade).toBeGreaterThan(10);
   });
 
   it("validates future AI output and rejects unsafe effects or disabled topics", () => {

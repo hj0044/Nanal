@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  advanceDays, backgroundLabels, chooseEvent, createGame, createSeed, generateContacts, startNextWeek,
-  type Background, type Character, type CharacterDraft, type Contact, type GameState, type Palette,
+  advanceDays, backgroundLabels, chooseEvent, createGame, createSeed, generateContacts, startNextWeek, takeDailyAction,
+  type Background, type Character, type CharacterDraft, type Contact, type DailyAction, type GameState, type Palette,
   type SensitiveTopic, type Tab,
 } from "./game";
 import "./style.css";
@@ -152,7 +152,7 @@ function App() {
         </div>
       </header>
       <main className="main-content">
-        {tab === "life" && <LifeView game={game} onAdvance={(days) => updateGame((current) => advanceDays(current, days))} onChoice={(id) => updateGame((current) => chooseEvent(current, id))} onNextWeek={() => updateGame(startNextWeek)} onSelectPerson={setSelectedPerson} />}
+        {tab === "life" && <LifeView game={game} onAdvance={(days) => updateGame((current) => advanceDays(current, days))} onAction={(action) => updateGame((current) => takeDailyAction(current, action))} onChoice={(id) => updateGame((current) => chooseEvent(current, id))} onNextWeek={() => updateGame(startNextWeek)} onSelectPerson={setSelectedPerson} />}
         {tab === "people" && <PeopleView game={game} onSelectPerson={setSelectedPerson} />}
         {tab === "work" && <WorkView game={game} />}
         {tab === "goals" && <GoalsView game={game} />}
@@ -224,7 +224,7 @@ function Creator({ draft, setDraft, canStart, randomize, start, onImport, import
   );
 }
 
-function LifeView({ game, onAdvance, onChoice, onNextWeek, onSelectPerson }: { game: GameState; onAdvance: (days: 1 | 3 | 7) => void; onChoice: (id: string) => void; onNextWeek: () => void; onSelectPerson: (person: Contact) => void }) {
+function LifeView({ game, onAdvance, onAction, onChoice, onNextWeek, onSelectPerson }: { game: GameState; onAdvance: (days: 1 | 3 | 7) => void; onAction: (action: DailyAction) => void; onChoice: (id: string) => void; onNextWeek: () => void; onSelectPerson: (person: Contact) => void }) {
   const [showResult, setShowResult] = useState(false);
   const date = new Date(game.character.year, 0, (game.week - 1) * 7 + game.day);
   const dateLabel = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric" }).format(date);
@@ -232,6 +232,7 @@ function LifeView({ game, onAdvance, onChoice, onNextWeek, onSelectPerson }: { g
   const featured = game.contacts[0];
   const energyLabel = game.stats.energy >= 70 ? "좋음" : game.stats.energy >= 40 ? "보통" : "피곤함";
   const scheduleLabel = game.phase === "event" ? "이벤트 선택" : game.phase === "summary" ? "주간 정산" : "일상 진행";
+  const actionUsed = (game.actionDays ?? []).includes(`${game.week}-${game.day}`);
   useEffect(() => { setShowResult(Boolean(game.lastChoice)); }, [game.lastChoice]);
   return (
     <>
@@ -248,7 +249,12 @@ function LifeView({ game, onAdvance, onChoice, onNextWeek, onSelectPerson }: { g
       {game.phase === "summary" && <section className="panel summary-panel"><div className="section-kicker">WEEKLY REVIEW</div><h2>이번 주를 돌아봤어요</h2><p>선택과 일정이 생활에 남았어요. 결과는 한 번의 성공이나 실패로 단정되지 않고 다음 주로 이어집니다.</p><div className="summary-chips"><span>에너지 {game.stats.energy}%</span><span>기분 {game.stats.mood}%</span><span>관계 {Math.round(game.contacts.reduce((sum, person) => sum + person.warmth, 0) / game.contacts.length)} 평균</span></div><button className="primary-button" onClick={onNextWeek}>다음 주 시작 <span>→</span></button></section>}
       {game.phase === "playing" && (
         <section className="next-card">
-          <div className="next-copy"><span className="section-kicker">NEXT STEP</span><h2>얼마나 진행할까요?</h2><p>사건이 생기거나 주간 정산에 도달하면 그 지점에서 멈춰요.</p><div className="advance-options">{([1, 3, 7] as const).map((days) => <button className="advance-button" key={days} onClick={() => { setShowResult(false); onAdvance(days); }}><span>{days === 1 ? "하루" : `${days}일`}</span><span className="arrow">→</span></button>)}</div></div>
+          <div className="next-copy"><span className="section-kicker">TODAY · DAILY CHOICE</span><h2>오늘은 어떻게 보낼까요?</h2><p>오늘 행동을 고르면 하루가 진행돼요. 여러 날 진행은 아래에서 선택할 수 있어요.</p><div className="daily-actions">{([
+            ["focus", game.character.background === "worker" ? "업무 집중" : game.character.background === "jobseeker" ? "구직 준비" : "공부하기", "집중도↑ · 체력 소모"],
+            ["rest", "충분히 쉬기", "에너지↑ · 스트레스↓"],
+            ["social", "가까운 사람 만나기", "기분↑ · 관계 온도↑"],
+            ["organize", "생활 정리하기", "집중도↑ · 부담↓"],
+          ] as [DailyAction, string, string][]).map(([action, title, detail]) => <button className="daily-action" key={action} disabled={actionUsed} onClick={() => { setShowResult(false); onAction(action); }}><strong>{title}</strong><small>{actionUsed ? "오늘 행동을 이미 선택했어요" : detail}</small></button>)}</div><div className="advance-options"><span className="fast-forward-label">그냥 진행</span>{([1, 3, 7] as const).map((days) => <button className="advance-button secondary-advance" key={days} onClick={() => { setShowResult(false); onAdvance(days); }}><span>{days === 1 ? "하루" : `${days}일`}</span><span className="arrow">→</span></button>)}</div></div>
         </section>
       )}
       {showResult && game.lastChoice && <div className="toast-result"><span className="toast-check">✓</span><span>{game.lastChoice}</span><button onClick={() => setShowResult(false)} aria-label="닫기">×</button></div>}

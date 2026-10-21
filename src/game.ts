@@ -2,6 +2,7 @@ export type Background = "student" | "jobseeker" | "worker";
 export type Palette = "clean" | "warm" | "dark";
 export type SensitiveTopic = "affair" | "illness" | "pregnancy";
 export type Tab = "life" | "people" | "work" | "goals" | "record";
+export type DailyAction = "focus" | "rest" | "social" | "organize";
 
 export interface Character {
   name: string;
@@ -70,8 +71,10 @@ export interface GameState {
   phase: "playing" | "event" | "summary";
   seed: number;
   evaluatedDays: number[];
+  actionDays?: string[];
   seenEvents: string[];
   recentEventIds?: string[];
+  eventLastSeenWeek?: Record<string, number>;
   npcStoryStages?: Record<string, number>;
   npcStoryLastWeek?: Record<string, number>;
   npcStoryChoices?: Record<string, string>;
@@ -221,12 +224,14 @@ export function getPersonalStoryEvents(state: GameState): LifeEvent[] {
 }
 function nextEligibleEvent(state: GameState): [LifeEvent | undefined, number] {
   const recent = state.recentEventIds ?? [];
+  const lastSeen = state.eventLastSeenWeek ?? {};
   const eligible = [...eventLibrary[state.character.background], ...commonEventLibrary, ...getPersonalStoryEvents(state)].filter((event) => !state.seenEvents.includes(event.id) && (!event.topic || state.settings.topics[event.topic]));
-  const cooled = eligible.filter((event) => !recent.includes(event.id));
-  const options = cooled.length ? cooled : eligible;
+  const cooled = eligible.filter((event) => state.week - (lastSeen[event.id] ?? -100) >= 3 && !recent.includes(event.id));
+  const olderButEligible = eligible.filter((event) => state.week - (lastSeen[event.id] ?? -100) >= 3);
+  const options = cooled.length ? cooled : olderButEligible.length ? olderButEligible : eligible;
   const [afterRoll, roll] = nextRandom(state.seed);
   if (!options.length) return [undefined, afterRoll];
-  const chance = 0.33 + Math.max(0, state.stats.stress - 30) / 300;
+  const chance = 0.42 + Math.max(0, state.stats.stress - 30) / 300;
   if (roll > Math.min(chance, 0.58)) return [undefined, afterRoll];
   const [afterSelect, indexRoll] = nextRandom(afterRoll);
   const totalWeight = options.reduce((sum, event) => sum + (event.personalStory ? 7 : 1), 0);
@@ -267,6 +272,35 @@ export function advanceDays(state: GameState, days: 1 | 3 | 7): GameState {
   }
   return next;
 }
+export function takeDailyAction(state: GameState, action: DailyAction): GameState {
+  if (state.phase !== "playing") return state;
+  const actionDay = `${state.week}-${state.day}`;
+  if ((state.actionDays ?? []).includes(actionDay)) return state;
+  const focusLabel = state.character.background === "worker" ? "업무에 집중했다" : state.character.background === "jobseeker" ? "구직 준비에 집중했다" : "공부에 집중했다";
+  const actionEffects: Record<DailyAction, { log: string; effect: Effect; contactIndex?: number }> = {
+    focus: { log: focusLabel, effect: { focus: 5, energy: -5, stress: 2 } },
+    rest: { log: "일정을 비우고 제대로 쉬었다", effect: { energy: 10, stress: -5, mood: 2 } },
+    social: { log: `${state.contacts[1]?.name ?? "가까운 사람"}과 시간을 보냈다`, effect: { mood: 4, energy: -3, relationship: 3 }, contactIndex: 1 },
+    organize: { log: "생활과 이번 주 계획을 정리했다", effect: { focus: 2, stress: -2, energy: -1 } },
+  };
+  const selected = actionEffects[action];
+  const next: GameState = {
+    ...state,
+    actionDays: [...(state.actionDays ?? []), actionDay],
+    stats: {
+      money: Math.max(0, state.stats.money + (selected.effect.money ?? 0)),
+      energy: clamp(state.stats.energy + (selected.effect.energy ?? 0)),
+      stress: clamp(state.stats.stress + (selected.effect.stress ?? 0)),
+      mood: clamp(state.stats.mood + (selected.effect.mood ?? 0)),
+      focus: clamp(state.stats.focus + (selected.effect.focus ?? 0)),
+    },
+    contacts: state.contacts.map((contact, index) => index === selected.contactIndex
+      ? { ...contact, warmth: clamp(contact.warmth + (selected.effect.relationship ?? 0)), note: selected.log }
+      : contact),
+    log: [selected.log, ...state.log],
+  };
+  return advanceDay(next);
+}
 export function chooseEvent(state: GameState, choiceId: string): GameState {
   if (state.phase !== "event" || !state.pendingEvent) return state;
   const choice = state.pendingEvent.choices.find((item) => item.id === choiceId);
@@ -279,6 +313,7 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
     lastChoice: choice.result,
     seenEvents: [...state.seenEvents, state.pendingEvent.id],
     recentEventIds: [...(state.recentEventIds ?? []), state.pendingEvent.id].slice(-3),
+    eventLastSeenWeek: { ...(state.eventLastSeenWeek ?? {}), [state.pendingEvent.id]: state.week },
     npcStoryStages: state.pendingEvent.personalStory ? {
       ...(state.npcStoryStages ?? {}), [state.pendingEvent.personalStory.contactId]: state.pendingEvent.personalStory.stage + 1,
     } : state.npcStoryStages,
@@ -306,7 +341,7 @@ export function startNextWeek(state: GameState): GameState {
   if (state.phase !== "summary") return state;
   return {
     ...state, week: state.week + 1, day: 1, phase: "playing",
-    evaluatedDays: [], seenEvents: [], lastChoice: undefined,
+    evaluatedDays: [], actionDays: [], seenEvents: [], lastChoice: undefined,
     stats: { ...state.stats, energy: clamp(state.stats.energy + 12), stress: clamp(state.stats.stress - 7) },
     log: [`${state.week + 1}주차가 시작됐다. 지난주의 경험이 생활에 남아 있다.`, ...state.log],
   };

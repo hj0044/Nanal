@@ -82,6 +82,14 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .next-copy p, .panel p, .event-panel p, .goal-card p, .page-title p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .advance-button { min-width: 114px; min-height: 46px; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; gap: 13px; border: 0; border-radius: 12px; background: var(--accent); color: white; font-size: 12px; font-weight: 700; cursor: pointer; }
 .advance-button .arrow { font-size: 18px; }
+.daily-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.daily-action { min-height: 58px; padding: 10px 12px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text); text-align: left; cursor: pointer; }
+.daily-action strong { font-size: 12px; }
+.daily-action small, .fast-forward-label { color: var(--muted); font-size: 10px; }
+.daily-action:hover { border-color: var(--accent); background: var(--accent-soft); }
+.daily-action:disabled { opacity: .55; cursor: not-allowed; }
+.fast-forward-label { align-self: center; margin-right: 2px; }
+.secondary-advance { background: var(--accent-soft); color: var(--accent); }
 .feed-section { margin-top: 27px; }
 .section-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 11px; }
 .section-heading h2 { margin: 5px 0 0; font-size: 18px; letter-spacing: -.04em; }
@@ -211,6 +219,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
   .advance-button { width: 100%; }
   .advance-options { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .advance-options .advance-button { min-width: 0; width: 100%; padding: 0 10px; }
+  .daily-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .event-panel { grid-template-columns: 1fr; }
   .event-icon { width: 34px; height: 34px; }
   .people-grid { grid-template-columns: 1fr; }
