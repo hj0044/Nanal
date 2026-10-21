@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advanceDay, advanceDays, chooseEvent, createGame, generateContacts, startNextWeek, type Character } from "./game";
+import { advanceDay, advanceDays, chooseEvent, createGame, generateContacts, getPersonalStoryEvents, startNextWeek, type Character } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
 
@@ -116,5 +116,22 @@ describe("first week simulation", () => {
     expect(validateGeneratedEvent(candidate, settings)?.choices).toHaveLength(2);
     expect(validateGeneratedEvent({ ...candidate, choices: candidate.choices.map((choice) => ({ ...choice, effect: { money: 500_000 } })) }, settings)).toBeUndefined();
     expect(validateGeneratedEvent({ ...candidate, topic: "affair" }, settings)).toBeUndefined();
+  });
+
+  it("unlocks a named NPC personal story over multiple weeks and preserves the chosen response", () => {
+    let state = createGame(character, 321);
+    state.contacts = state.contacts.map((person, index) => index === 0 ? { ...person, warmth: 90 } : person);
+    const first = getPersonalStoryEvents(state)[0];
+    expect(first?.title).toContain(state.contacts[0].name);
+    state = { ...state, phase: "event", pendingEvent: first };
+    state = chooseEvent(state, "story-plan");
+    expect(state.npcStoryStages?.[state.contacts[0].id]).toBe(1);
+    expect(state.npcStoryChoices?.[state.contacts[0].id]).toBe("story-plan");
+    expect(state.contacts[0].note).toContain(state.contacts[0].name);
+    expect(getPersonalStoryEvents(state).some((event) => event.personalStory?.contactId === state.contacts[0].id)).toBe(false);
+    const nextWeek = { ...state, week: 2 };
+    const followUp = getPersonalStoryEvents(nextWeek)[0];
+    expect(followUp?.personalStory?.stage).toBe(1);
+    expect(followUp?.body).toContain("함께 정리한 계획");
   });
 });
