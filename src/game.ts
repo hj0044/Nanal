@@ -478,13 +478,19 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
   const archived = [...(state.archivedContacts ?? [])];
   let nextContactNumber = state.nextContactNumber ?? (state.contacts.length + archived.length + 1);
   const survivors: Contact[] = [];
-  let departuresThisWeek = 0;
-  for (const [contactIndex, original] of state.contacts.entries()) {
+  for (const original of state.contacts) {
     let contact = original;
     const weeksSinceContact = Math.max(0, state.week - (contact.lastInteractionWeek ?? contact.firstMetWeek ?? 1));
-    if (weeksSinceContact >= 4 && contact.warmth > 20) contact = { ...contact, warmth: Math.max(15, contact.warmth - Math.min(2, Math.floor((weeksSinceContact - 2) / 3))) };
-    if (departuresThisWeek < 1 && weeksSinceContact >= 12 && contact.warmth <= 25 && survivors.length + state.contacts.length - contactIndex > 7) {
-      departuresThisWeek += 1;
+    if (weeksSinceContact >= 4 && contact.warmth > 15) {
+      const weeklyDrift = 0.35 + Math.min(1.1, weeksSinceContact * 0.045);
+      contact = { ...contact, warmth: Math.max(15, contact.warmth - weeklyDrift) };
+    }
+    const tieStrength = /가족|부모|사촌|친척|오래 알고 지낸 친구|친구/.test(contact.role) ? 0.58 : 1;
+    const warmthFactor = contact.warmth <= 25 ? 1.25 : contact.warmth <= 40 ? 0.78 : contact.warmth <= 55 ? 0.38 : 0.12;
+    const timeFactor = weeksSinceContact < 8 ? 0 : 0.008 + Math.min(0.085, (weeksSinceContact - 8) * 0.0065);
+    const [, departureRoll] = nextRandom(state.seed ^ createSeed(`distance:${contact.id}:${state.week}`));
+    const departureChance = timeFactor * warmthFactor * tieStrength;
+    if (departureChance > 0 && departureRoll < departureChance) {
       const departed = { ...contact, archivedWeek: state.week, note: "서로의 생활이 달라져 한동안 연락이 뜸해졌다." };
       archived.push(departed);
       const text = `${contact.name}과(와) 연락이 뜸해져 각자의 생활을 이어가게 됐다. 함께한 기억은 생애기록에 남아 있다.`;
@@ -534,16 +540,22 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
     }
     return { ...contact, goal, goalProgress, goalStage, mood, lastAutonomousAction, goalSupport: Math.max(0, playerSupport - 1), memories };
   });
-  const reunionIndex = archived.findIndex((person) => state.week - (person.archivedWeek ?? state.week) >= 6);
-  const [, reunionRoll] = nextRandom(seed ^ createSeed(`reunion:${state.week}`));
-  if (reunionIndex >= 0 && reunionRoll < 0.18 && contacts.length < 12) {
-    const old = archived.splice(reunionIndex, 1)[0];
+  for (let index = archived.length - 1; index >= 0; index -= 1) {
+    const old = archived[index];
+    const weeksAway = state.week - (old.archivedWeek ?? state.week);
+    if (weeksAway < 6) continue;
+    const [, reunionRoll] = nextRandom(state.seed ^ createSeed(`reunion:${old.id}:${state.week}`));
+    const reunionChance = Math.min(0.16, 0.025 + weeksAway * 0.0025) * (/가족|부모|사촌|친척|친구/.test(old.role) ? 1.25 : 1);
+    if (reunionRoll >= reunionChance) continue;
+    archived.splice(index, 1);
     const returned = { ...old, archivedWeek: undefined, warmth: Math.min(35, Math.max(18, old.warmth - 12)), goalSupport: 0, memories: (old.memories ?? []).map((memory) => ({ ...memory, vividness: Math.min(memory.vividness, 0.28) })), lastInteractionWeek: state.week, returnCount: (old.returnCount ?? 0) + 1, note: "우연히 다시 만나 어색하지만 반갑게 안부를 나눴다." };
     contacts.push(returned);
     const text = `${old.name}과(와) 우연히 다시 만났다. 예전만큼 가깝지는 않지만, 서로의 근황을 나누며 새롭게 관계를 이어가기 시작했다.`;
     logs.push(text);
     records.push({ id: `reunion-${old.id}-${state.week}`, week: state.week, kind: "reunion", contactId: old.id, contactName: old.name, text });
-  } else if (contacts.length < 12) {
+  }
+  const [, arrivalRoll] = nextRandom(state.seed ^ createSeed(`arrival-chance:${state.week}:${nextContactNumber}`));
+  if (arrivalRoll < 0.28) {
     const [nextSeed, roll] = nextRandom(seed ^ createSeed(`arrival:${state.week}:${nextContactNumber}`)); seed = nextSeed;
     const generated = generateContacts(state.character.background, Math.floor(roll * 0xffffffff), state.character.age, [state.character.portraitId ?? ""])[Math.floor(roll * 12)];
     const person: Contact = { ...generated, id: `person-${nextContactNumber++}`, firstMetWeek: state.week, lastInteractionWeek: state.week, returnCount: 0, warmth: 42 + Math.floor(roll * 13), note: "최근 새롭게 알게 된 사람" };
