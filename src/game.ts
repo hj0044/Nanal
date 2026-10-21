@@ -30,6 +30,23 @@ export interface NPCMemory {
   week: number;
   vividness: number;
 }
+export interface WeeklyCashflow {
+  week: number;
+  income: number;
+  expenses: number;
+  unpaidExpenses: number;
+  endingBalance: number;
+}
+export interface WeeklyCashflowPlan {
+  income: number;
+  livingExpenses: number;
+  housingExpenses: number;
+  expenses: number;
+  net: number;
+  incomeLabel: string;
+  expenseLabel: string;
+}
+
 export interface Contact {
   id: string;
   name: string;
@@ -42,6 +59,7 @@ export interface Contact {
   personality?: string;
   goal?: string;
   goalProgress?: number;
+  goalSupport?: number;
   goalStage?: string;
   mood?: string;
   lastAutonomousAction?: string;
@@ -56,6 +74,7 @@ export interface Effect {
   mood?: number;
   focus?: number;
   relationship?: number;
+  goalSupport?: number;
 }
 export interface EventChoice {
   id: string;
@@ -89,6 +108,7 @@ export interface GameState {
   npcStoryStages?: Record<string, number>;
   npcStoryLastWeek?: Record<string, number>;
   npcStoryChoices?: Record<string, string>;
+  weeklyCashflow?: WeeklyCashflow;
   stats: Stats;
   contacts: Contact[];
   log: string[];
@@ -192,7 +212,7 @@ export function generateContacts(background: Background, seed: number, playerAge
     const age = Math.max(19, playerAge + (family ? 10 : senior ? 3 : -2) + Math.floor(ageRoll * 7));
     const portraitId = choosePortraitId(gender, age, next, usedPortraits);
     usedPortraits.push(portraitId);
-    return { id: `person-${i + 1}`, name, role, gender, age, portraitId, portraitAgeBand: getPortrait(portraitId)?.ageBand, occupation: occupations[background][Math.floor(jobRoll * occupations[background].length)], personality: traits[Math.floor(traitRoll * traits.length)], goal: goals[Math.floor(goalRoll * goals.length)], goalProgress: Math.floor(goalRoll * 3), goalStage: ["계획 세우기", "한 걸음 진행", "기회 기다리기"][Math.floor(goalRoll * 3)], mood: "평소와 같음", lastAutonomousAction: "이번 주 계획을 생각하는 중", memories: [], warmth: 46 + Math.floor(value * 23), note: i < 2 ? "최근 연락이 이어지고 있다" : "아직 자세히 알지 못한다" };
+    return { id: `person-${i + 1}`, name, role, gender, age, portraitId, portraitAgeBand: getPortrait(portraitId)?.ageBand, occupation: occupations[background][Math.floor(jobRoll * occupations[background].length)], personality: traits[Math.floor(traitRoll * traits.length)], goal: goals[Math.floor(goalRoll * goals.length)], goalProgress: Math.floor(goalRoll * 3), goalSupport: 0, goalStage: ["계획 세우기", "한 걸음 진행", "기회 기다리기"][Math.floor(goalRoll * 3)], mood: "평소와 같음", lastAutonomousAction: "이번 주 계획을 생각하는 중", memories: [], warmth: 46 + Math.floor(value * 23), note: i < 2 ? "최근 연락이 이어지고 있다" : "아직 자세히 알지 못한다" };
   });
 }
 export function createGame(character: Character, seed = createSeed(`${character.name}:${character.year}:${character.age}:${character.background}`)): GameState {
@@ -208,6 +228,41 @@ export function createGame(character: Character, seed = createSeed(`${character.
   };
 }
 function clamp(value: number, min = 0, max = 100): number { return Math.max(min, Math.min(max, value)); }
+const weeklyCashflowProfiles: Record<Background, { income: number; livingExpenses: number; incomeLabel: string; expenseLabel: string }> = {
+  student: { income: 150_000, livingExpenses: 155_000, incomeLabel: "용돈·아르바이트", expenseLabel: "식비·교통·학업" },
+  jobseeker: { income: 80_000, livingExpenses: 180_000, incomeLabel: "단기 일·가족 지원", expenseLabel: "식비·교통·구직 준비" },
+  worker: { income: 600_000, livingExpenses: 340_000, incomeLabel: "급여", expenseLabel: "식비·교통·생활" },
+};
+const weeklyHousingExpenses: Record<string, number> = {
+  "가족과 동거": 0, "기숙사": 45_000, "전세·월세 동거": 85_000, "자취": 130_000,
+};
+export function getWeeklyCashflowPlan(character: Character): WeeklyCashflowPlan {
+  const profile = weeklyCashflowProfiles[character.background];
+  const housingExpenses = weeklyHousingExpenses[character.housing] ?? 85_000;
+  const expenses = profile.livingExpenses + housingExpenses;
+  return {
+    income: profile.income, livingExpenses: profile.livingExpenses, housingExpenses, expenses,
+    net: profile.income - expenses, incomeLabel: profile.incomeLabel, expenseLabel: profile.expenseLabel,
+  };
+}
+function settleWeeklyCashflow(state: GameState): GameState {
+  if (state.weeklyCashflow?.week === state.week) return state;
+  const plan = getWeeklyCashflowPlan(state.character);
+  const available = state.stats.money + plan.income;
+  const unpaidExpenses = Math.max(0, plan.expenses - available);
+  const endingBalance = Math.max(0, available - plan.expenses);
+  const cashflow: WeeklyCashflow = {
+    week: state.week, income: plan.income, expenses: plan.expenses, unpaidExpenses, endingBalance,
+  };
+  const line = unpaidExpenses > 0
+    ? `${state.week}주차 정산 · 수입 +${plan.income.toLocaleString("ko-KR")}원 / 지출 ${plan.expenses.toLocaleString("ko-KR")}원 · 미납 ${unpaidExpenses.toLocaleString("ko-KR")}원`
+    : `${state.week}주차 정산 · 수입 +${plan.income.toLocaleString("ko-KR")}원 / 지출 -${plan.expenses.toLocaleString("ko-KR")}원`;
+  return {
+    ...state, weeklyCashflow: cashflow,
+    stats: { ...state.stats, money: endingBalance, stress: clamp(state.stats.stress + (unpaidExpenses > 0 ? 5 : 0)) },
+    log: [line, ...state.log],
+  };
+}
 function personalStoryKind(contact: Contact): "family" | "work" | "friendship" | "goal" {
   if (/가족|사촌|친척|이웃/.test(contact.role)) return "family";
   if (/동료|직장|업무|선배|협력자/.test(contact.role)) return "work";
@@ -219,7 +274,7 @@ export function getPersonalStoryEvents(state: GameState): LifeEvent[] {
   const lastWeeks = state.npcStoryLastWeek ?? {};
   const eligible = state.contacts
     .map((contact, index) => ({ contact, index, stage: stages[contact.id] ?? 0 }))
-    .filter(({ contact, stage }) => stage < 3 && contact.warmth >= (stage === 0 ? 63 : stage === 1 ? 52 : 58) && (lastWeeks[contact.id] ?? 0) < state.week)
+    .filter(({ contact, stage }) => stage < 3 && (contact.warmth >= (stage === 0 ? 63 : stage === 1 ? 52 : 58) || (contact.goalSupport ?? 0) >= 1) && (lastWeeks[contact.id] ?? 0) < state.week)
     .sort((a, b) => b.contact.warmth - a.contact.warmth || a.index - b.index);
   const selected = eligible[0];
   if (!selected) return [];
@@ -230,24 +285,24 @@ export function getPersonalStoryEvents(state: GameState): LifeEvent[] {
   const goal = contact.goal ?? "자기만의 방향을 찾는 일";
   const previousChoice = (state.npcStoryChoices ?? {})[contact.id];
   const context = kind === "family" ? "가족의 돌봄과 생활비 문제" : kind === "work" ? "업무 변화와 앞으로의 진로" : kind === "friendship" ? "가까운 관계와 자신의 생활" : goal;
-  const npcUpdate = `${name}은(는) “${goal}”에 신경 쓰고 있고, 요즘 ${contact.mood ?? "평소와 같은 상태"}라고 한다.`;
+  const npcUpdate = `${name}은(는) “${goal}”에 신경 쓰고 있고, 요즘 ${contact.mood ?? "평소와 같은 상태"}라고 한다.${(contact.goalSupport ?? 0) >= 1 ? " 네가 건넨 응원이 다음 걸음을 고민하는 데 도움이 됐다고 한다." : ""}`;
   const stageCopy = stage === 0
     ? `${name}이 평소보다 진지한 표정으로 이야기를 꺼냈다. ${npcUpdate} 요즘 ${context} 때문에 고민이 있지만, 누구에게 어떻게 말해야 할지 몰랐다고 한다.`
     : stage === 1
       ? `${name}이 지난번 대화를 기억하며 다시 연락했다. ${previousChoice === "story-listen" ? "그때 충분히 들어준 덕분에 마음을 정리할 수 있었다고 한다." : previousChoice === "story-plan" ? "함께 정리한 계획을 실제로 시도해봤다고 한다." : "서두르지 않고 생각해본 뒤 작은 결정을 내렸다고 한다."} ${npcUpdate} 이제 다음에 무엇을 할지 이야기하고 싶어 한다.`
       : `${name}이 중요한 결정을 내린 뒤 근황을 전했다. ${npcUpdate} ${context}에 대한 고민이 완전히 사라진 것은 아니지만, 이제는 자신의 선택을 조금 더 믿게 됐다고 한다.`;
   const choices: EventChoice[] = stage === 0 ? [
-    { id: "story-listen", title: "해결책보다 먼저 충분히 들어준다", detail: "감정을 받아들이고 속도를 맞춘다", result: `${name}의 이야기를 끊지 않고 들었다. ${name}은 마음을 털어놓을 사람이 있다는 것만으로도 한결 편해졌다고 했다.`, effect: { mood: 3, stress: -2, relationship: 5 }, contactIndex: index },
-    { id: "story-plan", title: "함께 가능한 선택지를 정리한다", detail: "현실적인 다음 행동을 찾는다", result: `${name}과 상황을 나눠 보고 할 수 있는 일을 정리했다. ${name}은 작은 것부터 시도해보기로 했다.`, effect: { focus: 3, relationship: 4 }, contactIndex: index },
-    { id: "story-space", title: "지금 당장 결론 내리지 않아도 된다고 말한다", detail: "조언을 강요하지 않고 시간을 준다", result: `${name}이 스스로 생각을 정리할 시간을 가질 수 있도록 했다. 부담 없이 다시 이야기하기로 약속했다.`, effect: { stress: -2, relationship: 3 }, contactIndex: index },
+    { id: "story-listen", title: "해결책보다 먼저 충분히 들어준다", detail: "감정을 받아들이고 속도를 맞춘다", result: `${name}의 이야기를 끊지 않고 들었다. ${name}은 마음을 털어놓을 사람이 있다는 것만으로도 한결 편해졌다고 했다.`, effect: { mood: 3, stress: -2, relationship: 5, goalSupport: 1 }, contactIndex: index },
+    { id: "story-plan", title: "함께 가능한 선택지를 정리한다", detail: "현실적인 다음 행동을 찾는다", result: `${name}과 상황을 나눠 보고 할 수 있는 일을 정리했다. ${name}은 작은 것부터 시도해보기로 했다.`, effect: { focus: 3, relationship: 4, goalSupport: 2 }, contactIndex: index },
+    { id: "story-space", title: "지금 당장 결론 내리지 않아도 된다고 말한다", detail: "조언을 강요하지 않고 시간을 준다", result: `${name}이 스스로 생각을 정리할 시간을 가질 수 있도록 했다. 부담 없이 다시 이야기하기로 약속했다.`, effect: { stress: -2, relationship: 3, goalSupport: 1 }, contactIndex: index },
   ] : stage === 1 ? [
-    { id: "story-encourage", title: "시도한 점을 인정하고 응원한다", detail: "결과보다 용기와 노력을 본다", result: `${name}이 직접 움직인 점을 함께 돌아봤다. 완벽하지 않아도 계속해볼 힘을 얻었다고 했다.`, effect: { mood: 4, relationship: 4 }, contactIndex: index },
-    { id: "story-adjust", title: "잘되지 않은 부분을 같이 조정한다", detail: "다른 방법과 도움을 찾아본다", result: `${name}이 막힌 부분을 함께 살펴보고 계획을 조금 바꿨다. 혼자 해결해야 한다는 부담이 줄었다.`, effect: { focus: 3, stress: -2, relationship: 3 }, contactIndex: index },
-    { id: "story-follow", title: "앞으로 필요한 도움을 구체적으로 묻는다", detail: "필요한 만큼 돕고 경계를 존중한다", result: `${name}에게 어떤 도움이 실제로 필요한지 물었다. 서로 감당 가능한 범위를 정했다.`, effect: { stress: -1, relationship: 4 }, contactIndex: index },
+    { id: "story-encourage", title: "시도한 점을 인정하고 응원한다", detail: "결과보다 용기와 노력을 본다", result: `${name}이 직접 움직인 점을 함께 돌아봤다. 완벽하지 않아도 계속해볼 힘을 얻었다고 했다.`, effect: { mood: 4, relationship: 4, goalSupport: 1 }, contactIndex: index },
+    { id: "story-adjust", title: "잘되지 않은 부분을 같이 조정한다", detail: "다른 방법과 도움을 찾아본다", result: `${name}이 막힌 부분을 함께 살펴보고 계획을 조금 바꿨다. 혼자 해결해야 한다는 부담이 줄었다.`, effect: { focus: 3, stress: -2, relationship: 3, goalSupport: 2 }, contactIndex: index },
+    { id: "story-follow", title: "앞으로 필요한 도움을 구체적으로 묻는다", detail: "필요한 만큼 돕고 경계를 존중한다", result: `${name}에게 어떤 도움이 실제로 필요한지 물었다. 서로 감당 가능한 범위를 정했다.`, effect: { stress: -1, relationship: 4, goalSupport: 1 }, contactIndex: index },
   ] : [
-    { id: "story-celebrate", title: "작은 변화라도 함께 축하한다", detail: "성과를 인정하고 관계를 이어간다", result: `${name}의 결정을 함께 기뻐했다. 두 사람은 앞으로도 중요한 변화를 나누기로 했다.`, effect: { mood: 5, relationship: 5 }, contactIndex: index },
-    { id: "story-reflect", title: "과정에서 배운 점을 서로 나눈다", detail: "경험을 다음 선택의 밑거름으로 삼는다", result: `${name}과 지나온 과정을 돌아봤다. 고민이 남아 있어도 대응할 방법을 알게 됐다는 점을 확인했다.`, effect: { focus: 3, relationship: 4 }, contactIndex: index },
-    { id: "story-continue", title: "앞으로도 편하게 연락하자고 약속한다", detail: "필요할 때 이어질 관계를 만든다", result: `${name}과 앞으로도 부담 없이 안부를 나누기로 했다. 서로의 생활을 존중하며 관계를 이어간다.`, effect: { stress: -2, relationship: 4 }, contactIndex: index },
+    { id: "story-celebrate", title: "작은 변화라도 함께 축하한다", detail: "성과를 인정하고 관계를 이어간다", result: `${name}의 결정을 함께 기뻐했다. 두 사람은 앞으로도 중요한 변화를 나누기로 했다.`, effect: { mood: 5, relationship: 5, goalSupport: 1 }, contactIndex: index },
+    { id: "story-reflect", title: "과정에서 배운 점을 서로 나눈다", detail: "경험을 다음 선택의 밑거름으로 삼는다", result: `${name}과 지나온 과정을 돌아봤다. 고민이 남아 있어도 대응할 방법을 알게 됐다는 점을 확인했다.`, effect: { focus: 3, relationship: 4, goalSupport: 1 }, contactIndex: index },
+    { id: "story-continue", title: "앞으로도 편하게 연락하자고 약속한다", detail: "필요할 때 이어질 관계를 만든다", result: `${name}과 앞으로도 부담 없이 안부를 나누기로 했다. 서로의 생활을 존중하며 관계를 이어간다.`, effect: { stress: -2, relationship: 4, goalSupport: 1 }, contactIndex: index },
   ];
   return [{
     id, title: stage === 0 ? `${name}이 속마음을 털어놓았다` : stage === 1 ? `${name}이 그날의 대화를 기억하고 있다` : `${name}의 고민에 한 단락이 더해졌다`,
