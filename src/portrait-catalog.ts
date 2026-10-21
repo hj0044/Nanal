@@ -62,10 +62,32 @@ export function getPortrait(id?: string): PortraitRecord | undefined {
   return portraitCatalog.find((portrait) => portrait.id === id);
 }
 
-export function getPortraitImageUrl(id?: string): string {
+// This is a public image-delivery URL, not an API key. The original assets remain available.
+export function getImageKitPortraitUrl(endpoint: string | undefined, filename: string, directory = "nanal/portraits"): string | null {
+  if (!endpoint?.trim()) return null;
+  try {
+    const base = new URL(endpoint.trim());
+    if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) return null;
+    const segments = [...directory.split("/"), filename].filter(Boolean);
+    if (segments.some((segment) => segment === "." || segment === "..")) return null;
+    return `${base.toString().replace(/\/+$/, "")}/${segments.map(encodeURIComponent).join("/")}`;
+  } catch { return null; }
+}
+
+export function getPortraitFallbackImageUrl(id?: string): string {
   const portrait = getPortrait(id) ?? portraitCatalog[0];
   if (portrait.source === "atlas") return atlasUrl;
   return imageUrls[`./assets/character-portraits/${portrait.filename}`] ?? atlasUrl;
+}
+
+export function getPortraitImageUrl(id?: string): string {
+  const portrait = getPortrait(id) ?? portraitCatalog[0];
+  const filename = portrait.source === "atlas" ? "npc-portrait-atlas-v1.webp" : portrait.filename;
+  return getImageKitPortraitUrl(
+    import.meta.env.VITE_IMAGEKIT_URL_ENDPOINT,
+    filename ?? "npc-portrait-atlas-v1.webp",
+    import.meta.env.VITE_IMAGEKIT_PORTRAIT_PATH || "nanal/portraits",
+  ) ?? getPortraitFallbackImageUrl(id);
 }
 
 export function choosePortraitId(gender: PersonGender, age: number, seed: number, excluded: string[] = []): string {
