@@ -305,7 +305,7 @@ export function advanceDays(state: GameState, days: 1 | 3 | 7): GameState {
   }
   return next;
 }
-export function takeDailyAction(state: GameState, action: DailyAction): GameState {
+export function takeDailyAction(state: GameState, action: DailyAction, targetContactId?: string): GameState {
   if (state.phase !== "playing") return state;
   const actionDay = `${state.week}-${state.day}`;
   if ((state.actionDays ?? []).includes(actionDay)) return state;
@@ -313,10 +313,16 @@ export function takeDailyAction(state: GameState, action: DailyAction): GameStat
   const actionEffects: Record<DailyAction, { log: string; effect: Effect; contactIndex?: number }> = {
     focus: { log: focusLabel, effect: { focus: 5, energy: -5, stress: 2 } },
     rest: { log: "일정을 비우고 제대로 쉬었다", effect: { energy: 10, stress: -5, mood: 2 } },
-    social: { log: `${state.contacts[1]?.name ?? "가까운 사람"}과 시간을 보냈다`, effect: { mood: 4, energy: -3, relationship: 3 }, contactIndex: 1 },
+    social: { log: "가까운 사람과 시간을 보냈다", effect: { mood: 4, energy: -3, relationship: 3 }, contactIndex: 1 },
     organize: { log: "생활과 이번 주 계획을 정리했다", effect: { focus: 2, stress: -2, energy: -1 } },
   };
   const selected = actionEffects[action];
+  const selectedContactIndex = action === "social" && targetContactId
+    ? state.contacts.findIndex((contact) => contact.id === targetContactId)
+    : selected.contactIndex;
+  const actionLog = action === "social" && selectedContactIndex !== undefined && selectedContactIndex >= 0
+    ? `${state.contacts[selectedContactIndex].name}과 시간을 보냈다`
+    : selected.log;
   const next: GameState = {
     ...state,
     actionDays: [...(state.actionDays ?? []), actionDay],
@@ -327,10 +333,10 @@ export function takeDailyAction(state: GameState, action: DailyAction): GameStat
       mood: clamp(state.stats.mood + (selected.effect.mood ?? 0)),
       focus: clamp(state.stats.focus + (selected.effect.focus ?? 0)),
     },
-    contacts: state.contacts.map((contact, index) => index === selected.contactIndex
-      ? { ...contact, warmth: clamp(contact.warmth + (selected.effect.relationship ?? 0)), note: selected.log, memories: addNpcMemory(contact, selected.log, state.week) }
+    contacts: state.contacts.map((contact, index) => index === selectedContactIndex
+      ? { ...contact, warmth: clamp(contact.warmth + (selected.effect.relationship ?? 0)), note: actionLog, memories: addNpcMemory(contact, actionLog, state.week) }
       : contact),
-    log: [selected.log, ...state.log],
+    log: [actionLog, ...state.log],
   };
   return advanceDay(next);
 }
