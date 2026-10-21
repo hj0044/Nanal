@@ -113,13 +113,23 @@ export const backgroundLabels: Record<Background, string> = {
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { choosePortraitId, getPortrait } from "./portrait-catalog";
 
-const firstNames = ["지우", "서준", "하은", "민재", "수빈", "도윤", "예린", "현우", "유진", "지민", "은서", "준호", "채원", "시우", "다은", "건우", "소연", "태민", "나연", "우진"];
+// Keep generated names aligned with the character's selected gender. Korean names
+// can be unisex, so these pools favor names commonly associated with each gender.
+const firstNamesByGender: Record<Character["gender"], string[]> = {
+  여성: ["하은", "예린", "은서", "채원", "다은", "소연", "나연", "서윤", "예진", "유나", "하린", "수아", "지은", "수빈", "아린", "민서", "지원", "다현"],
+  남성: ["서준", "민준", "도윤", "현우", "준호", "건우", "태민", "우진", "시우", "민재", "도현", "지훈", "준서", "정우", "승현", "재현", "성민", "동현"],
+};
 const roles: Record<Background, string[]> = {
   student: ["같은 수업을 듣는 동기", "오래 알고 지낸 친구", "가족", "동아리 선배", "수업 팀원", "아르바이트 동료", "고등학교 친구", "학과 지인", "사촌", "스터디 구성원", "이웃", "온라인으로 알게 된 지인"],
   jobseeker: ["관심 분야를 아는 선배", "오래 알고 지낸 친구", "가족", "스터디 구성원", "이전 아르바이트 동료", "학교 선배", "친척", "취업 커뮤니티 지인", "동네 친구", "교육 과정 동기", "예전 직장 동료", "소개로 알게 된 지인"],
   worker: ["같은 팀 동료", "오래 알고 지낸 친구", "가족", "직장 선배", "이전 직장 동료", "학교 친구", "친척", "취미 모임 지인", "이웃", "업무 협력자", "동기", "소개로 알게 된 지인"],
 };
 const surnames = ["김", "이", "박", "최", "정", "강", "조", "윤", "장", "임"];
+const allGeneratedFirstNames = new Set(Object.values(firstNamesByGender).flat());
+const oppositeGenderNames: Record<Character["gender"], Set<string>> = {
+  여성: new Set(firstNamesByGender.남성),
+  남성: new Set(firstNamesByGender.여성),
+};
 const traits = ["차분하고 신중한", "활발하고 솔직한", "다정하고 세심한", "현실적이고 믿음직한", "호기심 많고 낙천적인", "조용하지만 끈기 있는"];
 const goals = ["관심 분야에서 자기 길 찾기", "일과 휴식의 균형 맞추기", "경제적으로 조금 더 독립하기", "오래 갈 관계를 만들어가기", "새로운 경험과 기회 넓히기", "꾸준히 실력을 쌓아가기"];
 const occupations: Record<Background, string[]> = {
@@ -141,22 +151,33 @@ function nextRandom(state: number): [number, number] {
   const next = x >>> 0;
   return [next, next / 4294967296];
 }
+export function generateName(gender: Character["gender"], seed: number): string {
+  const [, surnameRoll] = nextRandom(seed);
+  const [, firstNameRoll] = nextRandom(seed ^ 0x9e3779b9);
+  const firstNames = firstNamesByGender[gender];
+  return `${surnames[Math.floor(surnameRoll * surnames.length)]}${firstNames[Math.floor(firstNameRoll * firstNames.length)]}`;
+}
+export function normalizeContactName(name: string, gender: Character["gender"], seed: number): string {
+  const givenName = name.slice(-2);
+  if (!allGeneratedFirstNames.has(givenName) || !oppositeGenderNames[gender].has(givenName)) return name;
+  return `${name.slice(0, -2)}${firstNamesByGender[gender][seed % firstNamesByGender[gender].length]}`;
+}
 export function generateContacts(background: Background, seed: number, playerAge = 24, excludedPortraitIds: string[] = []): Contact[] {
   let state = seed;
   const usedPortraits = [...excludedPortraitIds];
   return roles[background].map((role, i) => {
     const [next, value] = nextRandom(state + i + 1);
-    const [afterName, nameRoll] = nextRandom(next);
+    const [afterName] = nextRandom(next);
     const [, genderRoll] = nextRandom(afterName);
     const [afterTrait, traitRoll] = nextRandom(afterName + 101);
     const [afterGoal, goalRoll] = nextRandom(afterTrait + 211);
     const [afterJob, jobRoll] = nextRandom(afterGoal + 307);
     const [, ageRoll] = nextRandom(afterJob + 401);
     state = next;
-    const name = `${surnames[Math.floor(value * surnames.length)]}${firstNames[Math.floor(nameRoll * firstNames.length)]}`;
+    const gender = genderRoll < 0.5 ? "여성" : "남성";
+    const name = generateName(gender, afterName);
     const family = /가족|사촌|친척/.test(role);
     const senior = /선배|부모|가족|친척/.test(role);
-    const gender = genderRoll < 0.5 ? "여성" : "남성";
     const age = Math.max(19, playerAge + (family ? 10 : senior ? 3 : -2) + Math.floor(ageRoll * 7));
     const portraitId = choosePortraitId(gender, age, next, usedPortraits);
     usedPortraits.push(portraitId);
