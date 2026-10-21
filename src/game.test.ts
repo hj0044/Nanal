@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { advanceDay, advanceDays, chooseEvent, createGame, createInitialNPCRelationships, generateBodyMetrics, generateContacts, getContactAffiliation, getNpcReunionEvents, getPersonalStoryEvents, getPlayerAffiliation, getRelationshipProfile, getWeeklyCashflowPlan, normalizeContactName, startNextWeek, takeDailyAction, type Character } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
-import { getPortrait, portraitCatalog } from "./portrait-catalog";
+import { getImageKitPortraitUrl, getPortrait, portraitCatalog } from "./portrait-catalog";
 
 const character: Character = {
   name: "지우", age: 24, year: 2024, background: "student",
@@ -14,6 +14,14 @@ function finishWeek(state: ReturnType<typeof createGame>) {
 }
 
 describe("first week simulation", () => {
+  it("constructs ImageKit CDN links safely without changing existing portrait IDs", () => {
+    expect(getImageKitPortraitUrl("https://ik.imagekit.io/demo/", "face-01.webp")).toBe("https://ik.imagekit.io/demo/nanal/portraits/face-01.webp");
+    expect(getImageKitPortraitUrl("https://ik.imagekit.io/demo", "npc-portrait-atlas-v1.webp", "/nanal/portraits/")).toBe("https://ik.imagekit.io/demo/nanal/portraits/npc-portrait-atlas-v1.webp");
+    expect(getImageKitPortraitUrl(undefined, "face.webp")).toBeNull();
+    expect(getImageKitPortraitUrl("http://ik.imagekit.io/demo", "face.webp")).toBeNull();
+    expect(getImageKitPortraitUrl("https://ik.imagekit.io/demo?token=secret", "face.webp")).toBeNull();
+  });
+
   it("keeps generated NPC names consistent with gender and repairs old mismatched names", () => {
     for (let seed = 0; seed < 100; seed += 1) {
       const contacts = generateContacts("student", seed);
