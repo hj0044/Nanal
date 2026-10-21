@@ -77,7 +77,14 @@ export function choosePortraitId(gender: PersonGender, age: number, seed: number
     const nearest = Math.min(...pool.map((item) => age < item.ageMin ? item.ageMin - age : age > item.ageMax ? age - item.ageMax : 0));
     return distance === nearest;
   });
-  return candidates[(seed >>> 0) % candidates.length].id;
+  // Mix the game seed before indexing so nearby seeds don't merely cycle by
+  // the catalog length. This keeps assignment reproducible within a save while
+  // making new-game seeds distribute portraits across the eligible pool.
+  let mixed = (seed >>> 0) ^ 0x9e3779b9;
+  mixed = Math.imul(mixed ^ (mixed >>> 16), 0x7feb352d);
+  mixed = Math.imul(mixed ^ (mixed >>> 15), 0x846ca68b);
+  mixed = (mixed ^ (mixed >>> 16)) >>> 0;
+  return candidates[mixed % candidates.length].id;
 }
 
 export function portraitPosition(id?: string): string {

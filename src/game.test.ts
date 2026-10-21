@@ -38,6 +38,18 @@ describe("first week simulation", () => {
     expect(new Set(individual.map((portrait) => portrait.characterId)).size).toBe(individual.length);
   });
 
+  it("reassigns portraits for a new game seed but keeps each save reproducible", () => {
+    const first = createGame(character, 48291);
+    const replay = createGame(character, 48291);
+    const fresh = createGame(character, 918273);
+    const portraits = (game: ReturnType<typeof createGame>) => [game.character.portraitId, ...game.contacts.map((person) => person.portraitId)];
+    expect(portraits(replay)).toEqual(portraits(first));
+    expect(portraits(fresh)).not.toEqual(portraits(first));
+    expect(fresh.character.portraitId).not.toBe(first.character.portraitId);
+    expect(fresh.contacts.every((person) => getPortrait(person.portraitId)?.gender === person.gender)).toBe(true);
+    expect(fresh.contacts.every((person) => getPortrait(person.portraitId) && person.age! >= getPortrait(person.portraitId)!.ageMin && person.age! <= getPortrait(person.portraitId)!.ageMax)).toBe(true);
+  });
+
   it("keeps all twelve contact portraits unique across a range of seeds", () => {
     for (let seed = 0; seed < 40; seed += 1) {
       const portraits = generateContacts("worker", seed, 28).map((person) => person.portraitId);
