@@ -233,6 +233,7 @@ function LifeView({ game, onAdvance, onAction, onChoice, onNextWeek, onSelectPer
   const energyLabel = game.stats.energy >= 70 ? "좋음" : game.stats.energy >= 40 ? "보통" : "피곤함";
   const scheduleLabel = game.phase === "event" ? "이벤트 선택" : game.phase === "summary" ? "주간 정산" : "일상 진행";
   const actionUsed = (game.actionDays ?? []).includes(`${game.week}-${game.day}`);
+  const notableNpc = [...game.contacts].sort((a, b) => b.warmth - a.warmth)[0];
   useEffect(() => { setShowResult(Boolean(game.lastChoice)); }, [game.lastChoice]);
   return (
     <>
@@ -246,7 +247,7 @@ function LifeView({ game, onAdvance, onAction, onChoice, onNextWeek, onSelectPer
         <StatCard label="오늘 일정" value={scheduleLabel} detail={`${game.day}일째 · ${game.phase === "playing" ? "하루 진행 가능" : "확인 필요"}`} tone="violet" />
       </section>
       {game.phase === "event" && game.pendingEvent && <EventPanel event={game.pendingEvent} onChoice={onChoice} />}
-      {game.phase === "summary" && <section className="panel summary-panel"><div className="section-kicker">WEEKLY REVIEW</div><h2>이번 주를 돌아봤어요</h2><p>선택과 일정이 생활에 남았어요. 결과는 한 번의 성공이나 실패로 단정되지 않고 다음 주로 이어집니다.</p><div className="summary-chips"><span>에너지 {game.stats.energy}%</span><span>기분 {game.stats.mood}%</span><span>관계 {Math.round(game.contacts.reduce((sum, person) => sum + person.warmth, 0) / game.contacts.length)} 평균</span></div><button className="primary-button" onClick={onNextWeek}>다음 주 시작 <span>→</span></button></section>}
+      {game.phase === "summary" && <section className="panel summary-panel"><div className="section-kicker">WEEKLY REVIEW</div><h2>이번 주를 돌아봤어요</h2><p>선택과 일정이 생활에 남았어요. 결과는 한 번의 성공이나 실패로 단정되지 않고 다음 주로 이어집니다.</p>{notableNpc && <p className="npc-weekly-note"><strong>{notableNpc.name}의 한 주</strong> · {notableNpc.lastAutonomousAction ?? notableNpc.note} 지금은 “{notableNpc.goal ?? "자기만의 방향 찾기"}” 목표를 {notableNpc.goalStage ?? "살펴보는 중"}이고, {notableNpc.mood ?? "평소와 같은 상태"}예요.</p>}<div className="summary-chips"><span>에너지 {game.stats.energy}%</span><span>기분 {game.stats.mood}%</span><span>관계 {Math.round(game.contacts.reduce((sum, person) => sum + person.warmth, 0) / game.contacts.length)} 평균</span></div><button className="primary-button" onClick={onNextWeek}>다음 주 시작 <span>→</span></button></section>}
       {game.phase === "playing" && (
         <section className="next-card">
           <div className="next-copy"><span className="section-kicker">TODAY · DAILY CHOICE</span><h2>오늘은 어떻게 보낼까요?</h2><p>오늘 행동을 고르면 하루가 진행돼요. 여러 날 진행은 아래에서 선택할 수 있어요.</p><div className="daily-actions">{([
