@@ -181,8 +181,7 @@ function nextEvent(state: GameState): StoryEvent | null {
   return structuredClone(pool[Math.floor(draw(state) * pool.length)]);
 }
 function addLog(state: GameState, category: string, text: string) {
-  state.log.unshift({ id: `${state.week}-${state.log.length}-${state.rngState}`, week: state.week, category, text });
-  state.log = state.log.slice(0, 80);
+  state.log.unshift({ id: `${state.id}-log-${state.week}-${state.log.length}`, week: state.week, category, text });
 }
 
 export function createGame(input: { name: string; age: number; year: number; background: Background; seedText?: string }): GameState {
@@ -325,12 +324,13 @@ export function finishWeek(state: GameState): GameState {
     }
      return updated;
   });
-  next.week += 1;
-  if (next.week > 52) { next.year += 1; next.week = 1; }
-  next.actionsLeft = 2;
+  const completedWeek = next.week;
   next.lastWeekSummary = summary;
-  addLog(next, "주간 정리", `제 ${next.week - 1}주가 끝났어요. 현금 흐름과 인물들의 한 주를 정리했습니다.`);
-  if ((next.week - 1) % 4 === 0) addLog(next, "월말 정산", `한 달이 지났어요. 이번 달의 선택과 관계 변화를 돌아볼 수 있습니다.`);
+  addLog(next, "주간 정리", `제 ${completedWeek}주가 끝났어요. 현금 흐름과 인물들의 한 주를 정리했습니다.`);
+  if (completedWeek % 4 === 0) addLog(next, "월말 정산", `한 달이 지났어요. 이번 달의 선택과 관계 변화를 돌아볼 수 있습니다.`);
+  next.week += 1;
+  if (next.week > 52) { next.year += 1; next.week = 1; next.age = Math.min(99, next.age + 1); }
+  next.actionsLeft = 2;
   next.pendingEvent = nextEvent(next);
   return next;
 }
