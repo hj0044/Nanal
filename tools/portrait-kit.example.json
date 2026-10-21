@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "kitId": "adult-female-v1",
+  "template": "template.png",
+  "size": [1024, 1024],
+  "gender": "여성",
+  "ageEstimate": {"min": 20, "max": 39},
+  "masks": {
+    "face": "masks/face.png",
+    "hair_front": "masks/hair_front.png",
+    "hair_back": "masks/hair_back.png",
+    "body": "masks/body.png",
+    "outfit": "masks/outfit.png"
+  },
+  "bodyMasks": {
+    "slim": "masks/body-slim.png",
+    "average": "masks/body-average.png"
+  },
+  "outfitMasks": {
+    "slim": "masks/outfit-slim.png",
+    "average": "masks/outfit-average.png"
+  },
+  "variants": {
+    "face": {
+      "f01": "subtle oval face, softly arched eyebrows, almond-shaped eyes",
+      "f02": "rounder cheekbones, narrower nose bridge, calm eyes",
+      "f03": "defined jawline, broader nose, slightly hooded eyes"
+    },
+    "hair": {
+      "h01": "short dark brown bob, natural stray strands",
+      "h02": "medium black layered hair, loose side part",
+      "h03": "long dark hair, natural straight fall",
+      "h04": "tied-back hair, neat hairline"
+    },
+    "body": {
+      "slim": "slim adult upper torso and narrow shoulders, same neck alignment",
+      "average": "average adult upper torso and natural shoulders, same neck alignment"
+    },
+    "outfit": {
+      "casual": "contemporary casual crewneck top with realistic fabric folds",
+      "office": "neat office-casual collared shirt with realistic seams",
+      "jacket": "neutral cardigan over a plain shirt, soft fabric shadows"
+    }
+  }
+}
