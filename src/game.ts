@@ -346,8 +346,7 @@ export function advanceDay(state: GameState): GameState {
   }
   next.log.unshift(`${next.week}주차 ${next.day}일 · 큰 일정 없이 하루를 보냈다.`);
   if (next.day >= 7) {
-    next.phase = "summary";
-    return next;
+    return { ...settleWeeklyCashflow(next), phase: "summary" };
   }
   next.day += 1;
   return next;
@@ -372,8 +371,11 @@ export function takeDailyAction(state: GameState, action: DailyAction, targetCon
     organize: { log: "생활과 이번 주 계획을 정리했다", effect: { focus: 2, stress: -2, energy: -1 } },
   };
   const selected = actionEffects[action];
-  const selectedContactIndex = action === "social" && targetContactId
+  const requestedContactIndex = action === "social" && targetContactId
     ? state.contacts.findIndex((contact) => contact.id === targetContactId)
+    : -1;
+  const selectedContactIndex = action === "social"
+    ? requestedContactIndex >= 0 ? requestedContactIndex : selected.contactIndex
     : selected.contactIndex;
   const actionLog = action === "social" && selectedContactIndex !== undefined && selectedContactIndex >= 0
     ? `${state.contacts[selectedContactIndex].name}과 시간을 보냈다`
@@ -389,7 +391,7 @@ export function takeDailyAction(state: GameState, action: DailyAction, targetCon
       focus: clamp(state.stats.focus + (selected.effect.focus ?? 0)),
     },
     contacts: state.contacts.map((contact, index) => index === selectedContactIndex
-      ? { ...contact, warmth: clamp(contact.warmth + (selected.effect.relationship ?? 0)), note: actionLog, memories: addNpcMemory(contact, actionLog, state.week) }
+      ? { ...contact, warmth: clamp(contact.warmth + (selected.effect.relationship ?? 0)), goalSupport: clamp((contact.goalSupport ?? 0) + 1, 0, 3), note: actionLog, memories: addNpcMemory(contact, actionLog, state.week) }
       : contact),
     log: [actionLog, ...state.log],
   };
@@ -424,10 +426,19 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
       mood: clamp(state.stats.mood + (effect.mood ?? 0)),
       focus: clamp(state.stats.focus + (effect.focus ?? 0)),
     },
-    contacts: state.contacts.map((contact, index) => index === choice.contactIndex && (effect.relationship || state.pendingEvent?.personalStory) ? {
-      ...contact, warmth: clamp(contact.warmth + (effect.relationship ?? 0)), note: choice.result,
-      memories: addNpcMemory(contact, choice.result, state.week),
-    } : contact),
+    contacts: state.contacts.map((contact, index) => {
+      const storyContactIndex = state.pendingEvent?.personalStory
+        ? state.contacts.findIndex((item) => item.id === state.pendingEvent?.personalStory?.contactId)
+        : choice.contactIndex;
+      if (index !== storyContactIndex || !(effect.relationship || effect.goalSupport || state.pendingEvent?.personalStory)) return contact;
+      return {
+        ...contact,
+        warmth: clamp(contact.warmth + (effect.relationship ?? 0)),
+        goalSupport: clamp((contact.goalSupport ?? 0) + (effect.goalSupport ?? 0), 0, 3),
+        note: choice.result,
+        memories: addNpcMemory(contact, choice.result, state.week),
+      };
+    }),
     log: [choice.result, ...state.log],
   };
   return next;
@@ -447,20 +458,23 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; seed: number;
     const [nextSeed, roll] = nextRandom(seed ^ createSeed(`${contact.id}:${state.week}`));
     seed = nextSeed;
     const warmth = contact.warmth;
-    const chance = clamp(55 + (warmth - 50) * 0.45, 30, 82) / 100;
+    const playerSupport = clamp(contact.goalSupport ?? 0, 0, 3);
+    const chance = clamp(55 + (warmth - 50) * 0.45 + playerSupport * 9, 30, 90) / 100;
     const oldGoal = contact.goal ?? "자기만의 방향을 찾는 일";
     const memories = (contact.memories ?? [])
       .map((memory) => ({ ...memory, vividness: memory.vividness * 0.94 }))
       .filter((memory) => memory.vividness >= 0.2);
     const currentProgress = contact.goalProgress ?? 0;
-    const advanced = roll < chance;
+    const advanced = roll < chance || playerSupport >= 3;
     let goal = oldGoal;
     let goalProgress = advanced ? currentProgress + 1 : currentProgress;
     let goalStage = advanced
       ? ["계획 세우기", "한 걸음 진행", "마무리 준비", "완료"][Math.min(goalProgress, 3)]
       : contact.goalStage ?? "기회 기다리기";
     let mood = advanced ? "자기 일에 집중하는 중" : "일정이 조금 꼬임";
-    let lastAutonomousAction = advanced ? `“${goal}”을(를) 이어갔어요.` : "갑작스러운 일정 때문에 계획을 미뤘어요.";
+    let lastAutonomousAction = advanced
+      ? playerSupport > 0 ? `“${goal}”을(를) 이어갔어요. 네가 건넨 응원이 도움이 됐어요.` : `“${goal}”을(를) 이어갔어요.`
+      : playerSupport > 0 ? `네가 건넨 응원을 생각하며 “${goal}” 다음 단계를 준비하고 있어요.` : "갑작스러운 일정 때문에 계획을 미뤘어요.";
     if (goalProgress >= 3) {
       const [goalSeed, goalRoll] = nextRandom(seed ^ createSeed(`${contact.id}:${state.week}:next-goal`));
       seed = goalSeed;
@@ -469,14 +483,16 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; seed: number;
       goalProgress = 0;
       goalStage = "새 목표를 살펴보는 중";
       mood = "작은 성취 뒤 다음 계획을 생각하는 중";
-      lastAutonomousAction = `“${oldGoal}”의 한 단계를 마치고 다음 목표를 찾기 시작했어요.`;
+      lastAutonomousAction = playerSupport > 0
+        ? `“${oldGoal}”의 한 단계를 마쳤어요. 네가 곁에서 도와준 것도 힘이 됐어요.`
+        : `“${oldGoal}”의 한 단계를 마치고 다음 목표를 찾기 시작했어요.`;
       logs.push(`${contact.name}이(가) “${oldGoal}”에서 한 단계를 마쳤어요.`);
       return {
-        ...contact, goal, goalProgress, goalStage, mood, lastAutonomousAction,
+        ...contact, goal, goalProgress, goalStage, mood, lastAutonomousAction, goalSupport: Math.max(0, playerSupport - 1),
         memories: addNpcMemory({ ...contact, memories }, lastAutonomousAction, state.week),
       };
     }
-    return { ...contact, goal, goalProgress, goalStage, mood, lastAutonomousAction, memories };
+    return { ...contact, goal, goalProgress, goalStage, mood, lastAutonomousAction, goalSupport: Math.max(0, playerSupport - 1), memories };
   });
   return { contacts, seed, logs };
 }
