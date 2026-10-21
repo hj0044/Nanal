@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   ACTIONS, BACKGROUNDS, chooseEvent, createGame, finishWeek, formatMoney,
   takeAction, type ActionId, type Background, type GameState, type TabId,
@@ -199,6 +199,6 @@ function Stat({ label, value, icon, level, warning = false }: { label: string; v
 function Meter({ label, value }: { label: string; value: number }) {
   return <div className="meter-row"><span>{label}</span><div className="meter-track"><i style={{ width: `${Math.max(0, Math.min(100, value))}%` }} /></div><b>{value}</b></div>;
 }
-function PageTitle({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
+function PageTitle({ eyebrow, title, children }: { eyebrow: string; title: string; children: ReactNode }) {
   return <section className="page-view"><p className="eyebrow">{eyebrow}</p><h1>{title}</h1>{children}</section>;
 }
