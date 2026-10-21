@@ -92,6 +92,15 @@ const EVENTS: Record<Background, StoryEvent[]> = {
       { id: "coordinate", label: "각자 가능한 일을 먼저 조율한다", hint: "부담을 나누고 협업의 기준을 만들어요.", effects: { energy: -5, stress: 2, target: "minji", affinity: 1, trust: 2 }, result: "역할이 정리됐어요. 민지는 서로 무리하지 않는 게 좋다고 했습니다." },
       { id: "limit", label: "가능한 범위를 솔직히 말한다", hint: "시간을 지키는 대신 상대의 반응은 상황에 따라 달라져요.", effects: { energy: 2, stress: -3, target: "minji", affinity: -1 }, result: "맡은 일은 줄었어요. 민지는 조금 아쉬워했지만 상황은 이해했습니다." },
     ],
+  }, {
+    id: "student-club", title: "동아리 선배의 작은 부탁", dateLabel: "목요일 · 학교",
+    body: "서준 선배가 주말 행사 준비를 같이 해보겠냐고 물었어요. 친해질 기회일 수도 있고, 이미 세운 일정에 부담이 될 수도 있습니다.",
+    actorId: "seojun",
+    choices: [
+      { id: "join", label: "행사 준비를 함께한다", hint: "새로운 사람을 만날 기회와 일정 부담이 생겨요.", effects: { energy: -8, stress: 4, target: "seojun", affinity: 1, trust: 3 }, result: "서준 선배가 준비를 함께하게 되어 든든하다고 했어요." },
+      { id: "small-task", label: "할 수 있는 일만 맡겠다고 한다", hint: "관계를 이어가면서 부담을 조절해요.", effects: { energy: -3, target: "seojun", affinity: 1 }, result: "작은 역할로 합류했어요. 서준 선배는 무리하지 않는 선에서 같이 하자고 했습니다." },
+      { id: "decline", label: "이번에는 어렵다고 말한다", hint: "시간을 지키지만 다음 만남은 따로 만들어야 해요.", effects: { energy: 3, stress: -2, target: "seojun", affinity: -1 }, result: "이번 행사는 쉬기로 했어요. 서준 선배는 다음 기회를 보자고 했습니다." },
+    ],
   }],
   jobseeker: [{
     id: "jobseeker-posting", title: "친구가 채용 정보를 보내왔어요", dateLabel: "화요일 · 메신저",
@@ -102,6 +111,15 @@ const EVENTS: Record<Background, StoryEvent[]> = {
       { id: "ask", label: "도윤이에게 회사 분위기를 물어본다", hint: "지원 판단에 필요한 정보를 얻어요.", effects: { energy: -3, target: "doyun", affinity: 1, trust: 4 }, result: "도윤이는 아는 선에서 정보를 알려줬어요. 공고에 적히지 않은 점도 확인할 수 있었습니다." },
       { id: "prepare", label: "부족한 기술부터 보완한다", hint: "당장 지원은 미루지만 준비도가 올라가요.", effects: { skill: 5, energy: -8, stress: 2 }, result: "기초 학습을 시작했어요. 마감 전까지 준비를 더 이어갈 수 있습니다." },
     ],
+  }, {
+    id: "jobseeker-study", title: "스터디 시간이 겹쳤어요", dateLabel: "금요일 · 스터디",
+    body: "유나가 이번 주 스터디 시간을 바꾸자고 했어요. 같은 시간에 준비하려던 일이 있지만, 함께 점검받는 것은 혼자 공부하는 것과 다를 수 있습니다.",
+    actorId: "yuna",
+    choices: [
+      { id: "reschedule", label: "가능한 시간을 같이 찾는다", hint: "스터디를 이어가며 일정을 다시 맞춰요.", effects: { energy: -3, target: "yuna", affinity: 1, trust: 3 }, result: "둘 다 가능한 시간을 정했어요. 유나는 계획을 같이 맞춰줘서 고맙다고 했습니다." },
+      { id: "solo", label: "이번 주는 혼자 준비한다", hint: "내 계획을 지키고 준비도를 높여요.", effects: { skill: 4, energy: -7, target: "yuna", affinity: -1 }, result: "이번 주는 혼자 준비하기로 했어요. 유나는 다음 주에 다시 같이 하자고 했습니다." },
+      { id: "pause", label: "스터디를 잠시 쉬겠다고 말한다", hint: "부담을 낮추는 대신 함께 준비할 기회가 줄어요.", effects: { stress: -4, target: "yuna", trust: -2 }, result: "잠깐 쉬기로 했어요. 유나는 이유를 물었지만 결정을 존중했습니다." },
+    ],
   }],
   worker: [{
     id: "worker-priority", title: "퇴근 직전, 새 업무가 들어왔어요", dateLabel: "수요일 · 회사",
@@ -111,6 +129,15 @@ const EVENTS: Record<Background, StoryEvent[]> = {
       { id: "take", label: "내가 맡아 오늘 마무리한다", hint: "팀을 돕지만 에너지와 퇴근 시간이 줄어요.", effects: { energy: -14, stress: 8, skill: 2, target: "junho", trust: 5 }, result: "준호는 고맙다고 했어요. 퇴근은 늦어졌지만 팀의 급한 일을 넘겼습니다." },
       { id: "prioritize", label: "기존 업무와 마감 순서를 조율한다", hint: "업무 기대와 일정을 함께 맞춰요.", effects: { energy: -4, stress: 1, target: "junho", trust: 2 }, result: "우선순위가 정리됐어요. 준호는 일정을 공유해줘서 도움이 됐다고 했습니다." },
       { id: "boundary", label: "오늘은 어렵다고 말하고 대안을 찾는다", hint: "내 시간을 지키고 협력 가능한 범위를 제안해요.", effects: { energy: 2, stress: -3, target: "junho", affinity: -1 }, result: "준호는 다른 방법을 찾아보기로 했어요. 약간 미안했지만 오늘 일정을 지켰습니다." },
+    ],
+  }, {
+    id: "worker-friend", title: "오랜만에 온 친구의 연락", dateLabel: "토요일 · 메신저",
+    body: "소라가 오랜만에 만나자고 연락했어요. 이번 주에는 쉬고 싶기도 하지만, 약속을 계속 미루면 서로 멀어질 수 있습니다.",
+    actorId: "sora",
+    choices: [
+      { id: "meet", label: "짧게라도 만나기로 한다", hint: "관계를 돌보며 휴식 시간은 조금 줄어요.", effects: { energy: -4, stress: -2, target: "sora", affinity: 1, trust: 3 }, result: "소라와 짧게 얼굴을 봤어요. 둘은 다음에 조금 여유 있게 만나기로 했습니다." },
+      { id: "plan", label: "다음 주 날짜를 구체적으로 잡는다", hint: "이번 주 컨디션을 지키면서 약속을 이어가요.", effects: { energy: 2, target: "sora", trust: 2 }, result: "다음 주 약속 날짜를 정했어요. 소라는 기다릴 일이 생겼다며 좋아했습니다." },
+      { id: "decline", label: "오늘은 쉬고 싶다고 솔직히 말한다", hint: "회복을 우선하고 다음 대화에 여지를 남겨요.", effects: { energy: 5, stress: -3, target: "sora", affinity: -1 }, result: "오늘은 쉬기로 했어요. 소라는 아쉬워했지만 네 상태를 이해한다고 했습니다." },
     ],
   }],
 };
@@ -148,7 +175,10 @@ function draw(state: GameState) {
 function nextEvent(state: GameState): StoryEvent | null {
   const candidates = EVENTS[state.background];
   if (draw(state) < 0.18) return null;
-  return structuredClone(candidates[(state.week + Math.floor(draw(state) * candidates.length)) % candidates.length]);
+  const lastChoice = state.log.find((entry) => entry.category === "선택")?.text ?? "";
+  const fresh = candidates.filter((candidate) => !lastChoice.includes(candidate.title));
+  const pool = fresh.length ? fresh : candidates;
+  return structuredClone(pool[Math.floor(draw(state) * pool.length)]);
 }
 function addLog(state: GameState, category: string, text: string) {
   state.log.unshift({ id: `${state.week}-${state.log.length}-${state.rngState}`, week: state.week, category, text });
@@ -272,7 +302,7 @@ export function finishWeek(state: GameState): GameState {
   next.npcs = next.npcs.map((npc) => {
     const updated = structuredClone(npc);
     updated.memories = updated.memories
-      .map((memory) => ({ ...memory, vividness: memory.vividness * Math.pow(0.94, Math.max(1, next.week - memory.week)) }))
+      .map((memory) => ({ ...memory, vividness: memory.vividness * 0.94 }))
       .filter((memory) => memory.vividness > 0.18)
       .slice(0, 6);
     const roll = draw(next);
@@ -281,9 +311,11 @@ export function finishWeek(state: GameState): GameState {
       updated.goal.stage = ["시작하기", "진행 중", "마무리 준비", "완료"][updated.goal.progress];
       updated.lastAction = `${updated.goal.title}을(를) 이어갔어요.`;
       if (updated.goal.progress === 3) {
+        const completed = updated.goal.title;
         updated.mood = "작은 성취를 얻음";
-        updated.memories.unshift({ text: `${updated.goal.title}에서 한 단계를 마쳤어요.`, week: next.week, vividness: 0.9 });
-        addLog(next, "인물", `${updated.name}이(가) 자기 목표에서 한 단계를 마쳤어요.`);
+        updated.memories.unshift({ text: `${completed}에서 한 단계를 마쳤어요.`, week: next.week, vividness: 0.9 });
+        addLog(next, "인물", `${updated.name}이(가) “${completed}” 목표를 마쳤어요.`);
+        updated.goal = { title: updated.role.includes("친구") ? "함께할 다음 약속 만들기" : "다음 기회 준비하기", progress: 0, stage: "새 목표 생각 중" };
       } else {
         updated.mood = roll < 0.22 ? "조금 지침" : "평소와 같음";
       }
@@ -291,15 +323,10 @@ export function finishWeek(state: GameState): GameState {
       updated.lastAction = "예상하지 못한 일로 계획을 미뤘어요.";
       updated.mood = "일정이 꼬임";
     }
-    if (updated.goal.progress >= 3 && draw(next) < 0.28) {
-      const oldGoal = updated.goal.title;
-      updated.goal = { title: updated.role.includes("친구") ? "함께할 약속 만들기" : "다음 기회 준비하기", progress: 0, stage: "생각 중" };
-      updated.mood = "새 목표를 고민하는 중";
-      addLog(next, "인물", `${updated.name}의 관심이 “${oldGoal}”에서 “${updated.goal.title}”로 옮겨가기 시작했어요.`);
-    }
-    return updated;
+     return updated;
   });
   next.week += 1;
+  if (next.week > 52) { next.year += 1; next.week = 1; }
   next.actionsLeft = 2;
   next.lastWeekSummary = summary;
   addLog(next, "주간 정리", `제 ${next.week - 1}주가 끝났어요. 현금 흐름과 인물들의 한 주를 정리했습니다.`);
