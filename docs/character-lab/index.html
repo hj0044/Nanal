@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f6f2ee"><title>Nanal | Safari 캐릭터 테스트</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;color:#26272b;background:#f5f2ee}
+*{box-sizing:border-box}body{margin:0}.wrap{max-width:900px;margin:auto;padding:22px 14px 50px}header{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.brand{font-weight:900;letter-spacing:.14em;color:#7b6254;font-size:12px}h1{font-size:clamp(23px,4vw,33px);margin:10px 0 8px;letter-spacing:-.04em}
+p{line-height:1.55}.lead{font-size:13px;color:#6f6c68;margin:0 0 16px}.status{padding:6px 9px;border:1px solid #b9cbb7;background:#eaf3e7;color:#3e7246;border-radius:30px;font-size:11px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.card{background:white;border-radius:18px;box-shadow:0 4px 24px rgba(60,48,42,.05);overflow:hidden;border:1px solid #e8e4df}
+.photo{position:relative;aspect-ratio:1;overflow:hidden;background:#eceae7;display:flex;justify-content:center;align-items:center}
+.photo img{height:100%;width:100%;object-fit:cover;object-position:center;display:block}
+#empty{position:absolute;inset:0;display:none;place-items:center;text-align:center;padding:22px;color:#866f61;font-size:13px}
+#outfit-overlay{position:absolute;inset:0;pointer-events:none;mix-blend-mode:multiply;opacity:0;clip-path:polygon(0% 73%,29% 68%,42% 75%,59% 75%,72% 68%,100% 73%,100% 100%,0 100%);}
+.photo-info{padding:13px 14px;display:flex;justify-content:space-between;gap:12px;font-size:12px}.code{color:#8a7a6c;font-size:11px}
+.controls{padding:16px}.group{margin-bottom:17px}.group-title{font-size:13px;font-weight:800;margin-bottom:8px;display:flex;justify-content:space-between}
+.group-title small{font-size:10px;color:#8e8985;font-weight:400}.options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+button{border:1px solid #e3ddd5;background:#faf9f7;color:#353330;border-radius:11px;padding:12px 8px;min-height:44px;font:inherit;font-size:12px;cursor:pointer;touch-action:manipulation}
+button[aria-pressed="true"]{background:#e8edf4;color:#264b76;border-color:#8ba9ca;font-weight:800}
+.actions{display:flex;gap:8px}.actions button{flex:1}.footer{margin-top:13px;padding:13px;border-radius:12px;background:#ebe7e1;color:#726c66;font-size:11px;line-height:1.6}
+.notice{padding:12px;margin-top:12px;background:#fff9ed;border:1px solid #eedfc3;border-radius:10px;color:#735b35;font-size:11px;line-height:1.6}
+@media(max-width:620px){.layout{grid-template-columns:1fr}.wrap{padding-top:17px}.photo{max-height:380px}.photo-info{padding:12px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:9px 11px}.group{margin:0}.group-title{font-size:12px}.options{gap:5px}button{padding:10px 5px;font-size:11px}.actions{margin-top:12px}}
+</style></head><body><main class="wrap">
+<header><span class="brand">NANAL / CHARACTER LAB</span><span class="status" id="status">● 작동 준비</span></header>
+<h1>NPC 외형 조합 테스트</h1><p class="lead">Safari에서 별도 앱 설치 없이 버튼을 눌러 외형 선택 UI를 시험할 수 있어요.</p>
+<div class="layout">
+<section class="card"><div class="photo"><img id="portrait" alt="선택된 반실사 NPC 이미지"><div id="outfit-overlay"></div><div id="empty">이미지를 불러오지 못했어요.<br>인터넷 연결을 확인해 주세요.</div></div><div class="photo-info"><b id="character">남성 NPC</b><span class="code" id="serial">M-F01-H01-O01</span></div></section>
+<section class="card"><div class="controls">
+<div class="group"><div class="group-title">성별</div><div class="options" id="sex"></div></div>
+<div class="group"><div class="group-title">얼굴 선택<small>3종</small></div><div class="options" id="face"></div></div>
+<div class="group"><div class="group-title">헤어 샘플<small>4종</small></div><div class="options" id="hair"></div></div>
+<div class="group"><div class="group-title">의상 컬러 데모<small>4종</small></div><div class="options" id="outfit"></div></div>
+</div></section></div>
+<div class="actions"><button id="random">🎲 랜덤 조합</button><button id="reset">↺ 초기화</button></div>
+<div class="notice"><b>중요:</b> 이 버전은 실제 Nanal 초상화 라이브러리로 버튼 작동을 확인하는 <b>웹 데모</b>입니다. 현재 얼굴/헤어 버튼은 준비된 완성형 초상화 샘플을 전환하며, 같은 얼굴에 독립 헤어 파츠를 합성하는 정식 엔진은 아닙니다. 의상은 하단 색상 시연용입니다.</div>
+<div class="footer">실제 Nanal 이미지 경로 사용 · 게임 세이브 변경 없음 · 휴대폰 화면 최적화 · 테스트 목적으로 공개</div>
+</main>
+<script>
+(()=>{"use strict";
+const el=id=>document.getElementById(id);
+const files={
+ M:[
+ ["p-m20-01.webp","p-m22-new-01.webp","p-m24-new-07.webp","p-m28-new-03.webp"],
+ ["p-m23-b2-08.webp","p-m25-b2-18.webp","p-m27-b2-12.webp","p-m29-b2-02.webp"],
+ ["p-m30-01.webp","p-m31-b2-10.webp","p-m34-b2-04.webp","p-m38-new-11.webp"]
+ ],
+ F:[
+ ["p-f20-01.webp","p-f21-b2-15.webp","p-f22-new-10.webp","p-f24-new-02.webp"],
+ ["p-f25-new-18.webp","p-f26-b2-03.webp","p-f28-b2-11.webp","p-f29-new-14.webp"],
+ ["p-f30-01.webp","p-f31-new-04.webp","p-f34-new-12.webp","p-f37-b2-17.webp"]
+ ]
+};
+const names={sex:["남성","여성"],face:["얼굴 1","얼굴 2","얼굴 3"],hair:["헤어 샘플 1","헤어 샘플 2","헤어 샘플 3","헤어 샘플 4"],outfit:["원본","네이비","카키","브라운"]};
+const colors=["transparent","#406a95","#749579","#b18370"];
+const s={sex:0,face:0,hair:0,outfit:0};
+const base="https://raw.githubusercontent.com/hj0044/Nanal/main/src/assets/character-portraits/";
+function draw(){
+for (const category of Object.keys(names)){
+ const buttons=names[category].map((n,i)=>'<button type="button" data-cat="'+category+'" data-i="'+i+'" aria-pressed="'+(s[category]===i?'true':'false')+'">'+n+'</button>').join("");
+ el(category).innerHTML=buttons;
+}
+const gender=s.sex===1?"F":"M";
+el("character").textContent=names.sex[s.sex]+" NPC";
+el("serial").textContent=gender+"-F0"+(s.face+1)+"-H0"+(s.hair+1)+"-O0"+(s.outfit+1);
+el("outfit-overlay").style.background=colors[s.outfit];
+el("outfit-overlay").style.opacity=s.outfit===0?"0":".42";
+const img=el("portrait");
+el("empty").style.display="none";
+img.src=base+files[gender][s.face][s.hair];
+}
+el("portrait").onerror=()=>{el("empty").style.display="grid";el("status").textContent="이미지 로딩 실패";};
+el("portrait").onload=()=>{el("empty").style.display="none";el("status").textContent="● 터치 테스트 가능";};
+document.addEventListener("click",e=>{
+const btn=e.target.closest("button");if(!btn)return;
+if(btn.id==="random"){s.sex=Math.floor(Math.random()*2);s.face=Math.floor(Math.random()*3);s.hair=Math.floor(Math.random()*4);s.outfit=Math.floor(Math.random()*4);}
+else if(btn.id==="reset"){Object.keys(s).forEach(k=>s[k]=0);}
+else if(btn.dataset.cat){s[btn.dataset.cat]=Number(btn.dataset.i);}
+else return;draw();
+});
+draw();
+})();
+</script></body></html>
