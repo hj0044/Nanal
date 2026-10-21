@@ -100,7 +100,7 @@ export const backgroundLabels: Record<Background, string> = {
   worker: "직장인",
 };
 
-import { eventLibrary } from "./scenarios";
+import { commonEventLibrary, eventLibrary } from "./scenarios";
 
 const firstNames = ["지우", "서준", "하은", "민재", "수빈", "도윤", "예린", "현우", "유진", "지민", "은서", "준호", "채원", "시우", "다은", "건우", "소연", "태민", "나연", "우진"];
 const roles: Record<Background, string[]> = {
@@ -161,7 +161,7 @@ export function createGame(character: Character, seed = createSeed(`${character.
 function clamp(value: number, min = 0, max = 100): number { return Math.max(min, Math.min(max, value)); }
 function nextEligibleEvent(state: GameState): [LifeEvent | undefined, number] {
   const recent = state.recentEventIds ?? [];
-  const eligible = eventLibrary[state.character.background].filter((event) => !state.seenEvents.includes(event.id) && (!event.topic || state.settings.topics[event.topic]));
+  const eligible = [...eventLibrary[state.character.background], ...commonEventLibrary].filter((event) => !state.seenEvents.includes(event.id) && (!event.topic || state.settings.topics[event.topic]));
   const cooled = eligible.filter((event) => !recent.includes(event.id));
   const options = cooled.length ? cooled : eligible;
   const [afterRoll, roll] = nextRandom(state.seed);

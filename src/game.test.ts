@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { advanceDay, advanceDays, chooseEvent, createGame, generateContacts, startNextWeek, type Character } from "./game";
+import { commonEventLibrary, eventLibrary } from "./scenarios";
 
 const character: Character = {
   name: "지우", age: 24, year: 2024, background: "student",
@@ -14,6 +15,15 @@ describe("first week simulation", () => {
     expect(first).toEqual(second);
     expect(new Set(first.map((contact) => contact.id)).size).toBe(12);
     expect(first.every((contact) => contact.age && contact.occupation && contact.personality && contact.goal)).toBe(true);
+  });
+
+  it("provides a broad, unique pool of reviewed events per background", () => {
+    const ids = [...commonEventLibrary, ...Object.values(eventLibrary).flat()].map((event) => event.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const background of ["student", "jobseeker", "worker"] as const) {
+      expect(eventLibrary[background].length + commonEventLibrary.length).toBeGreaterThanOrEqual(16);
+      expect([...eventLibrary[background], ...commonEventLibrary].every((event) => event.choices.length >= 2)).toBe(true);
+    }
   });
 
   it("replays the same first week from the same seed", () => {
@@ -47,10 +57,10 @@ describe("first week simulation", () => {
     let state = createGame(character, 54321);
     for (let i = 0; i < 20 && state.phase !== "event" && state.phase !== "summary"; i += 1) state = advanceDay(state);
     if (state.phase === "event" && state.pendingEvent) {
-      const oldEnergy = state.stats.energy;
+      const oldStats = { ...state.stats };
       state = chooseEvent(state, state.pendingEvent.choices[0].id);
       expect(state.phase).toBe("playing");
-      expect(state.stats.energy).not.toBe(oldEnergy);
+      expect(state.stats).not.toEqual(oldStats);
     }
     let guard = 0;
     while (state.phase !== "summary" && guard < 20) {
