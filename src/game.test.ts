@@ -37,6 +37,20 @@ describe("first week simulation", () => {
     expect(first.every((contact) => getPortrait(contact.portraitId)?.gender === contact.gender)).toBe(true);
   });
 
+  it("archives long-absent relationships, records the departure, and introduces a new person", () => {
+    const started = createGame(character, 4455);
+    const distant = started.contacts.map((person, index) => ({ ...person, warmth: index < 5 ? 10 : 55, lastInteractionWeek: 1 }));
+    const state = { ...started, week: 15, day: 7, phase: "playing" as const, contacts: distant, evaluatedDays: [1, 2, 3, 4, 5, 6, 7] };
+    const result = advanceDay(state);
+    expect(result.phase).toBe("summary");
+    expect(result.contacts).toHaveLength(12);
+    expect(result.archivedContacts).toHaveLength(1);
+    expect(result.relationshipRecords?.filter((record) => record.kind === "departure")).toHaveLength(1);
+    expect(result.relationshipRecords?.some((record) => record.kind === "arrival")).toBe(true);
+    expect(result.contacts.some((person) => person.id === "person-13")).toBe(true);
+    expect(result.contacts.every((person) => person.id !== "person-1")).toBe(true);
+  });
+
   it("assigns the player and contacts distinct stable portraits from matching age and gender ranges", () => {
     const first = createGame(character, 48291);
     const second = createGame(character, 48291);

@@ -37,6 +37,9 @@ function normalizeSave(parsed: GameState): GameState {
     ...parsed,
     character: { ...parsed.character, portraitId: playerPortraitId },
     recentEventIds: parsed.recentEventIds ?? [],
+    archivedContacts: parsed.archivedContacts ?? [],
+    relationshipRecords: parsed.relationshipRecords ?? [],
+    nextContactNumber: parsed.nextContactNumber ?? Math.max(13, ...parsed.contacts.map((person) => Number(person.id.replace("person-", "")) + 1)),
     contacts: parsed.contacts.map((person, index) => {
       const merged = { ...generated[index], ...person };
       const age = person.age ?? generated[index]?.age ?? parsed.character.age;
@@ -51,6 +54,9 @@ function normalizeSave(parsed: GameState): GameState {
         occupation: person.occupation ?? generated[index]?.occupation,
         personality: person.personality ?? generated[index]?.personality,
         goal: person.goal ?? generated[index]?.goal,
+        firstMetWeek: person.firstMetWeek ?? 1,
+        lastInteractionWeek: person.lastInteractionWeek ?? 1,
+        returnCount: person.returnCount ?? 0,
       };
     }),
   };
@@ -277,7 +283,7 @@ function EventPanel({ event, onChoice }: { event: NonNullable<GameState["pending
 }
 function PeopleView({ game, onSelectPerson }: { game: GameState; onSelectPerson: (person: Contact) => void }) {
   const average = Math.round(game.contacts.reduce((sum, item) => sum + item.warmth, 0) / game.contacts.length);
-  return <><PageTitle kicker="PEOPLE & RELATIONSHIPS" title="내 주변 사람들" subtitle="인물을 누르면 지금까지 쌓인 관계와 기억을 볼 수 있어요." /><div className="relationship-overview"><span className="overview-icon">♡</span><div><small>주요 인맥 {game.contacts.length}명</small><strong>관계 온도 평균 {average}</strong></div></div><div className="people-grid">{game.contacts.map((person, index) => <button className="person-card" key={person.id} onClick={() => onSelectPerson(person)} aria-label={`${person.name} 상세 정보 열기`}><span className={`illustrated-portrait person-avatar avatar-${index % 5}`} style={portraitStyle(person.portraitId)} aria-hidden="true" /><span className="person-info"><strong>{person.name}</strong><span>{person.role}</span><small>{person.mood ?? "평소와 같음"} · {person.lastAutonomousAction ?? person.note}</small></span><span className="warmth-meter"><span style={{ width: `${person.warmth}%` }} /></span><span className="person-open-hint">상세 보기 <b>›</b></span></button>)}</div></>;
+  return <><PageTitle kicker="PEOPLE & RELATIONSHIPS" title="내 주변 사람들" subtitle="인물을 누르면 지금까지 쌓인 관계와 기억을 볼 수 있어요." /><div className="relationship-overview"><span className="overview-icon">♡</span><div><small>주요 인맥 {game.contacts.length}명</small><strong>관계 온도 평균 {average}</strong></div></div><div className="people-grid">{game.contacts.map((person, index) => <button className="person-card" key={person.id} onClick={() => onSelectPerson(person)} aria-label={`${person.name} 상세 정보 열기`}><span className={`illustrated-portrait person-avatar avatar-${index % 5}`} style={portraitStyle(person.portraitId)} aria-hidden="true" /><span className="person-info"><strong>{person.name}</strong><span>{person.role}</span><small>{person.mood ?? "평소와 같음"} · {person.lastAutonomousAction ?? person.note}</small></span><span className="warmth-meter"><span style={{ width: `${person.warmth}%` }} /></span><span className="person-open-hint">상세 보기 <b>›</b></span></button>)}</div>{(game.archivedContacts?.length ?? 0) > 0 && <section className="panel muted-panel"><h2>한동안 만나지 못한 사람들</h2><p>지금은 연락이 뜸하지만, 함께한 이야기는 기록에 남아 있어요. 다시 마주칠 수도 있어요.</p><div className="archive-list">{[...game.archivedContacts!].reverse().map((person) => <div className="archive-row" key={person.id}><strong>{person.name}</strong><span>{person.role} · {person.archivedWeek}주차부터 연락이 뜸해짐</span><small>{person.memories?.find((memory) => memory.vividness >= 0.2)?.text ?? "함께 보낸 기억은 생애기록에 보관돼 있어요."}</small></div>)}</div></section>}</>;
 }
 function closenessLabel(warmth: number) { return warmth >= 75 ? "가까운 사이" : warmth >= 50 ? "알아가는 중" : warmth >= 25 ? "가벼운 인맥" : "아직 서먹함"; }
 function PersonDetails({ person, onClose }: { person: Contact; onClose: () => void }) {
@@ -295,7 +301,8 @@ function GoalsView({ game }: { game: GameState }) {
   return <><PageTitle kicker="GOALS & GROWTH" title="지금의 목표" subtitle="목표는 상황이 달라지면 바뀔 수 있어요." /><div className="goal-card"><div className="goal-icon">✳</div><span className="section-kicker">추천 목표 · 수정 가능</span><h2>{goal}</h2><p>현재는 시제품 추천이에요. 다음 단계에서 직접 추가·수정하고 진행 과정을 기록할 수 있게 만들 예정입니다.</p><div className="goal-progress"><span style={{ width: "22%" }} /></div><small>첫 걸음 전 · 상황 살펴보기</small></div><div className="panel muted-panel"><h3>이번 주에 남긴 변화</h3><p>{game.lastChoice || "선택한 행동과 생활의 변화가 여기에 모여요."}</p></div></>;
 }
 function RecordView({ game }: { game: GameState }) {
-  return <><PageTitle kicker="LIFE RECORD" title="나의 생애기록" subtitle="중요한 선택과 변화가 시간순으로 쌓입니다." /><div className="timeline">{[...game.log].reverse().map((line, index) => <div className="timeline-row" key={`${line}-${index}`}><span className="timeline-dot" /><div><small>{game.character.year}년 · {index === 0 ? "시작" : `${index}주차`}</small><p>{line}</p></div></div>)}</div></>;
+  const history = [...(game.relationshipRecords ?? [])].reverse();
+  return <><PageTitle kicker="LIFE RECORD" title="나의 생애기록" subtitle="중요한 선택과 변화가 시간순으로 쌓입니다." /><div className="timeline">{history.map((record) => <div className="timeline-row" key={record.id}><span className="timeline-dot" /><div><small>{game.character.year}년 · {record.week}주차 · {record.contactName}</small><p>{record.text}</p></div></div>)}{[...game.log].reverse().map((line, index) => <div className="timeline-row" key={`${line}-${index}`}><span className="timeline-dot" /><div><small>{game.character.year}년 · 생활 기록</small><p>{line}</p></div></div>)}</div></>;
 }
 function PageTitle({ kicker, title, subtitle }: { kicker: string; title: string; subtitle: string }) {
   return <div className="page-title"><span className="section-kicker">{kicker}</span><h1>{title}</h1><p>{subtitle}</p></div>;
