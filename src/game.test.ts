@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advanceDay, advanceDays, chooseEvent, createGame, generateContacts, getPersonalStoryEvents, getWeeklyCashflowPlan, normalizeContactName, startNextWeek, takeDailyAction, type Character } from "./game";
+import { advanceDay, advanceDays, chooseEvent, createGame, generateContacts, getNpcReunionEvents, getPersonalStoryEvents, getRelationshipProfile, getWeeklyCashflowPlan, normalizeContactName, startNextWeek, takeDailyAction, type Character } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
 import { getPortrait, portraitCatalog } from "./portrait-catalog";
@@ -201,6 +201,44 @@ describe("first week simulation", () => {
     expect(next.contacts[1].warmth).toBe(other.warmth);
     expect(next.contacts[1].memories).toEqual(other.memories);
     expect(next.log[1]).toContain(target.name);
+    expect(next.contacts[4].lastInteractionWeek).toBe(base.week);
+    expect(next.weeklyActions?.social).toBe(1);
+  });
+
+  it("lets relationship type shape the pace of distance", () => {
+    const family = getRelationshipProfile("가족");
+    const friend = getRelationshipProfile("오래 알고 지낸 친구");
+    const work = getRelationshipProfile("직장 동료");
+    const acquaintance = getRelationshipProfile("온라인으로 알게 된 지인");
+    expect(family.graceWeeks).toBeGreaterThan(friend.graceWeeks);
+    expect(friend.graceWeeks).toBeGreaterThan(work.graceWeeks);
+    expect(work.graceWeeks).toBeGreaterThan(acquaintance.graceWeeks);
+    expect(family.warmthDrift).toBeLessThan(friend.warmthDrift);
+    expect(family.departureMultiplier).toBeLessThan(acquaintance.departureMultiplier);
+  });
+
+  it("connects weekly activities to contextual new introductions", () => {
+    const base = { ...createGame(character, 322), weeklyActions: { social: 7 }, weeklyMeetingContext: "동네 그림 모임" };
+    const result = finishWeek(base);
+    expect(result.contacts).toHaveLength(base.contacts.length + 1);
+    const newcomer = result.contacts.at(-1)!;
+    expect(newcomer.note).toContain("동네 그림 모임");
+    expect(result.relationshipRecords?.at(-1)?.text).toContain("동네 그림 모임");
+    expect(startNextWeek(result).weeklyActions).toEqual({});
+  });
+
+  it("brings a returning NPC back through a hazy-memory reunion conversation", () => {
+    const base = createGame(character, 323);
+    const person = { ...base.contacts[0], warmth: 22, returnCount: 1, memories: [{ id: "old-memory", text: "함께 동네 축제에 갔다", week: 1, vividness: 0.28 }] };
+    const state = { ...base, contacts: [person, ...base.contacts.slice(1)], npcReunionIds: [person.id] };
+    const reunion = getNpcReunionEvents(state)[0];
+    expect(reunion?.body).toContain("어렴풋이 떠올랐다");
+    expect(reunion?.body).toContain("함께 동네 축제에 갔다");
+    const eventState = { ...state, phase: "event" as const, pendingEvent: reunion };
+    const next = chooseEvent(eventState, "reunion-memory");
+    expect(next.npcReunionIds).toEqual([]);
+    expect(next.contacts[0].warmth).toBe(person.warmth + 5);
+    expect(next.contacts[0].memories?.[0].text).toContain("천천히 떠올렸다");
   });
 
   it("keeps a recent-event cooldown across week boundaries", () => {

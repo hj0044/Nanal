@@ -80,6 +80,8 @@ export interface Effect {
   focus?: number;
   relationship?: number;
   goalSupport?: number;
+  /** Adds a chance to meet someone through the selected event. */
+  newContactOpportunity?: number;
 }
 export interface EventChoice {
   id: string;
@@ -88,6 +90,7 @@ export interface EventChoice {
   result: string;
   effect: Effect;
   contactIndex?: number;
+  meetingContext?: string;
 }
 export interface LifeEvent {
   id: string;
@@ -96,6 +99,7 @@ export interface LifeEvent {
   body: string;
   topic?: SensitiveTopic;
   personalStory?: { contactId: string; stage: number };
+  reunion?: { contactId: string };
   choices: EventChoice[];
 }
 export interface GameState {
@@ -107,6 +111,10 @@ export interface GameState {
   seed: number;
   evaluatedDays: number[];
   actionDays?: string[];
+  weeklyActions?: Partial<Record<DailyAction, number>>;
+  weeklyMeetingMomentum?: number;
+  weeklyMeetingContext?: string;
+  npcReunionIds?: string[];
   seenEvents: string[];
   recentEventIds?: string[];
   eventLastSeenWeek?: Record<string, number>;
@@ -319,10 +327,34 @@ export function getPersonalStoryEvents(state: GameState): LifeEvent[] {
     personalStory: { contactId: contact.id, stage }, choices,
   }];
 }
+export function getNpcReunionEvents(state: GameState): LifeEvent[] {
+  const ids = state.npcReunionIds ?? [];
+  return ids.flatMap((contactId) => {
+    const contact = state.contacts.find((item) => item.id === contactId);
+    if (!contact) return [];
+    const index = state.contacts.findIndex((item) => item.id === contactId);
+    const remembered = (contact.memories ?? []).find((memory) => memory.vividness <= 0.45)?.text;
+    const memoryLine = remembered
+      ? `예전 함께 보낸 날의 한 장면이 어렴풋이 떠올랐다. “우리 그때 ${remembered} 얘기도 했었지?” ${contact.name}도 정확히는 기억나지 않는 듯 웃었다.`
+      : "예전에 함께 지낸 시간이 있었지만, 세세한 장면은 희미해져 있었다. 두 사람은 그동안 달라진 일상을 조심스럽게 물었다.";
+    return [{
+      id: `npc-reunion-${contact.id}-${contact.returnCount ?? 1}`,
+      title: `${contact.name}과 다시 마주쳤다`,
+      eyebrow: `${contact.role} · 다시 이어진 인연`,
+      body: `${contact.name}과(와) 다시 만나 반갑게 인사를 나눴다. ${memoryLine} 예전처럼 바로 가까워지기보다, 지금의 서로를 알아가는 시간이 필요해 보인다.`,
+      reunion: { contactId },
+      choices: [
+        { id: "reunion-memory", title: "희미한 기억을 같이 되짚어본다", detail: "기억이 완전하지 않아도 함께 웃었던 순간을 나눈다", result: `${contact.name}과 예전 일을 천천히 떠올렸다. 기억은 흐릿했지만 함께 웃으며 다시 대화를 이어갈 수 있었다.`, effect: { mood: 3, relationship: 5 }, contactIndex: index },
+        { id: "reunion-now", title: "지난 일보다 서로의 요즘을 묻는다", detail: "지금 달라진 생활과 관심사를 알아간다", result: `${contact.name}과 서로의 최근 생활을 나눴다. 예전 관계를 그대로 되돌리기보다 지금의 모습으로 새로 알아가기로 했다.`, effect: { stress: -1, relationship: 4 }, contactIndex: index },
+        { id: "reunion-slow", title: "반가움을 전하고 천천히 연락하자고 한다", detail: "서로의 속도를 존중하며 부담 없이 이어간다", result: `${contact.name}에게 다시 만나 반갑다고 전했다. 무리해서 예전처럼 지내려 하지 않고, 편한 때 안부를 나누기로 했다.`, effect: { relationship: 3 }, contactIndex: index },
+      ],
+    }];
+  });
+}
 function nextEligibleEvent(state: GameState): [LifeEvent | undefined, number] {
   const recent = state.recentEventIds ?? [];
   const lastSeen = state.eventLastSeenWeek ?? {};
-  const eligible = [...eventLibrary[state.character.background], ...commonEventLibrary, ...getPersonalStoryEvents(state)].filter((event) => !state.seenEvents.includes(event.id) && (!event.topic || state.settings.topics[event.topic]));
+  const eligible = [...eventLibrary[state.character.background], ...commonEventLibrary, ...getPersonalStoryEvents(state), ...getNpcReunionEvents(state)].filter((event) => !state.seenEvents.includes(event.id) && (!event.topic || state.settings.topics[event.topic]));
   const cooled = eligible.filter((event) => state.week - (lastSeen[event.id] ?? -100) >= 3 && !recent.includes(event.id));
   const olderButEligible = eligible.filter((event) => state.week - (lastSeen[event.id] ?? -100) >= 3);
   const options = cooled.length ? cooled : olderButEligible.length ? olderButEligible : eligible;
@@ -331,10 +363,11 @@ function nextEligibleEvent(state: GameState): [LifeEvent | undefined, number] {
   const chance = 0.42 + Math.max(0, state.stats.stress - 30) / 300;
   if (roll > Math.min(chance, 0.58)) return [undefined, afterRoll];
   const [afterSelect, indexRoll] = nextRandom(afterRoll);
-  const totalWeight = options.reduce((sum, event) => sum + (event.personalStory ? 7 : 1), 0);
+  const eventWeight = (event: LifeEvent) => event.reunion ? 12 : event.personalStory ? 7 : 1;
+  const totalWeight = options.reduce((sum, event) => sum + eventWeight(event), 0);
   let ticket = indexRoll * totalWeight;
   const selected = options.find((event) => {
-    ticket -= event.personalStory ? 7 : 1;
+    ticket -= eventWeight(event);
     return ticket < 0;
   });
   return [selected ?? options[options.length - 1], afterSelect];
@@ -365,6 +398,7 @@ export function advanceDay(state: GameState): GameState {
       archivedContacts: npcTurn.archivedContacts,
       relationshipRecords: npcTurn.relationshipRecords,
       nextContactNumber: npcTurn.nextContactNumber,
+      npcReunionIds: npcTurn.reunionIds,
       log: [...npcTurn.logs, ...settled.log],
     };
   }
@@ -403,6 +437,7 @@ export function takeDailyAction(state: GameState, action: DailyAction, targetCon
   const next: GameState = {
     ...state,
     actionDays: [...(state.actionDays ?? []), actionDay],
+    weeklyActions: { ...(state.weeklyActions ?? {}), [action]: ((state.weeklyActions ?? {})[action] ?? 0) + 1 },
     stats: {
       money: Math.max(0, state.stats.money + (selected.effect.money ?? 0)),
       energy: clamp(state.stats.energy + (selected.effect.energy ?? 0)),
@@ -411,7 +446,7 @@ export function takeDailyAction(state: GameState, action: DailyAction, targetCon
       focus: clamp(state.stats.focus + (selected.effect.focus ?? 0)),
     },
     contacts: state.contacts.map((contact, index) => index === selectedContactIndex
-      ? { ...contact, warmth: clamp(contact.warmth + (selected.effect.relationship ?? 0)), goalSupport: clamp((contact.goalSupport ?? 0) + 1, 0, 3), note: actionLog, memories: addNpcMemory(contact, actionLog, state.week) }
+      ? { ...contact, warmth: clamp(contact.warmth + (selected.effect.relationship ?? 0)), lastInteractionWeek: state.week, goalSupport: clamp((contact.goalSupport ?? 0) + 1, 0, 3), note: actionLog, memories: addNpcMemory(contact, actionLog, state.week) }
       : contact),
     log: [actionLog, ...state.log],
   };
@@ -430,6 +465,11 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
     seenEvents: [...state.seenEvents, state.pendingEvent.id],
     recentEventIds: [...(state.recentEventIds ?? []), state.pendingEvent.id].slice(-3),
     eventLastSeenWeek: { ...(state.eventLastSeenWeek ?? {}), [state.pendingEvent.id]: state.week },
+    weeklyMeetingMomentum: Math.min(5, (state.weeklyMeetingMomentum ?? 0) + (effect.newContactOpportunity ?? 0)),
+    weeklyMeetingContext: choice.meetingContext ?? state.weeklyMeetingContext,
+    npcReunionIds: state.pendingEvent.reunion
+      ? (state.npcReunionIds ?? []).filter((id) => id !== state.pendingEvent?.reunion?.contactId)
+      : state.npcReunionIds,
     npcStoryStages: state.pendingEvent.personalStory ? {
       ...(state.npcStoryStages ?? {}), [state.pendingEvent.personalStory.contactId]: state.pendingEvent.personalStory.stage + 1,
     } : state.npcStoryStages,
@@ -471,25 +511,34 @@ function addNpcMemory(contact: Contact, text: string, week: number): NPCMemory[]
   ].slice(0, 8);
 }
 
-function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedContacts: Contact[]; relationshipRecords: RelationshipRecord[]; nextContactNumber: number; seed: number; logs: string[] } {
+export type RelationshipType = "family" | "friend" | "work" | "acquaintance";
+export function getRelationshipProfile(role: string): { type: RelationshipType; graceWeeks: number; warmthDrift: number; departureMultiplier: number } {
+  if (/가족|부모|사촌|친척|형제|자매/.test(role)) return { type: "family", graceWeeks: 12, warmthDrift: 0.18, departureMultiplier: 0.48 };
+  if (/오래 알고 지낸 친구|친구|절친|동아리|스터디|모임/.test(role)) return { type: "friend", graceWeeks: 10, warmthDrift: 0.28, departureMultiplier: 0.68 };
+  if (/동료|직장|업무|선배|협력자|팀원/.test(role)) return { type: "work", graceWeeks: 8, warmthDrift: 0.4, departureMultiplier: 0.9 };
+  return { type: "acquaintance", graceWeeks: 6, warmthDrift: 0.58, departureMultiplier: 1.15 };
+}
+
+function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedContacts: Contact[]; relationshipRecords: RelationshipRecord[]; nextContactNumber: number; reunionIds: string[]; seed: number; logs: string[] } {
   let seed = state.seed;
   const logs: string[] = [];
   const records = [...(state.relationshipRecords ?? [])];
   const archived = [...(state.archivedContacts ?? [])];
+  const reunionIds = [...(state.npcReunionIds ?? [])];
   let nextContactNumber = state.nextContactNumber ?? (state.contacts.length + archived.length + 1);
   const survivors: Contact[] = [];
   for (const original of state.contacts) {
     let contact = original;
     const weeksSinceContact = Math.max(0, state.week - (contact.lastInteractionWeek ?? contact.firstMetWeek ?? 1));
-    if (weeksSinceContact >= 4 && contact.warmth > 15) {
-      const weeklyDrift = 0.35 + Math.min(1.1, weeksSinceContact * 0.045);
+    const relationship = getRelationshipProfile(contact.role);
+    if (weeksSinceContact >= relationship.graceWeeks && contact.warmth > 15) {
+      const weeklyDrift = relationship.warmthDrift + Math.min(0.65, Math.max(0, weeksSinceContact - relationship.graceWeeks) * 0.035);
       contact = { ...contact, warmth: Math.max(15, contact.warmth - weeklyDrift) };
     }
-    const tieStrength = /가족|부모|사촌|친척|오래 알고 지낸 친구|친구/.test(contact.role) ? 0.58 : 1;
     const warmthFactor = contact.warmth <= 25 ? 1.25 : contact.warmth <= 40 ? 0.78 : contact.warmth <= 55 ? 0.38 : 0.12;
-    const timeFactor = weeksSinceContact < 8 ? 0 : 0.008 + Math.min(0.085, (weeksSinceContact - 8) * 0.0065);
+    const timeFactor = weeksSinceContact < relationship.graceWeeks ? 0 : 0.008 + Math.min(0.085, (weeksSinceContact - relationship.graceWeeks) * 0.0065);
     const [, departureRoll] = nextRandom(state.seed ^ createSeed(`distance:${contact.id}:${state.week}`));
-    const departureChance = timeFactor * warmthFactor * tieStrength;
+    const departureChance = timeFactor * warmthFactor * relationship.departureMultiplier;
     if (departureChance > 0 && departureRoll < departureChance) {
       const departed = { ...contact, archivedWeek: state.week, note: "서로의 생활이 달라져 한동안 연락이 뜸해졌다." };
       archived.push(departed);
@@ -550,21 +599,27 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
     archived.splice(index, 1);
     const returned = { ...old, archivedWeek: undefined, warmth: Math.min(35, Math.max(18, old.warmth - 12)), goalSupport: 0, memories: (old.memories ?? []).map((memory) => ({ ...memory, vividness: Math.min(memory.vividness, 0.28) })), lastInteractionWeek: state.week, returnCount: (old.returnCount ?? 0) + 1, note: "우연히 다시 만나 어색하지만 반갑게 안부를 나눴다." };
     contacts.push(returned);
+    reunionIds.push(returned.id);
     const text = `${old.name}과(와) 우연히 다시 만났다. 예전만큼 가깝지는 않지만, 서로의 근황을 나누며 새롭게 관계를 이어가기 시작했다.`;
     logs.push(text);
     records.push({ id: `reunion-${old.id}-${state.week}`, week: state.week, kind: "reunion", contactId: old.id, contactName: old.name, text });
   }
+  const actions = state.weeklyActions ?? {};
+  const arrivalChance = Math.min(0.85, 0.06 + (actions.social ?? 0) * 0.11 + (actions.focus ?? 0) * 0.025 + (actions.organize ?? 0) * 0.02 + (state.weeklyMeetingMomentum ?? 0) * 0.18);
   const [, arrivalRoll] = nextRandom(state.seed ^ createSeed(`arrival-chance:${state.week}:${nextContactNumber}`));
-  if (arrivalRoll < 0.28) {
+  if (arrivalRoll < arrivalChance) {
     const [nextSeed, roll] = nextRandom(seed ^ createSeed(`arrival:${state.week}:${nextContactNumber}`)); seed = nextSeed;
     const generated = generateContacts(state.character.background, Math.floor(roll * 0xffffffff), state.character.age, [state.character.portraitId ?? ""])[Math.floor(roll * 12)];
-    const person: Contact = { ...generated, id: `person-${nextContactNumber++}`, firstMetWeek: state.week, lastInteractionWeek: state.week, returnCount: 0, warmth: 42 + Math.floor(roll * 13), note: "최근 새롭게 알게 된 사람" };
+    const social = (actions.social ?? 0) > 0;
+    const focus = (actions.focus ?? 0) > 0;
+    const meetingContext = state.weeklyMeetingContext ?? (social ? "취미나 동네 모임" : focus ? (state.character.background === "student" ? "수업이나 스터디" : state.character.background === "jobseeker" ? "취업 준비 모임" : "업무나 프로젝트") : "일상을 정리하던 중 들른 동네 공간");
+    const person: Contact = { ...generated, id: `person-${nextContactNumber++}`, firstMetWeek: state.week, lastInteractionWeek: state.week, returnCount: 0, warmth: 42 + Math.floor(roll * 13), note: `${meetingContext}에서 처음 인사를 나눴다.` };
     contacts.push(person);
-    const text = `${person.name}을(를) 새롭게 알게 됐다. ${person.role}로 만나 가볍게 인사를 나눴다.`;
+    const text = `${meetingContext}에서 ${person.name}을(를) 새롭게 알게 됐다. ${person.role}로 만나 가볍게 인사를 나눴다.`;
     logs.push(text);
     records.push({ id: `arrival-${person.id}-${state.week}`, week: state.week, kind: "arrival", contactId: person.id, contactName: person.name, text });
   }
-  return { contacts, archivedContacts: archived, relationshipRecords: records, nextContactNumber, seed, logs };
+  return { contacts, archivedContacts: archived, relationshipRecords: records, nextContactNumber, reunionIds, seed, logs };
 }
 
 export function startNextWeek(state: GameState): GameState {
@@ -572,7 +627,7 @@ export function startNextWeek(state: GameState): GameState {
   const week = state.week + 1;
   return {
     ...state, week, day: 1, phase: "playing",
-    evaluatedDays: [], actionDays: [], seenEvents: [], lastChoice: undefined,
+    evaluatedDays: [], actionDays: [], weeklyActions: {}, weeklyMeetingMomentum: 0, weeklyMeetingContext: undefined, seenEvents: [], lastChoice: undefined,
     stats: { ...state.stats, energy: clamp(state.stats.energy + 12), stress: clamp(state.stats.stress - 7) },
     log: [`${week}주차가 시작됐다. 지난주의 경험이 생활에 남아 있다.`, ...state.log],
   };
