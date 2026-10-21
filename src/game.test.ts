@@ -9,6 +9,10 @@ const character: Character = {
   gender: "여성", region: "서울", housing: "자취",
 };
 
+function finishWeek(state: ReturnType<typeof createGame>) {
+  return advanceDay({ ...state, day: 7, phase: "playing", evaluatedDays: [...new Set([...state.evaluatedDays, 7])] });
+}
+
 describe("first week simulation", () => {
   it("keeps generated NPC names consistent with gender and repairs old mismatched names", () => {
     for (let seed = 0; seed < 100; seed += 1) {
@@ -122,6 +126,7 @@ describe("first week simulation", () => {
     expect(state.phase).toBe("summary");
     const next = startNextWeek(state);
     expect(next.week).toBe(2);
+    expect(next.contacts).toEqual(state.contacts);
     expect(next.day).toBe(1);
     expect(next.phase).toBe("playing");
   });
@@ -237,13 +242,16 @@ describe("first week simulation", () => {
 
   it("gives each NPC independent goal state and reproducible weekly behavior", () => {
     const base = { ...createGame(character, 61024), phase: "summary" as const };
-    const first = startNextWeek(base);
-    const replay = startNextWeek(base);
+    const weekEnd = { ...base, phase: "playing" as const, day: 7, evaluatedDays: [7] };
+    const first = finishWeek(weekEnd);
+    const replay = finishWeek(weekEnd);
     expect(replay).toEqual(first);
     expect(first.contacts).toHaveLength(12);
     expect(first.contacts.every((person) => person.goal && person.goalStage && person.mood && person.lastAutonomousAction)).toBe(true);
     expect(first.contacts.every((person) => (person.goalProgress ?? -1) >= 0 && (person.goalProgress ?? 4) <= 3)).toBe(true);
-    expect(first.log.some((line) => line.includes("주차가 시작됐다"))).toBe(true);
+    expect(first.phase).toBe("summary");
+    expect(first.week).toBe(1);
+    expect(first.contacts.some((person, index) => person.goalProgress !== weekEnd.contacts[index].goalProgress || person.lastAutonomousAction !== weekEnd.contacts[index].lastAutonomousAction)).toBe(true);
   });
 
   it("lets player support advance an NPC goal and unlock a goal-aware follow-up", () => {
@@ -254,7 +262,7 @@ describe("first week simulation", () => {
       goalProgress: index === 0 ? 0 : person.goalProgress,
       goalSupport: index === 0 ? 3 : 0,
     }));
-    const next = startNextWeek({ ...base, phase: "summary", contacts });
+    const next = finishWeek({ ...base, contacts });
     const supported = next.contacts[0];
     expect(supported.goalProgress).toBe(1);
     expect(supported.goalSupport).toBe(2);
@@ -294,7 +302,7 @@ describe("first week simulation", () => {
     const contact = social.contacts[1];
     expect(contact.memories?.[0].text).toContain(contact.name);
     expect(contact.memories?.[0].vividness).toBe(1);
-    const nextWeek = startNextWeek({ ...social, phase: "summary" });
+    const nextWeek = finishWeek(social);
     expect(nextWeek.contacts[1].memories?.[0].vividness).toBeCloseTo(0.94);
   });
 
@@ -306,14 +314,14 @@ describe("first week simulation", () => {
     };
     let completed: { name: string; goal: string; result: ReturnType<typeof startNextWeek> } | undefined;
     for (let seed = 1; seed < 80 && !completed; seed += 1) {
-      const result = startNextWeek({ ...base, seed });
+      const result = finishWeek({ ...base, phase: "playing", day: 7, evaluatedDays: [7], seed });
       const person = result.contacts.find((contact, index) => contact.goal !== base.contacts[index].goal);
       if (person) completed = { name: person.name, goal: base.contacts.find((contact) => contact.id === person.id)!.goal!, result };
     }
     expect(completed).toBeDefined();
     const line = `${completed!.name}이(가) “${completed!.goal}”에서 한 단계를 마쳤어요.`;
     expect(completed!.result.log.filter((entry) => entry === line)).toHaveLength(1);
-    const following = startNextWeek({ ...completed!.result, phase: "summary" });
+    const following = finishWeek({ ...completed!.result, phase: "playing", day: 7, evaluatedDays: [7], week: 2 });
     expect(following.log.filter((entry) => entry === line)).toHaveLength(1);
   });
 });
