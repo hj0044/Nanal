@@ -77,6 +77,14 @@ export interface Contact {
   archivedWeek?: number;
   returnCount?: number;
 }
+export interface NPCRelationship {
+  id: string;
+  contactAId: string;
+  contactBId: string;
+  warmth: number;
+  kind: "family" | "friend" | "work" | "acquaintance";
+  lastInteractionWeek?: number;
+}
 export interface RelationshipRecord { id: string; week: number; kind: "arrival" | "drift" | "departure" | "reunion" | "memory"; contactId: string; contactName: string; text: string }
 export interface Effect {
   money?: number;
@@ -132,6 +140,7 @@ export interface GameState {
   contacts: Contact[];
   archivedContacts?: Contact[];
   relationshipRecords?: RelationshipRecord[];
+  npcRelationships?: NPCRelationship[];
   nextContactNumber?: number;
   log: string[];
   pendingEvent?: LifeEvent;
@@ -200,13 +209,13 @@ import { choosePortraitId, getPortrait } from "./portrait-catalog";
 // Keep generated names aligned with the character's selected gender. Korean names
 // can be unisex, so these pools favor names commonly associated with each gender.
 const firstNamesByGender: Record<Character["gender"], string[]> = {
-  여성: ["하은", "예린", "은서", "채원", "다은", "소연", "나연", "서윤", "예진", "유나", "하린", "수아", "지은", "수빈", "아린", "민서", "지원", "다현"],
-  남성: ["서준", "민준", "도윤", "현우", "준호", "건우", "태민", "우진", "시우", "민재", "도현", "지훈", "준서", "정우", "승현", "재현", "성민", "동현"],
+  여성: ["하은", "예린", "은서", "채원", "다은", "소연", "나연", "서윤", "예진", "유나", "하린", "수아", "지은", "수빈", "아린", "민서", "지원", "다현", "지민", "윤서", "서현", "유진", "혜원", "시은", "보민", "가은", "예원", "수민", "주연", "현지", "다영", "나은", "연우", "채은"],
+  남성: ["서준", "민준", "도윤", "현우", "준호", "건우", "태민", "우진", "시우", "민재", "도현", "지훈", "준서", "정우", "승현", "재현", "성민", "동현", "윤호", "시원", "주원", "현준", "민성", "진우", "성현", "유찬", "태윤", "승우", "재민", "정민", "준영", "도훈", "은우"],
 };
 const roles: Record<Background, string[]> = {
-  student: ["같은 수업을 듣는 동기", "오래 알고 지낸 친구", "가족", "동아리 선배", "수업 팀원", "아르바이트 동료", "고등학교 친구", "학과 지인", "사촌", "스터디 구성원", "이웃", "온라인으로 알게 된 지인"],
-  jobseeker: ["관심 분야를 아는 선배", "오래 알고 지낸 친구", "가족", "스터디 구성원", "이전 아르바이트 동료", "학교 선배", "친척", "취업 커뮤니티 지인", "동네 친구", "교육 과정 동기", "예전 직장 동료", "소개로 알게 된 지인"],
-  worker: ["같은 팀 동료", "오래 알고 지낸 친구", "가족", "직장 선배", "이전 직장 동료", "학교 친구", "친척", "취미 모임 지인", "이웃", "업무 협력자", "동기", "소개로 알게 된 지인"],
+  student: ["같은 수업을 듣는 동기", "오래 알고 지낸 친구", "가족", "동아리 선배", "수업 팀원", "아르바이트 동료", "고등학교 친구", "학과 지인", "사촌", "스터디 구성원", "이웃", "온라인으로 알게 된 지인", "교양 수업에서 만난 친구", "학생회에서 함께 일하는 사람", "동아리 신입 회원", "기숙사 룸메이트", "과외 선생님", "단골 카페 아르바이트생", "친구의 친구", "운동 모임 지인", "같은 프로젝트 팀원", "도서관에서 알게 된 사람", "교환학생 친구", "학과 조교", "예전 학원 친구", "동네에서 자주 마주치는 사람", "봉사활동 동료", "온라인 게임 친구", "선배의 소개로 만난 사람", "가족의 지인"],
+  jobseeker: ["관심 분야를 아는 선배", "오래 알고 지낸 친구", "가족", "스터디 구성원", "이전 아르바이트 동료", "학교 선배", "친척", "취업 커뮤니티 지인", "동네 친구", "교육 과정 동기", "예전 직장 동료", "소개로 알게 된 지인", "자격증 스터디 동료", "취업 박람회에서 만난 사람", "같은 분야 지원자", "현직자 멘토", "온라인 커뮤니티 운영진", "직업훈련 과정 친구", "면접에서 알게 된 지원자", "단기 프로젝트 동료", "동네 아르바이트 동료", "친구의 직장 선배", "예전 대학 팀원", "봉사활동 지인", "취미 모임 친구", "헤드헌터 소개 인맥", "창업 준비 모임 지인", "가족의 친구", "이전 직장 선배", "스터디 카페 단골"],
+  worker: ["같은 팀 동료", "오래 알고 지낸 친구", "가족", "직장 선배", "이전 직장 동료", "학교 친구", "친척", "취미 모임 지인", "이웃", "업무 협력자", "동기", "소개로 알게 된 지인", "다른 팀 협업자", "신입사원 동료", "거래처 담당자", "업계 모임에서 만난 사람", "직장 동료의 친구", "점심 모임 동료", "예전 프로젝트 파트너", "동네 운동 친구", "동호회 운영진", "단골 가게 사장님", "전 직장 후배", "대학원 동기", "멘토링 모임 지인", "온라인 커뮤니티 친구", "가족의 지인", "동네 이웃", "회사 근처 카페 단골", "친구의 직장 동료"],
 };
 const surnames = ["김", "이", "박", "최", "정", "강", "조", "윤", "장", "임"];
 const allGeneratedFirstNames = new Set(Object.values(firstNamesByGender).flat());
@@ -214,12 +223,12 @@ const oppositeGenderNames: Record<Character["gender"], Set<string>> = {
   여성: new Set(firstNamesByGender.남성),
   남성: new Set(firstNamesByGender.여성),
 };
-const traits = ["차분하고 신중한", "활발하고 솔직한", "다정하고 세심한", "현실적이고 믿음직한", "호기심 많고 낙천적인", "조용하지만 끈기 있는"];
-const goals = ["관심 분야에서 자기 길 찾기", "일과 휴식의 균형 맞추기", "경제적으로 조금 더 독립하기", "오래 갈 관계를 만들어가기", "새로운 경험과 기회 넓히기", "꾸준히 실력을 쌓아가기"];
+const traits = ["차분하고 신중한", "활발하고 솔직한", "다정하고 세심한", "현실적이고 믿음직한", "호기심 많고 낙천적인", "조용하지만 끈기 있는", "낯은 가리지만 마음을 잘 쓰는", "경쟁심이 강하고 추진력 있는", "계획적이고 책임감 있는", "즉흥적이고 유쾌한", "독립적이고 자기 주관이 뚜렷한", "공감은 빠르지만 걱정이 많은", "말수는 적어도 관찰력이 좋은", "사교적이지만 혼자만의 시간도 중시하는", "완벽을 추구하지만 쉽게 지치는", "새로운 사람에게 먼저 다가가는"];
+const goals = ["관심 분야에서 자기 길 찾기", "일과 휴식의 균형 맞추기", "경제적으로 조금 더 독립하기", "오래 갈 관계를 만들어가기", "새로운 경험과 기회 넓히기", "꾸준히 실력을 쌓아가기", "가족과 보내는 시간을 늘리기", "지금 사는 곳에서 내 기반 만들기", "미뤄둔 공부나 자격증 끝내기", "건강한 생활 리듬 되찾기", "작은 창작물을 세상에 내놓기", "믿고 의지할 사람을 만들기", "빚이나 생활비 부담 줄이기", "일에서 인정받고 다음 단계로 가기", "오래 품은 여행 계획 실현하기", "좋아하는 취미를 꾸준히 이어가기", "새로운 직무나 진로에 도전하기", "주변 사람과 오래된 오해 풀기", "나만의 집이나 작업 공간 마련하기", "실패해도 다시 시도할 용기 얻기"];
 const occupations: Record<Background, string[]> = {
-  student: ["대학생", "카페 아르바이트", "취업 준비 중", "대학원생", "프리랜서", "사무직", "서비스직"],
-  jobseeker: ["취업 준비 중", "사무직", "서비스직", "프리랜서", "대학원생", "기술직", "창업 준비 중"],
-  worker: ["사무직", "서비스직", "기술직", "프리랜서", "자영업", "공공기관 근무", "대학원생"],
+  student: ["대학생", "카페 아르바이트", "취업 준비 중", "대학원생", "프리랜서", "사무직", "서비스직", "과외 강사", "연구 보조원", "디자인 외주 작업자", "편의점 아르바이트", "콘텐츠 제작자", "배달 플랫폼 종사자", "휴학 중", "창업 동아리 활동 중"],
+  jobseeker: ["취업 준비 중", "사무직", "서비스직", "프리랜서", "대학원생", "기술직", "창업 준비 중", "자격증 공부 중", "단기 계약직", "직업훈련생", "콘텐츠 제작자", "과외 강사", "플랫폼 노동자", "인턴", "가족 사업 보조"],
+  worker: ["사무직", "서비스직", "기술직", "프리랜서", "자영업", "공공기관 근무", "대학원생", "교육·강의직", "의료·복지직", "현장직", "디자이너", "콘텐츠 제작자", "소규모 사업 운영", "계약직", "육아·가사와 일 병행"],
 };
 
 export function createSeed(text: string): number {
@@ -246,10 +255,16 @@ export function normalizeContactName(name: string, gender: Character["gender"], 
   if (!allGeneratedFirstNames.has(givenName) || !oppositeGenderNames[gender].has(givenName)) return name;
   return `${name.slice(0, -2)}${firstNamesByGender[gender][seed % firstNamesByGender[gender].length]}`;
 }
-export function generateContacts(background: Background, seed: number, playerAge = 24, excludedPortraitIds: string[] = []): Contact[] {
+export function generateContacts(background: Background, seed: number, playerAge = 24, excludedPortraitIds: string[] = [], excludedNames: string[] = []): Contact[] {
   let state = seed;
   const usedPortraits = [...excludedPortraitIds];
-  return roles[background].map((role, i) => {
+  const anchors = [roles[background][0], roles[background][1], roles[background][2]];
+  const variedRoles = roles[background]
+    .filter((role) => !anchors.includes(role))
+    .sort((a, b) => createSeed(`${seed}:role:${a}`) - createSeed(`${seed}:role:${b}`));
+  const selectedRoles = [...anchors, ...variedRoles.slice(0, 9)];
+  const usedNames = new Set(excludedNames);
+  return selectedRoles.map((role, i) => {
     const [next, value] = nextRandom(state + i + 1);
     const [afterName] = nextRandom(next);
     const [, genderRoll] = nextRandom(afterName);
@@ -259,7 +274,13 @@ export function generateContacts(background: Background, seed: number, playerAge
     const [, ageRoll] = nextRandom(afterJob + 401);
     state = next;
     const gender = genderRoll < 0.5 ? "여성" : "남성";
-    const name = generateName(gender, afterName);
+    let name = generateName(gender, afterName);
+    for (let attempt = 0; usedNames.has(name) && attempt < firstNamesByGender[gender].length; attempt += 1) {
+      const surnameIndex = (Math.floor(nextRandom(afterName)[1] * surnames.length) + attempt + 1) % surnames.length;
+      const firstIndex = (afterName + attempt + 1) % firstNamesByGender[gender].length;
+      name = `${surnames[surnameIndex]}${firstNamesByGender[gender][firstIndex]}`;
+    }
+    usedNames.add(name);
     const family = /가족|사촌|친척/.test(role);
     const senior = /선배|부모|가족|친척/.test(role);
     const age = Math.max(19, playerAge + (family ? 10 : senior ? 3 : -2) + Math.floor(ageRoll * 7));
@@ -269,16 +290,58 @@ export function generateContacts(background: Background, seed: number, playerAge
     return { id: `person-${i + 1}`, name, role, gender, age, ...body, affiliation: getContactAffiliation(role, background), portraitId, portraitAgeBand: getPortrait(portraitId)?.ageBand, occupation: occupations[background][Math.floor(jobRoll * occupations[background].length)], personality: traits[Math.floor(traitRoll * traits.length)], goal: goals[Math.floor(goalRoll * goals.length)], goalProgress: Math.floor(goalRoll * 3), goalSupport: 0, goalStage: ["계획 세우기", "한 걸음 진행", "기회 기다리기"][Math.floor(goalRoll * 3)], mood: "평소와 같음", lastAutonomousAction: "이번 주 계획을 생각하는 중", memories: [], warmth: 46 + Math.floor(value * 23), note: i < 2 ? "최근 연락이 이어지고 있다" : "아직 자세히 알지 못한다" };
   });
 }
+function relationshipKind(a: Contact, b: Contact): NPCRelationship["kind"] {
+  if (/가족|사촌|친척|형제|자매/.test(a.role) && /가족|사촌|친척|형제|자매/.test(b.role)) return "family";
+  if (a.affiliation && a.affiliation === b.affiliation) return "work";
+  const aType = getRelationshipProfile(a.role).type;
+  const bType = getRelationshipProfile(b.role).type;
+  if (aType === "friend" || bType === "friend") return "friend";
+  if (aType === "work" || bType === "work") return "work";
+  return "acquaintance";
+}
+function makeNPCRelationship(a: Contact, b: Contact, warmth: number, week = 1): NPCRelationship {
+  const [contactAId, contactBId] = [a.id, b.id].sort();
+  return { id: `npc-link-${contactAId}-${contactBId}`, contactAId, contactBId, warmth, kind: relationshipKind(a, b), lastInteractionWeek: week };
+}
+export function createInitialNPCRelationships(contacts: Contact[], seed: number): NPCRelationship[] {
+  const links: NPCRelationship[] = [];
+  for (let i = 0; i < contacts.length; i += 1) {
+    for (let j = i + 1; j < contacts.length; j += 1) {
+      const a = contacts[i];
+      const b = contacts[j];
+      const sameGroup = !!a.affiliation && a.affiliation === b.affiliation;
+      const socialTie = getRelationshipProfile(a.role).type === "friend" || getRelationshipProfile(b.role).type === "friend";
+      const [, roll] = nextRandom(seed ^ createSeed(`npc-link:${a.id}:${b.id}`));
+      const chance = sameGroup ? 0.42 : socialTie ? 0.31 : 0.16;
+      if (roll < chance) links.push(makeNPCRelationship(a, b, 35 + Math.floor(roll * 50)));
+    }
+  }
+  return links;
+}
+function evolveNPCRelationships(contacts: Contact[], previous: NPCRelationship[], week: number, seed: number): NPCRelationship[] {
+  const byId = new Map(contacts.map((contact) => [contact.id, contact]));
+  const links = previous.map((link) => {
+    const a = byId.get(link.contactAId);
+    const b = byId.get(link.contactBId);
+    if (!a || !b) return link;
+    const [, encounterRoll] = nextRandom(seed ^ createSeed(`${link.id}:week:${week}:encounter`));
+    if (encounterRoll >= 0.16 + (link.kind === "friend" ? 0.08 : link.kind === "work" ? 0.05 : 0)) return link;
+    const [, outcomeRoll] = nextRandom(seed ^ createSeed(`${link.id}:week:${week}:outcome`));
+    const change = outcomeRoll < 0.7 ? 1 + Math.floor(outcomeRoll * 3) : -1 - Math.floor(outcomeRoll * 2);
+    return { ...link, warmth: clamp(link.warmth + change), lastInteractionWeek: week };
+  });
+  return links;
+}
 export function createGame(character: Character, seed = createSeed(`${character.name}:${character.year}:${character.age}:${character.background}`)): GameState {
   const money = character.startingMoney ?? (character.background === "student" ? 420_000 : character.background === "jobseeker" ? 650_000 : 1_850_000);
   const body = generateBodyMetrics(character.gender, seed, character.heightCm);
   const player = { ...character, ...body, weightKg: character.weightKg ?? body.weightKg, affiliation: getPlayerAffiliation(character), portraitId: character.portraitId ?? choosePortraitId(character.gender, character.age, seed) };
+  const contacts = generateContacts(character.background, seed, character.age, [player.portraitId]).map((person) => ({ ...person, firstMetWeek: 1, lastInteractionWeek: 1, returnCount: 0 }));
   return {
     version: 1, character: player, week: 1, day: 1, phase: "playing", seed,
     evaluatedDays: [], seenEvents: [], npcStoryStages: {}, npcStoryLastWeek: {}, npcStoryChoices: {},
     stats: { money, energy: 72, stress: 24, mood: 61, focus: 52 },
-    contacts: generateContacts(character.background, seed, character.age, [player.portraitId]).map((person) => ({ ...person, firstMetWeek: 1, lastInteractionWeek: 1, returnCount: 0 })),
-    archivedContacts: [], relationshipRecords: [], nextContactNumber: 13,
+    contacts, archivedContacts: [], relationshipRecords: [], npcRelationships: createInitialNPCRelationships(contacts, seed), nextContactNumber: 13,
     log: [`${character.year}년, ${character.name}의 새로운 생활이 시작됐다.`],
     settings: { palette: "clean", nightMode: "device", nightStart: "21:00", nightEnd: "07:00", topics: { affair: true, illness: true, pregnancy: true } },
   };
@@ -436,6 +499,7 @@ export function advanceDay(state: GameState): GameState {
       contacts: npcTurn.contacts,
       archivedContacts: npcTurn.archivedContacts,
       relationshipRecords: npcTurn.relationshipRecords,
+      npcRelationships: npcTurn.npcRelationships,
       nextContactNumber: npcTurn.nextContactNumber,
       npcReunionIds: npcTurn.reunionIds,
       log: [...npcTurn.logs, ...settled.log],
@@ -558,12 +622,13 @@ export function getRelationshipProfile(role: string): { type: RelationshipType; 
   return { type: "acquaintance", graceWeeks: 6, warmthDrift: 0.58, departureMultiplier: 1.15 };
 }
 
-function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedContacts: Contact[]; relationshipRecords: RelationshipRecord[]; nextContactNumber: number; reunionIds: string[]; seed: number; logs: string[] } {
+function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedContacts: Contact[]; relationshipRecords: RelationshipRecord[]; npcRelationships: NPCRelationship[]; nextContactNumber: number; reunionIds: string[]; seed: number; logs: string[] } {
   let seed = state.seed;
   const logs: string[] = [];
   const records = [...(state.relationshipRecords ?? [])];
   const archived = [...(state.archivedContacts ?? [])];
   const reunionIds = [...(state.npcReunionIds ?? [])];
+  let npcRelationships = [...(state.npcRelationships ?? createInitialNPCRelationships(state.contacts, state.seed))];
   let nextContactNumber = state.nextContactNumber ?? (state.contacts.length + archived.length + 1);
   const survivors: Contact[] = [];
   for (const original of state.contacts) {
@@ -648,17 +713,30 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
   const [, arrivalRoll] = nextRandom(state.seed ^ createSeed(`arrival-chance:${state.week}:${nextContactNumber}`));
   if (arrivalRoll < arrivalChance) {
     const [nextSeed, roll] = nextRandom(seed ^ createSeed(`arrival:${state.week}:${nextContactNumber}`)); seed = nextSeed;
-    const generated = generateContacts(state.character.background, Math.floor(roll * 0xffffffff), state.character.age, [state.character.portraitId ?? ""])[Math.floor(roll * 12)];
+    const knownPeople = [...contacts, ...archived];
+    const generated = generateContacts(
+      state.character.background,
+      Math.floor(roll * 0xffffffff),
+      state.character.age,
+      [state.character.portraitId ?? "", ...knownPeople.map((person) => person.portraitId ?? "")],
+      knownPeople.map((person) => person.name),
+    )[Math.floor(roll * 12)];
     const social = (actions.social ?? 0) > 0;
     const focus = (actions.focus ?? 0) > 0;
     const meetingContext = state.weeklyMeetingContext ?? (social ? "취미나 동네 모임" : focus ? (state.character.background === "student" ? "수업이나 스터디" : state.character.background === "jobseeker" ? "취업 준비 모임" : "업무나 프로젝트") : "일상을 정리하던 중 들른 동네 공간");
     const person: Contact = { ...generated, id: `person-${nextContactNumber++}`, firstMetWeek: state.week, lastInteractionWeek: state.week, returnCount: 0, warmth: 42 + Math.floor(roll * 13), note: `${meetingContext}에서 처음 인사를 나눴다.` };
     contacts.push(person);
+    const newTies = contacts.filter((candidate) => candidate.id !== person.id)
+      .map((candidate) => ({ candidate, score: createSeed(`${state.seed}:${person.id}:${candidate.id}:tie`) }))
+      .sort((a, b) => a.score - b.score)
+      .slice(0, Math.min(2, contacts.length - 1));
+    for (const { candidate } of newTies) npcRelationships.push(makeNPCRelationship(person, candidate, 28 + createSeed(`${person.id}:${candidate.id}`) % 28, state.week));
     const text = `${meetingContext}에서 ${person.name}을(를) 새롭게 알게 됐다. ${person.role}로 만나 가볍게 인사를 나눴다.`;
     logs.push(text);
     records.push({ id: `arrival-${person.id}-${state.week}`, week: state.week, kind: "arrival", contactId: person.id, contactName: person.name, text });
   }
-  return { contacts, archivedContacts: archived, relationshipRecords: records, nextContactNumber, reunionIds, seed, logs };
+  npcRelationships = evolveNPCRelationships(contacts, npcRelationships, state.week, state.seed);
+  return { contacts, archivedContacts: archived, relationshipRecords: records, npcRelationships, nextContactNumber, reunionIds, seed, logs };
 }
 
 export function startNextWeek(state: GameState): GameState {
