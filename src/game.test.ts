@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advanceDay, advanceDays, chooseEvent, createGame, createInitialNPCRelationships, generateBodyMetrics, generateContacts, getContactAffiliation, getNpcReunionEvents, getPersonalStoryEvents, getPlayerAffiliation, getRelationshipProfile, getWeeklyCashflowPlan, normalizeContactName, startNextWeek, takeDailyAction, type Character } from "./game";
+import { advanceDay, advanceDays, chooseEvent, createGame, createInitialNPCRelationships, generateBodyMetrics, generateContacts, getContactAffiliation, getEventFamily, getNpcRelationshipEvents, getNpcReunionEvents, getPersonalStoryEvents, getPlayerAffiliation, getRelationshipProfile, getWeeklyCashflowPlan, normalizeContactName, personalizeAuthoredEvent, startNextWeek, takeDailyAction, type Character } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
 import { getImageKitPortraitUrl, getPortrait, portraitCatalog } from "./portrait-catalog";
@@ -73,6 +73,56 @@ describe("first week simulation", () => {
       .find((seed) => resolveWithSeed(seed).npcRelationships?.[0].warmth !== 50);
     expect(changingSeed).toBeDefined();
     expect(resolveWithSeed(changingSeed!)).toEqual(resolveWithSeed(changingSeed!));
+  });
+
+  it("turns NPC bond, conflict, and reconciliation states into voiced events that change their relationship", () => {
+    const started = createGame(character, 30411);
+    const link = started.npcRelationships![0];
+    const stateFor = (warmth: number, lastInteractionWeek: number) => ({
+      ...started, week: 8,
+      npcRelationships: [{ ...link, warmth, lastInteractionWeek }],
+    });
+    const conflict = getNpcRelationshipEvents(stateFor(20, 2))[0];
+    expect(conflict.npcPair?.kind).toBe("conflict");
+    expect(conflict.npcDialogue?.line.length).toBeGreaterThan(10);
+    const conflictResolved = chooseEvent({ ...stateFor(20, 2), phase: "event", pendingEvent: conflict }, conflict.choices[0].id);
+    expect(conflictResolved.npcRelationships?.[0].warmth).toBe(30);
+    expect(conflictResolved.contacts.filter((person) => person.id === link.contactAId || person.id === link.contactBId).every((person) => person.memories?.[0].text === conflict.choices[0].result)).toBe(true);
+
+    expect(getNpcRelationshipEvents(stateFor(35, 7))[0].npcPair?.kind).toBe("reconciliation");
+    expect(getNpcRelationshipEvents(stateFor(82, 3))[0].npcPair?.kind).toBe("bond");
+    expect(getNpcRelationshipEvents(stateFor(55, 3))).toHaveLength(0);
+
+    const romanceState = started.npcRelationships!.map((candidate) => ({
+      ...started, week: 8,
+      npcRelationships: [{ ...candidate, kind: "friend" as const, warmth: 82, romanceStatus: undefined }],
+    })).find((state) => getNpcRelationshipEvents(state)[0]?.npcPair?.kind === "romance");
+    expect(romanceState).toBeDefined();
+    const romance = getNpcRelationshipEvents(romanceState!)[0];
+    expect(romance.title).toContain("마음");
+    const dating = chooseEvent({ ...romanceState!, phase: "event", pendingEvent: romance }, romance.choices[0].id);
+    expect(dating.npcRelationships?.[0].romanceStatus).toBe("dating");
+    expect(getNpcRelationshipEvents(dating)).toHaveLength(0);
+  });
+
+  it("adapts authored scenes to the NPC involved and remembers the player's response", () => {
+    const started = createGame(character, 55192);
+    const scene = eventLibrary.student.find((event) => event.id === "student-team")!;
+    const involved = personalizeAuthoredEvent(scene, started);
+    const contact = started.contacts[0];
+    expect(involved.npcDialogue?.speakerName).toBe(contact.name);
+    expect(involved.body).toContain(contact.goal);
+    expect(involved.choices[0].result).toContain(contact.name);
+
+    const resolved = chooseEvent({ ...started, phase: "event", pendingEvent: involved }, involved.choices[0].id);
+    expect(resolved.contacts[0].lastInteractionWeek).toBe(started.week);
+    expect(resolved.contacts[0].memories?.[0].text).toBe(involved.choices[0].result);
+    expect(getEventFamily(scene)).toBe("study");
+
+    const differentVoice = personalizeAuthoredEvent(scene, {
+      ...started, contacts: started.contacts.map((person, index) => index === 0 ? { ...person, personality: "낯은 가리지만 마음을 잘 쓰는" } : person),
+    });
+    expect(differentVoice.npcDialogue?.line).not.toBe(involved.npcDialogue?.line);
   });
 
   it("provides stable demographic and affiliation details for the protagonist and NPCs", () => {
@@ -308,13 +358,20 @@ describe("first week simulation", () => {
     }
   });
 
-  it("avoids repeating authored events inside the three-week cooldown", () => {
+  it("avoids repeating authored events inside the eight-week cooldown and rotates story families", () => {
     let state = createGame(character, 662910);
     let choicesMade = 0;
+    const familyLastSeen = new Map<string, number>();
     for (let guard = 0; guard < 140 && state.week <= 12; guard += 1) {
       if (state.phase === "event" && state.pendingEvent) {
         const previousWeek = state.eventLastSeenWeek?.[state.pendingEvent.id];
-        if (previousWeek !== undefined) expect(state.week - previousWeek).toBeGreaterThanOrEqual(3);
+        if (previousWeek !== undefined && !state.pendingEvent.personalStory && !state.pendingEvent.reunion && !state.pendingEvent.npcPair) expect(state.week - previousWeek).toBeGreaterThanOrEqual(8);
+        if (!state.pendingEvent.personalStory && !state.pendingEvent.reunion && !state.pendingEvent.npcPair) {
+          const family = getEventFamily(state.pendingEvent);
+          const lastFamilyWeek = familyLastSeen.get(family);
+          if (lastFamilyWeek !== undefined) expect(state.week - lastFamilyWeek).toBeGreaterThanOrEqual(2);
+          familyLastSeen.set(family, state.week);
+        }
         state = chooseEvent(state, state.pendingEvent.choices[0].id);
         choicesMade += 1;
       } else if (state.phase === "summary") {
