@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  advanceDays, backgroundLabels, chooseEvent, createGame, createSeed, generateContacts, startNextWeek, takeDailyAction,
+  advanceDays, backgroundLabels, chooseEvent, createGame, createSeed, generateContacts, generateName, normalizeContactName, startNextWeek, takeDailyAction,
   type Background, type Character, type CharacterDraft, type Contact, type DailyAction, type GameState, type Palette,
   type SensitiveTopic, type Tab,
 } from "./game";
@@ -10,7 +10,6 @@ import { choosePortraitId, getPortrait, getPortraitImageUrl, portraitPosition } 
 
 const SAVE_KEY = "nanal-save-v1";
 const backgroundChoices: Background[] = ["student", "jobseeker", "worker"];
-const namePool = ["서윤", "민준", "지우", "하린", "도현", "예진", "시우", "유나"];
 const regions = ["서울", "인천", "경기", "부산", "대구"];
 const housingChoices = ["가족과 동거", "자취", "기숙사", "전세·월세 동거"];
 const emptyDraft: CharacterDraft = { name: "", age: "", year: "", background: "", gender: "", region: "", housing: "", education: "", family: "", startingMoney: "" };
@@ -47,7 +46,7 @@ function normalizeSave(parsed: GameState): GameState {
       }
       usedPortraitIds.push(portraitId);
       return {
-        ...merged, age, portraitId,
+        ...merged, name: normalizeContactName(merged.name, merged.gender ?? "여성", createSeed(`${parsed.seed}:${merged.id}:name`)), age, portraitId,
         portraitAgeBand: getPortrait(portraitId)?.ageBand,
         occupation: person.occupation ?? generated[index]?.occupation,
         personality: person.personality ?? generated[index]?.personality,
@@ -117,10 +116,11 @@ function App() {
     const age = background === "student" ? 19 + Math.floor(Math.random() * 8) : background === "jobseeker" ? 20 + Math.floor(Math.random() * 11) : 22 + Math.floor(Math.random() * 9);
     const education = background === "student" ? "대학 재학·휴학" : background === "jobseeker" ? ["고등학교 졸업", "대학교 졸업", "대학원·전문 과정"][Math.floor(Math.random() * 3)] : ["대학교 졸업", "직업교육·자격 과정"][Math.floor(Math.random() * 2)];
     const money = background === "student" ? [100000, 300000, 700000][Math.floor(Math.random() * 3)] : background === "jobseeker" ? [200000, 600000, 1500000][Math.floor(Math.random() * 3)] : [800000, 1800000, 3500000][Math.floor(Math.random() * 3)];
+    const gender = Math.random() > 0.5 ? "남성" : "여성";
     setDraft({
-      name: namePool[Math.floor(Math.random() * namePool.length)],
+      name: generateName(gender, Math.floor(Math.random() * 0xffffffff)),
       age, year: 2020 + Math.floor(Math.random() * 7), background,
-      gender: Math.random() > 0.5 ? "남성" : "여성",
+      gender,
       region: regions[Math.floor(Math.random() * regions.length)],
       housing: housingChoices[Math.floor(Math.random() * housingChoices.length)],
       education,
