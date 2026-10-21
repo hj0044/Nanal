@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  advanceDays, backgroundLabels, chooseEvent, createGame, createSeed, generateContacts, generateName, getWeeklyCashflowPlan, normalizeContactName, startNextWeek, takeDailyAction,
+  advanceDays, backgroundLabels, chooseEvent, createGame, createSeed, generateBodyMetrics, generateContacts, generateName, getContactAffiliation, getPlayerAffiliation, getWeeklyCashflowPlan, normalizeContactName, startNextWeek, takeDailyAction,
   type Background, type Character, type CharacterDraft, type Contact, type DailyAction, type GameState, type Palette,
   type SensitiveTopic, type Tab,
 } from "./game";
@@ -12,7 +12,7 @@ const SAVE_KEY = "nanal-save-v1";
 const backgroundChoices: Background[] = ["student", "jobseeker", "worker"];
 const regions = ["서울", "인천", "경기", "부산", "대구"];
 const housingChoices = ["가족과 동거", "자취", "기숙사", "전세·월세 동거"];
-const emptyDraft: CharacterDraft = { name: "", age: "", year: "", background: "", gender: "", region: "", housing: "", education: "", family: "", startingMoney: "" };
+const emptyDraft: CharacterDraft = { name: "", age: "", year: "", background: "", gender: "", heightCm: "", weightKg: "", affiliation: "", region: "", housing: "", education: "", family: "", startingMoney: "" };
 function portraitStyle(portraitId?: string): React.CSSProperties {
   const portrait = getPortrait(portraitId);
   return { backgroundImage: `url("${getPortraitImageUrl(portraitId)}")`, backgroundSize: portrait?.source === "atlas" ? "400% 400%" : "cover", backgroundPosition: portraitPosition(portraitId) };
@@ -32,24 +32,35 @@ function normalizeSave(parsed: GameState): GameState {
   const playerPortraitId = savedPlayerPortraitId && getPortrait(savedPlayerPortraitId)?.gender === parsed.character.gender
     ? savedPlayerPortraitId : createGame(parsed.character, parsed.seed).character.portraitId;
   const generated = generateContacts(parsed.character.background, parsed.seed, parsed.character.age, playerPortraitId ? [playerPortraitId] : []);
+  const playerBody = generateBodyMetrics(parsed.character.gender, createSeed(`${parsed.seed}:${parsed.character.name}:body`), parsed.character.heightCm);
   const usedPortraitIds = playerPortraitId ? [playerPortraitId] : [];
   return {
     ...parsed,
-    character: { ...parsed.character, portraitId: playerPortraitId },
+    character: {
+      ...parsed.character, ...playerBody, weightKg: parsed.character.weightKg ?? playerBody.weightKg,
+      affiliation: getPlayerAffiliation(parsed.character), portraitId: playerPortraitId,
+    },
     recentEventIds: parsed.recentEventIds ?? [],
-    archivedContacts: parsed.archivedContacts ?? [],
     relationshipRecords: parsed.relationshipRecords ?? [],
     nextContactNumber: parsed.nextContactNumber ?? Math.max(13, ...[...parsed.contacts, ...(parsed.archivedContacts ?? [])].map((person) => Number(person.id.replace("person-", "")) + 1)),
+    archivedContacts: (parsed.archivedContacts ?? []).map((person) => {
+      const gender = person.gender ?? (createSeed(`${parsed.seed}:${person.id}:gender`) % 2 === 0 ? "여성" : "남성");
+      const body = generateBodyMetrics(gender, createSeed(`${parsed.seed}:${person.id}:body`), person.heightCm);
+      return { ...person, gender, age: person.age ?? parsed.character.age, ...body, weightKg: person.weightKg ?? body.weightKg, affiliation: person.affiliation ?? getContactAffiliation(person.role, parsed.character.background) };
+    }),
     contacts: parsed.contacts.map((person, index) => {
       const merged = { ...generated[index], ...person };
       const age = person.age ?? generated[index]?.age ?? parsed.character.age;
+      const gender = person.gender ?? generated[index]?.gender ?? (createSeed(`${parsed.seed}:${person.id}:gender`) % 2 === 0 ? "여성" : "남성");
+      const body = generateBodyMetrics(gender, createSeed(`${parsed.seed}:${person.id}:body`), person.heightCm);
       let portraitId = person.portraitId;
-      if (!portraitId || usedPortraitIds.includes(portraitId) || getPortrait(portraitId)?.gender !== merged.gender) {
-        portraitId = choosePortraitId(merged.gender ?? generated[index]?.gender ?? "여성", age, createSeed(`${parsed.seed}:${merged.id}`), usedPortraitIds);
+      if (!portraitId || usedPortraitIds.includes(portraitId) || getPortrait(portraitId)?.gender !== gender) {
+        portraitId = choosePortraitId(gender, age, createSeed(`${parsed.seed}:${merged.id}`), usedPortraitIds);
       }
       usedPortraitIds.push(portraitId);
       return {
-        ...merged, name: normalizeContactName(merged.name, merged.gender ?? "여성", createSeed(`${parsed.seed}:${merged.id}:name`)), age, portraitId,
+        ...merged, name: normalizeContactName(merged.name, gender, createSeed(`${parsed.seed}:${merged.id}:name`)), age, gender,
+        ...body, weightKg: person.weightKg ?? body.weightKg, affiliation: person.affiliation ?? getContactAffiliation(person.role, parsed.character.background), portraitId,
         portraitAgeBand: getPortrait(portraitId)?.ageBand,
         occupation: person.occupation ?? generated[index]?.occupation,
         personality: person.personality ?? generated[index]?.personality,
@@ -67,6 +78,7 @@ function App() {
   const [tab, setTab] = useState<Tab>("life");
   const [showSettings, setShowSettings] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState<Contact | null>(null);
+  const [showPlayerProfile, setShowPlayerProfile] = useState(false);
   const [showCreator, setShowCreator] = useState(!readSave());
   const [importMessage, setImportMessage] = useState("");
   const [nightNow, setNightNow] = useState(false);
@@ -110,6 +122,9 @@ function App() {
       ...draft, name: draft.name.trim(), age: Number(draft.age), year: Number(draft.year),
       background: draft.background, gender: draft.gender,
       education: draft.education || undefined, family: draft.family || undefined,
+      heightCm: draft.heightCm ? Number(draft.heightCm) : undefined,
+      weightKg: draft.weightKg ? Number(draft.weightKg) : undefined,
+      affiliation: draft.affiliation.trim() || undefined,
       startingMoney: draft.startingMoney ? Number(draft.startingMoney) : undefined,
     };
     const seed = createSeed(`${character.name}:${character.age}:${character.year}:${character.background}:${Date.now()}`);
@@ -130,6 +145,7 @@ function App() {
       region: regions[Math.floor(Math.random() * regions.length)],
       housing: housingChoices[Math.floor(Math.random() * housingChoices.length)],
       education,
+      heightCm: "", weightKg: "", affiliation: "",
       family: ["가족과 동거", "독립 생활", "배우자·자녀와 거주", "기숙사 생활"][Math.floor(Math.random() * 4)],
       startingMoney: String(money),
     });
@@ -159,7 +175,7 @@ function App() {
       </header>
       <main className="main-content">
         {tab === "life" && <LifeView game={game} onAdvance={(days) => updateGame((current) => advanceDays(current, days))} onAction={(action, targetContactId) => updateGame((current) => takeDailyAction(current, action, targetContactId))} onChoice={(id) => updateGame((current) => chooseEvent(current, id))} onNextWeek={() => updateGame(startNextWeek)} onSelectPerson={setSelectedPerson} />}
-        {tab === "people" && <PeopleView game={game} onSelectPerson={setSelectedPerson} />}
+        {tab === "people" && <PeopleView game={game} onSelectPerson={setSelectedPerson} onSelectPlayer={() => setShowPlayerProfile(true)} />}
         {tab === "work" && <WorkView game={game} />}
         {tab === "goals" && <GoalsView game={game} />}
         {tab === "record" && <RecordView game={game} />}
@@ -177,6 +193,7 @@ function App() {
         onUpdate={(patch) => updateGame((current) => ({ ...current, settings: { ...current.settings, ...patch } }))}
         onExport={() => exportSave(game)} onImport={handleImport} importMessage={importMessage} />}
       {selectedPerson && <PersonDetails person={selectedPerson} onClose={() => setSelectedPerson(null)} />}
+      {showPlayerProfile && <PlayerDetails character={game.character} onClose={() => setShowPlayerProfile(false)} />}
     </div>
   );
 }
@@ -185,7 +202,7 @@ function Creator({ draft, setDraft, canStart, randomize, start, onImport, import
   draft: CharacterDraft; setDraft: React.Dispatch<React.SetStateAction<CharacterDraft>>; canStart: boolean;
   randomize: () => void; start: () => void; onImport: (file?: File) => void; importMessage: string; hasSave: boolean; onContinue: () => void;
 }) {
-  const set = (key: keyof CharacterDraft, value: string) => setDraft((current) => ({ ...current, [key]: key === "age" || key === "year" ? (value ? Number(value) : "") : value } as CharacterDraft));
+  const set = (key: keyof CharacterDraft, value: string) => setDraft((current) => ({ ...current, [key]: key === "age" || key === "year" || key === "heightCm" || key === "weightKg" ? (value ? Number(value) : "") : value } as CharacterDraft));
   const select = (label: string, key: keyof CharacterDraft, values: string[], placeholder: string) => (
     <label className="field"><span>{label}</span><select value={draft[key]} onChange={(event) => set(key, event.target.value)}><option value="">{placeholder}</option>{values.map((v) => <option key={v} value={v}>{v}</option>)}</select></label>
   );
@@ -211,7 +228,12 @@ function Creator({ draft, setDraft, canStart, randomize, start, onImport, import
             {select("지역", "region", regions, "지역 선택")}
             {select("주거 형태", "housing", housingChoices, "주거 선택")}
           </div>
-          <details className="optional-fields"><summary>학력·가족·초기 자산 설정</summary>
+          <details className="optional-fields"><summary>신체·소속·학력·가족·초기 자산 설정</summary>
+            <div className="field-row">
+              <label className="field"><span>키 (cm, 선택 사항)</span><input type="number" min="130" max="220" value={draft.heightCm} placeholder="비우면 자동 설정" onChange={(event) => set("heightCm", event.target.value)} /></label>
+              <label className="field"><span>몸무게 (kg, 선택 사항)</span><input type="number" min="30" max="200" value={draft.weightKg} placeholder="비우면 자동 설정" onChange={(event) => set("weightKg", event.target.value)} /></label>
+            </div>
+            <label className="field"><span>소속 (학교·회사·모임)</span><input maxLength={40} value={draft.affiliation} placeholder="비우면 배경에 맞춰 표시" onChange={(event) => set("affiliation", event.target.value)} /></label>
             <div className="field-row">
               {select("학력", "education", ["고등학교 졸업", "대학 재학·휴학", "대학교 졸업", "대학원·전문 과정", "직업교육·자격 과정"], "선택 사항")}
               {select("가족·동거", "family", ["가족과 동거", "독립 생활", "배우자·자녀와 거주", "기숙사 생활", "직접 설정"], "선택 사항")}
@@ -281,13 +303,18 @@ function formatMoney(amount: number): string { return new Intl.NumberFormat("ko-
 function EventPanel({ event, onChoice }: { event: NonNullable<GameState["pendingEvent"]>; onChoice: (id: string) => void }) {
   return <section className="event-panel"><div className="event-icon">✦</div><div className="event-content"><span className="section-kicker">{event.eyebrow}</span><h2>{event.title}</h2><p>{event.body}</p><div className="choice-list">{event.choices.map((choice, index) => <button className="choice-button" key={choice.id} onClick={() => onChoice(choice.id)}><span className="choice-number">0{index + 1}</span><span className="choice-main"><strong>{choice.title}</strong><small>{choice.detail}</small></span><span className="choice-arrow">→</span></button>)}</div><p className="microcopy">시제품 규칙으로 계산한 결과예요. 현실 통계 기반 확률은 자료를 연결하며 보강합니다.</p></div></section>;
 }
-function PeopleView({ game, onSelectPerson }: { game: GameState; onSelectPerson: (person: Contact) => void }) {
+function PeopleView({ game, onSelectPerson, onSelectPlayer }: { game: GameState; onSelectPerson: (person: Contact) => void; onSelectPlayer: () => void }) {
   const average = Math.round(game.contacts.reduce((sum, item) => sum + item.warmth, 0) / game.contacts.length);
-  return <><PageTitle kicker="PEOPLE & RELATIONSHIPS" title="내 주변 사람들" subtitle="인물을 누르면 지금까지 쌓인 관계와 기억을 볼 수 있어요." /><div className="relationship-overview"><span className="overview-icon">♡</span><div><small>주요 인맥 {game.contacts.length}명</small><strong>관계 온도 평균 {average}</strong></div></div><div className="people-grid">{game.contacts.map((person, index) => <button className="person-card" key={person.id} onClick={() => onSelectPerson(person)} aria-label={`${person.name} 상세 정보 열기`}><span className={`illustrated-portrait person-avatar avatar-${index % 5}`} style={portraitStyle(person.portraitId)} aria-hidden="true" /><span className="person-info"><strong>{person.name}</strong><span>{person.role}</span><small>{person.mood ?? "평소와 같음"} · {person.lastAutonomousAction ?? person.note}</small></span><span className="warmth-meter"><span style={{ width: `${person.warmth}%` }} /></span><span className="person-open-hint">상세 보기 <b>›</b></span></button>)}</div>{(game.archivedContacts?.length ?? 0) > 0 && <section className="panel muted-panel"><h2>한동안 만나지 못한 사람들</h2><p>지금은 연락이 뜸하지만, 함께한 이야기는 기록에 남아 있어요. 다시 마주칠 수도 있어요.</p><div className="archive-list">{[...game.archivedContacts!].reverse().map((person) => <div className="archive-row" key={person.id}><strong>{person.name}</strong><span>{person.role} · {person.archivedWeek}주차부터 연락이 뜸해짐</span><small>{person.memories?.find((memory) => memory.vividness >= 0.2)?.text ?? "함께 보낸 기억은 생애기록에 보관돼 있어요."}</small></div>)}</div></section>}</>;
+  const player = game.character;
+  return <><PageTitle kicker="PEOPLE & RELATIONSHIPS" title="내 주변 사람들" subtitle="주인공과 주변 사람의 프로필을 누르면 자세한 정보를 볼 수 있어요." /><button className="player-profile-card" onClick={onSelectPlayer}><span className="illustrated-portrait player-profile-avatar" style={portraitStyle(player.portraitId)} aria-hidden="true" /><span className="player-profile-copy"><small>주인공 프로필</small><strong>{player.name}</strong><span>{player.gender} · {player.age}세 · {player.heightCm}cm · {player.weightKg}kg</span><span>{getPlayerAffiliation(player)}</span></span><b aria-hidden="true">›</b></button><div className="relationship-overview"><span className="overview-icon">♡</span><div><small>주요 인맥 {game.contacts.length}명</small><strong>관계 온도 평균 {average}</strong></div></div><div className="people-grid">{game.contacts.map((person, index) => <button className="person-card" key={person.id} onClick={() => onSelectPerson(person)} aria-label={`${person.name} 상세 정보 열기`}><span className={`illustrated-portrait person-avatar avatar-${index % 5}`} style={portraitStyle(person.portraitId)} aria-hidden="true" /><span className="person-info"><strong>{person.name}</strong><span>{person.role}</span><small className="person-demographics">{person.gender ?? "성별 미상"} · {person.age ?? "나이 미상"}세 · {person.heightCm ?? "—"}cm · {person.weightKg ?? "—"}kg</small><small className="person-affiliation">소속 · {person.affiliation ?? getContactAffiliation(person.role, player.background)}</small></span><span className="warmth-meter"><span style={{ width: `${person.warmth}%` }} /></span><span className="person-open-hint">상세 보기 <b>›</b></span></button>)}</div>{(game.archivedContacts?.length ?? 0) > 0 && <section className="panel muted-panel"><h2>한동안 만나지 못한 사람들</h2><p>지금은 연락이 뜸하지만, 함께한 이야기는 기록에 남아 있어요. 다시 마주칠 수도 있어요.</p><div className="archive-list">{[...game.archivedContacts!].reverse().map((person) => <div className="archive-row" key={person.id}><strong>{person.name}</strong><span>{person.role} · {person.gender} · {person.age}세 · {person.heightCm}cm · {person.weightKg}kg · {person.affiliation}</span><small>{person.memories?.find((memory) => memory.vividness >= 0.2)?.text ?? "함께 보낸 기억은 생애기록에 보관돼 있어요."}</small></div>)}</div></section>}</>;
 }
 function closenessLabel(warmth: number) { return warmth >= 75 ? "가까운 사이" : warmth >= 50 ? "알아가는 중" : warmth >= 25 ? "가벼운 인맥" : "아직 서먹함"; }
 function PersonDetails({ person, onClose }: { person: Contact; onClose: () => void }) {
-  return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="person-details-modal" role="dialog" aria-modal="true" aria-labelledby="person-details-title" onClick={(event) => event.stopPropagation()}><div className="person-detail-cover"><button className="icon-button person-detail-close" aria-label="상세 정보 닫기" onClick={onClose}>×</button><span className="illustrated-portrait detail-portrait" style={portraitStyle(person.portraitId)} /></div><div className="person-detail-body"><span className="section-kicker">RELATIONSHIP PROFILE</span><h2 id="person-details-title">{person.name}</h2><p className="person-detail-role">{person.role}{person.gender ? ` · ${person.gender}` : ""}</p><div className="profile-facts"><div><small>나이</small><strong>{person.age ?? "미상"}세</strong></div><div><small>직업</small><strong>{person.occupation ?? "정보 없음"}</strong></div><div><small>성격</small><strong>{person.personality ?? "조금씩 알아가는 중"}</strong></div><div><small>요즘 목표</small><strong>{person.goal ?? "아직 알 수 없음"}</strong></div><div><small>목표 진행</small><strong>{person.goalStage ?? "진행 전"}</strong></div><div><small>요즘 상태</small><strong>{person.mood ?? "평소와 같음"}</strong></div></div><div className="relationship-score"><div><span>관계 온도</span><strong>{person.warmth}<small>/100</small></strong></div><b>{closenessLabel(person.warmth)}</b></div><div className="warmth-meter detail-meter"><span style={{ width: `${person.warmth}%` }} /></div><section className="memory-card"><span className="section-kicker">최근 기억</span><p>{person.memories?.[0]?.text ?? person.note}</p>{person.memories?.[0] && <small>기억 선명도 {Math.round(person.memories[0].vividness * 100)}% · {person.memories[0].week}주차</small>}<p className="memory-action">{person.lastAutonomousAction ?? "아직 최근 행동 기록이 없어요."}</p></section><p className="person-detail-footnote">인물의 성격과 목표는 관계와 사건을 거치며 더 구체적으로 드러나요.</p><button className="primary-button full" onClick={onClose}>확인</button></div></section></div>;
+  return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="person-details-modal" role="dialog" aria-modal="true" aria-labelledby="person-details-title" onClick={(event) => event.stopPropagation()}><div className="person-detail-cover"><button className="icon-button person-detail-close" aria-label="상세 정보 닫기" onClick={onClose}>×</button><span className="illustrated-portrait detail-portrait" style={portraitStyle(person.portraitId)} /></div><div className="person-detail-body"><span className="section-kicker">RELATIONSHIP PROFILE</span><h2 id="person-details-title">{person.name}</h2><p className="person-detail-role">{person.role} · {person.gender ?? "성별 미상"}</p><div className="profile-facts"><div><small>나이</small><strong>{person.age ?? "미상"}세</strong></div><div><small>키 · 몸무게</small><strong>{person.heightCm ?? "미상"}cm · {person.weightKg ?? "미상"}kg</strong></div><div><small>소속</small><strong>{person.affiliation ?? "소속 정보 없음"}</strong></div><div><small>직업</small><strong>{person.occupation ?? "정보 없음"}</strong></div><div><small>성격</small><strong>{person.personality ?? "조금씩 알아가는 중"}</strong></div><div><small>요즘 목표</small><strong>{person.goal ?? "아직 알 수 없음"}</strong></div><div><small>목표 진행</small><strong>{person.goalStage ?? "진행 전"}</strong></div><div><small>요즘 상태</small><strong>{person.mood ?? "평소와 같음"}</strong></div></div><div className="relationship-score"><div><span>관계 온도</span><strong>{person.warmth}<small>/100</small></strong></div><b>{closenessLabel(person.warmth)}</b></div><div className="warmth-meter detail-meter"><span style={{ width: `${person.warmth}%` }} /></div><section className="memory-card"><span className="section-kicker">최근 기억</span><p>{person.memories?.[0]?.text ?? person.note}</p>{person.memories?.[0] && <small>기억 선명도 {Math.round(person.memories[0].vividness * 100)}% · {person.memories[0].week}주차</small>}<p className="memory-action">{person.lastAutonomousAction ?? "아직 최근 행동 기록이 없어요."}</p></section><p className="person-detail-footnote">인물의 성격과 목표는 관계와 사건을 거치며 더 구체적으로 드러나요.</p><button className="primary-button full" onClick={onClose}>확인</button></div></section></div>;
+}
+
+function PlayerDetails({ character, onClose }: { character: Character; onClose: () => void }) {
+  return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="person-details-modal" role="dialog" aria-modal="true" aria-labelledby="player-details-title" onClick={(event) => event.stopPropagation()}><div className="person-detail-cover"><button className="icon-button person-detail-close" aria-label="주인공 정보 닫기" onClick={onClose}>×</button><span className="illustrated-portrait detail-portrait" style={portraitStyle(character.portraitId)} /></div><div className="person-detail-body"><span className="section-kicker">PLAYER PROFILE</span><h2 id="player-details-title">{character.name}</h2><p className="person-detail-role">주인공 · {character.gender} · {character.age}세</p><div className="profile-facts"><div><small>키 · 몸무게</small><strong>{character.heightCm ?? "미설정"}cm · {character.weightKg ?? "미설정"}kg</strong></div><div><small>소속</small><strong>{getPlayerAffiliation(character)}</strong></div><div><small>배경</small><strong>{backgroundLabels[character.background]}</strong></div><div><small>지역</small><strong>{character.region}</strong></div><div><small>주거 형태</small><strong>{character.housing}</strong></div><div><small>학력</small><strong>{character.education ?? "정보 미입력"}</strong></div><div><small>가족·동거</small><strong>{character.family ?? "정보 미입력"}</strong></div><div><small>시작 연도</small><strong>{character.year}년</strong></div></div><p className="person-detail-footnote">소속·키·몸무게는 새 생활을 만들 때 설정할 수 있고, 비워두면 게임이 추천값을 채워요.</p><button className="primary-button full" onClick={onClose}>확인</button></div></section></div>;
 }
 function WorkView({ game }: { game: GameState }) {
   const label = backgroundLabels[game.character.background];
