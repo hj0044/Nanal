@@ -1,11 +1,12 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   advanceDay, backgroundLabels, chooseEvent, createGame, createSeed, startNextWeek,
-  type Background, type Character, type CharacterDraft, type GameState, type Palette,
+  type Background, type Character, type CharacterDraft, type Contact, type GameState, type Palette,
   type SensitiveTopic, type Tab,
 } from "./game";
 import "./style.css";
+import portraitSheet from "./assets/people-portraits.webp";
 
 const SAVE_KEY = "nanal-save-v1";
 const backgroundChoices: Background[] = ["student", "jobseeker", "worker"];
@@ -13,6 +14,9 @@ const namePool = ["서윤", "민준", "지우", "하린", "도현", "예진", "�
 const regions = ["서울", "인천", "경기", "부산", "대구"];
 const housingChoices = ["가족과 동거", "자취", "기숙사", "전세·월세 동거"];
 const emptyDraft: CharacterDraft = { name: "", age: "", year: "", background: "", gender: "", region: "", housing: "", education: "", family: "", startingMoney: "" };
+function portraitStyle(gender?: "남성" | "여성"): React.CSSProperties {
+  return { backgroundImage: `url("${portraitSheet}")`, backgroundPosition: gender === "여성" ? "right center" : "left center" };
+}
 
 function readSave(): GameState | null {
   try {
@@ -28,6 +32,7 @@ function App() {
   const [draft, setDraft] = useState<CharacterDraft>(emptyDraft);
   const [tab, setTab] = useState<Tab>("life");
   const [showSettings, setShowSettings] = useState(false);
+  const [selectedPerson, setSelectedPerson] = useState<Contact | null>(null);
   const [showCreator, setShowCreator] = useState(!readSave());
   const [importMessage, setImportMessage] = useState("");
   const [nightNow, setNightNow] = useState(false);
@@ -118,8 +123,8 @@ function App() {
         </div>
       </header>
       <main className="main-content">
-        {tab === "life" && <LifeView game={game} onAdvance={() => updateGame(advanceDay)} onChoice={(id) => updateGame((current) => chooseEvent(current, id))} onNextWeek={() => updateGame(startNextWeek)} />}
-        {tab === "people" && <PeopleView game={game} />}
+        {tab === "life" && <LifeView game={game} onAdvance={() => updateGame(advanceDay)} onChoice={(id) => updateGame((current) => chooseEvent(current, id))} onNextWeek={() => updateGame(startNextWeek)} onSelectPerson={setSelectedPerson} />}
+        {tab === "people" && <PeopleView game={game} onSelectPerson={setSelectedPerson} />}
         {tab === "work" && <WorkView game={game} />}
         {tab === "goals" && <GoalsView game={game} />}
         {tab === "record" && <RecordView game={game} />}
@@ -136,6 +141,7 @@ function App() {
       {showSettings && <Settings game={game} onClose={() => setShowSettings(false)} onPalette={setPalette}
         onUpdate={(patch) => updateGame((current) => ({ ...current, settings: { ...current.settings, ...patch } }))}
         onExport={() => exportSave(game)} onImport={handleImport} importMessage={importMessage} />}
+      {selectedPerson && <PersonDetails person={selectedPerson} onClose={() => setSelectedPerson(null)} />}
     </div>
   );
 }
@@ -189,31 +195,25 @@ function Creator({ draft, setDraft, canStart, randomize, start, onImport, import
   );
 }
 
-function LifeView({ game, onAdvance, onChoice, onNextWeek }: { game: GameState; onAdvance: () => void; onChoice: (id: string) => void; onNextWeek: () => void }) {
+function LifeView({ game, onAdvance, onChoice, onNextWeek, onSelectPerson }: { game: GameState; onAdvance: () => void; onChoice: (id: string) => void; onNextWeek: () => void; onSelectPerson: (person: Contact) => void }) {
   const [showResult, setShowResult] = useState(false);
-  const intro = useMemo(() => {
-    const context = `${game.character.age}세로 ${game.character.region}에서 ${game.character.housing} 생활을 이어가고 있다.`;
-    const study = game.character.education ? ` 현재 학력은 ${game.character.education}이다.` : "";
-    const family = game.character.family ? ` ${game.character.family} 상황도 생활의 한 부분이다.` : "";
-    const path = game.character.background === "student" ? "학교와 생활의 균형을 찾아간다." : game.character.background === "jobseeker" ? "일을 찾는 준비와 하루의 리듬을 함께 살펴본다." : "일과 생활 사이에서 이번 주의 우선순위를 정한다.";
-    return `${context}${study}${family} ${path}`;
-  }, [game.character]);
-  const dateLabel = new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "long", day: "numeric" }).format(new Date(game.character.year, 0, (game.week - 1) * 7 + game.day));
+  const date = new Date(game.character.year, 0, (game.week - 1) * 7 + game.day);
+  const dateLabel = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric" }).format(date);
+  const weekday = new Intl.DateTimeFormat("ko-KR", { weekday: "short" }).format(date);
+  const featured = game.contacts[0];
+  const energyLabel = game.stats.energy >= 70 ? "좋음" : game.stats.energy >= 40 ? "보통" : "피곤함";
+  const scheduleLabel = game.phase === "event" ? "이벤트 선택" : game.phase === "summary" ? "주간 정산" : "일상 진행";
   useEffect(() => { setShowResult(Boolean(game.lastChoice)); }, [game.lastChoice]);
   return (
     <>
-      <div className="welcome-row"><div><div className="eyebrow">{dateLabel} · {backgroundLabels[game.character.background]}</div><h1>안녕, {game.character.name}<span className="wave">.</span></h1><div className="profile-line">{game.character.age}세 · {game.character.region} · {game.character.housing}</div></div><div className="avatar-mini">{game.character.name.slice(0, 1)}</div></div>
-      <section className="hero-card">
-        <div className="hero-top"><span className="week-chip">{game.week}주차 · {game.day}일</span><span className="live-dot">이번 주 진행 중</span></div>
-        <p>{intro}</p>
-        <div className="week-track" aria-label="이번 주 진행"><span style={{ width: `${Math.max(8, (game.day / 7) * 100)}%` }} /></div>
-        <div className="track-labels"><span>월요일</span><span>일요일</span></div>
+      <section className="home-hero">
+        <div className="home-hero-copy"><span className="home-date">{dateLabel} ({weekday}) · {game.week}주차</span><h1>오늘도 좋은 하루예요,<br /><em>{game.character.name}!</em></h1><p>지금도 충분히 잘하고 있어요.</p><div className="home-profile-tags"><span>{game.character.age}세</span><span>{game.character.region}</span><span>{backgroundLabels[game.character.background]}</span></div></div>
+        <div className={`illustrated-portrait home-portrait ${game.character.gender === "남성" ? "portrait-male" : "portrait-female"}`} style={portraitStyle(game.character.gender)} role="img" aria-label={`${game.character.name} 캐릭터 일러스트`} />
       </section>
-      <section className="stats-grid" aria-label="현재 상태">
-        <StatCard label="생활비" value={formatMoney(game.stats.money)} detail="보유 자금" tone="mint" />
-        <StatCard label="컨디션" value={`${game.stats.energy}%`} detail="에너지" tone="blue" />
-        <StatCard label="기분" value={`${game.stats.mood}%`} detail="최근 흐름" tone="peach" />
-        <StatCard label="스트레스" value={`${game.stats.stress}%`} detail="낮을수록 여유" tone="lavender" />
+      <section className="stats-grid home-stats" aria-label="오늘의 생활 요약">
+        <StatCard label="소지금" value={formatMoney(game.stats.money)} detail="현재 보유 자금" tone="blue" />
+        <StatCard label="건강 상태" value={energyLabel} detail={`컨디션 ${game.stats.energy}%`} tone="rose" />
+        <StatCard label="오늘 일정" value={scheduleLabel} detail={`${game.day}일째 · ${game.phase === "playing" ? "하루 진행 가능" : "확인 필요"}`} tone="violet" />
       </section>
       {game.phase === "event" && game.pendingEvent && <EventPanel event={game.pendingEvent} onChoice={onChoice} />}
       {game.phase === "summary" && <section className="panel summary-panel"><div className="section-kicker">WEEKLY REVIEW</div><h2>이번 주를 돌아봤어요</h2><p>선택과 일정이 생활에 남았어요. 결과는 한 번의 성공이나 실패로 단정되지 않고 다음 주로 이어집니다.</p><div className="summary-chips"><span>에너지 {game.stats.energy}%</span><span>기분 {game.stats.mood}%</span><span>관계 {Math.round(game.contacts.reduce((sum, person) => sum + person.warmth, 0) / game.contacts.length)} 평균</span></div><button className="primary-button" onClick={onNextWeek}>다음 주 시작 <span>→</span></button></section>}
@@ -224,7 +224,7 @@ function LifeView({ game, onAdvance, onChoice, onNextWeek }: { game: GameState; 
         </section>
       )}
       {showResult && game.lastChoice && <div className="toast-result"><span className="toast-check">✓</span><span>{game.lastChoice}</span><button onClick={() => setShowResult(false)} aria-label="닫기">×</button></div>}
-      <section className="feed-section"><div className="section-heading"><div><span className="section-kicker">RECENT MOMENTS</span><h2>최근 기록</h2></div><span className="quiet-label">이번 생의 흐름</span></div>{game.log.slice(0, 4).map((line, i) => <div className="feed-item" key={`${line}-${i}`}><span className={i === 0 ? "feed-marker current" : "feed-marker"} /><p>{line}</p><span className="feed-time">{i === 0 ? "방금" : `${i}일 전`}</span></div>)}</section>
+      {featured && <section className="feed-section"><div className="section-heading"><div><span className="section-kicker">PEOPLE AROUND YOU</span><h2>이번 생활의 인물</h2></div><span className="quiet-label">누르면 상세 정보</span></div><button className="featured-person" onClick={() => onSelectPerson(featured)}><span className={`illustrated-portrait featured-portrait ${featured.gender === "남성" ? "portrait-male" : featured.gender === "여성" ? "portrait-female" : "portrait-placeholder"}`} style={featured.gender ? portraitStyle(featured.gender) : undefined} aria-hidden="true">{!featured.gender && featured.name.slice(0, 1)}</span><span className="featured-copy"><strong>{featured.name} · {featured.role}</strong><span>{game.lastChoice || featured.note}</span><small>관계 온도 {featured.warmth} · 자세히 보기</small></span><span className="featured-arrow">›</span></button><div className="recent-log"><div className="section-heading"><h2>최근 이야기</h2><span className="quiet-label">이번 생의 흐름</span></div>{game.log.slice(0, 2).map((line, i) => <div className="feed-item" key={`${line}-${i}`}><span className={i === 0 ? "feed-marker current" : "feed-marker"} /><p>{line}</p><span className="feed-time">{i === 0 ? "방금" : "이전"}</span></div>)}</div></section>}
     </>
   );
 }
@@ -235,9 +235,13 @@ function formatMoney(amount: number): string { return new Intl.NumberFormat("ko-
 function EventPanel({ event, onChoice }: { event: NonNullable<GameState["pendingEvent"]>; onChoice: (id: string) => void }) {
   return <section className="event-panel"><div className="event-icon">✦</div><div className="event-content"><span className="section-kicker">{event.eyebrow}</span><h2>{event.title}</h2><p>{event.body}</p><div className="choice-list">{event.choices.map((choice, index) => <button className="choice-button" key={choice.id} onClick={() => onChoice(choice.id)}><span className="choice-number">0{index + 1}</span><span className="choice-main"><strong>{choice.title}</strong><small>{choice.detail}</small></span><span className="choice-arrow">→</span></button>)}</div><p className="microcopy">시제품 규칙으로 계산한 결과예요. 현실 통계 기반 확률은 자료를 연결하며 보강합니다.</p></div></section>;
 }
-function PeopleView({ game }: { game: GameState }) {
+function PeopleView({ game, onSelectPerson }: { game: GameState; onSelectPerson: (person: Contact) => void }) {
   const average = Math.round(game.contacts.reduce((sum, item) => sum + item.warmth, 0) / game.contacts.length);
-  return <><PageTitle kicker="PEOPLE & RELATIONSHIPS" title="내 주변 사람들" subtitle="관계는 한 번의 대화보다 쌓인 경험과 현재 상황에 따라 달라져요." /><div className="relationship-overview"><span className="overview-icon">♡</span><div><small>주요 인맥 {game.contacts.length}명</small><strong>관계 온도 평균 {average}</strong></div></div><div className="people-grid">{game.contacts.map((person, index) => <article className="person-card" key={person.id}><div className={`person-avatar avatar-${index % 5}`}>{person.name.slice(0, 1)}</div><div className="person-info"><strong>{person.name}</strong><span>{person.role}</span><small>{person.note}</small></div><div className="warmth-meter"><span style={{ width: `${person.warmth}%` }} /></div></article>)}</div></>;
+  return <><PageTitle kicker="PEOPLE & RELATIONSHIPS" title="내 주변 사람들" subtitle="인물을 누르면 지금까지 쌓인 관계와 기억을 볼 수 있어요." /><div className="relationship-overview"><span className="overview-icon">♡</span><div><small>주요 인맥 {game.contacts.length}명</small><strong>관계 온도 평균 {average}</strong></div></div><div className="people-grid">{game.contacts.map((person, index) => <button className="person-card" key={person.id} onClick={() => onSelectPerson(person)} aria-label={`${person.name} 상세 정보 열기`}><span className={`illustrated-portrait person-avatar avatar-${index % 5} ${person.gender === "남성" ? "portrait-male" : person.gender === "여성" ? "portrait-female" : "portrait-placeholder"}`} style={person.gender ? portraitStyle(person.gender) : undefined} aria-hidden="true">{!person.gender && person.name.slice(0, 1)}</span><span className="person-info"><strong>{person.name}</strong><span>{person.role}</span><small>{person.note}</small></span><span className="warmth-meter"><span style={{ width: `${person.warmth}%` }} /></span><span className="person-open-hint">상세 보기 <b>›</b></span></button>)}</div></>;
+}
+function closenessLabel(warmth: number) { return warmth >= 75 ? "가까운 사이" : warmth >= 50 ? "알아가는 중" : warmth >= 25 ? "가벼운 인맥" : "아직 서먹함"; }
+function PersonDetails({ person, onClose }: { person: Contact; onClose: () => void }) {
+  return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="person-details-modal" role="dialog" aria-modal="true" aria-labelledby="person-details-title" onClick={(event) => event.stopPropagation()}><div className="person-detail-cover"><button className="icon-button person-detail-close" aria-label="상세 정보 닫기" onClick={onClose}>×</button><span className={`illustrated-portrait detail-portrait ${person.gender === "남성" ? "portrait-male" : person.gender === "여성" ? "portrait-female" : "portrait-placeholder"}`} style={person.gender ? portraitStyle(person.gender) : undefined}>{!person.gender && person.name.slice(0, 1)}</span></div><div className="person-detail-body"><span className="section-kicker">RELATIONSHIP PROFILE</span><h2 id="person-details-title">{person.name}</h2><p className="person-detail-role">{person.role}{person.gender ? ` · ${person.gender}` : ""}</p><div className="relationship-score"><div><span>관계 온도</span><strong>{person.warmth}<small>/100</small></strong></div><b>{closenessLabel(person.warmth)}</b></div><div className="warmth-meter detail-meter"><span style={{ width: `${person.warmth}%` }} /></div><section className="memory-card"><span className="section-kicker">최근 기억</span><p>{person.note}</p></section><p className="person-detail-footnote">관계의 거리감은 함께한 일과 연락이 쌓이면서 달라집니다.</p><button className="primary-button full" onClick={onClose}>확인</button></div></section></div>;
 }
 function WorkView({ game }: { game: GameState }) {
   const label = backgroundLabels[game.character.background];

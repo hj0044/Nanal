@@ -26,6 +26,7 @@ export interface Contact {
   id: string;
   name: string;
   role: string;
+  gender?: "남성" | "여성";
   warmth: number;
   note: string;
 }
@@ -121,10 +122,11 @@ export function generateContacts(background: Background, seed: number): Contact[
   let state = seed;
   return roles[background].map((role, i) => {
     const [next, value] = nextRandom(state + i + 1);
-    const [, nameRoll] = nextRandom(next);
+    const [afterName, nameRoll] = nextRandom(next);
+    const [, genderRoll] = nextRandom(afterName);
     state = next;
     const name = `${surnames[Math.floor(value * surnames.length)]}${firstNames[Math.floor(nameRoll * firstNames.length)]}`;
-    return { id: `person-${i + 1}`, name, role, warmth: 46 + Math.floor(value * 23), note: i < 2 ? "최근 연락이 이어지고 있다" : "아직 자세히 알지 못한다" };
+    return { id: `person-${i + 1}`, name, role, gender: genderRoll < 0.5 ? "여성" : "남성", warmth: 46 + Math.floor(value * 23), note: i < 2 ? "최근 연락이 이어지고 있다" : "아직 자세히 알지 못한다" };
   });
 }
 export function createGame(character: Character, seed = createSeed(`${character.name}:${character.year}:${character.age}:${character.background}`)): GameState {
