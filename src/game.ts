@@ -327,7 +327,7 @@ export function takeDailyAction(state: GameState, action: DailyAction): GameStat
       focus: clamp(state.stats.focus + (selected.effect.focus ?? 0)),
     },
     contacts: state.contacts.map((contact, index) => index === selected.contactIndex
-      ? { ...contact, warmth: clamp(contact.warmth + (selected.effect.relationship ?? 0)), note: selected.log }
+      ? { ...contact, warmth: clamp(contact.warmth + (selected.effect.relationship ?? 0)), note: selected.log, memories: addNpcMemory(contact, selected.log, state.week) }
       : contact),
     log: [selected.log, ...state.log],
   };
@@ -364,6 +364,7 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
     },
     contacts: state.contacts.map((contact, index) => index === choice.contactIndex && (effect.relationship || state.pendingEvent?.personalStory) ? {
       ...contact, warmth: clamp(contact.warmth + (effect.relationship ?? 0)), note: choice.result,
+      memories: addNpcMemory(contact, choice.result, state.week),
     } : contact),
     log: [choice.result, ...state.log],
   };
