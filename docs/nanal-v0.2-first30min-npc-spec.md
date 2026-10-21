@@ -88,3 +88,26 @@
 - 기억은 NPC 상호작용에 생성되고 시간이 지나며 선명도가 낮아질 수 있다.
 - 사건 대기 중 시간은 멈추고, 이벤트 효과는 한 번만 반영된다.
 - 기존 12명 인맥, 인물별 자산 연결, 초상 매핑, 하단 5탭, 저장 호환성을 보존한다.
+
+
+## 7. v0.3 follow-up: player influence and weekly cashflow
+
+### NPC goal influence
+
+- A social action adds one support point to the chosen NPC. Personal-story choices add one point for listening or encouragement and two for practical planning or adjustment.
+- Support is capped at three points and decays by one at each weekly NPC simulation.
+- Each support point raises the NPC's goal-advancement chance by nine percentage points; three points guarantee one advancement for that week.
+- When relationship warmth is below the normal personal-story threshold, one remaining support point can still unlock that NPC's goal-aware personal story. The story text references the NPC's current goal and whether the player's support helped.
+- This connects player behavior to relationship, memory, NPC goal progress, and the next personalized story while preserving deterministic seeded outcomes.
+
+### Weekly cashflow prototype values
+
+These are tunable gameplay values, not Korean household or wage statistics. Income is applied before expenses once when the seventh day closes. If available money cannot cover all expenses, the balance stops at zero, the shortfall is recorded as unpaid, and stress rises by five points.
+
+| Background | Weekly income | Living expenses | Housing cost by choice |
+|---|---:|---:|---|
+| Student | 150,000원 | 155,000원 | Family 0원 · dormitory 45,000원 · shared lease 85,000원 · solo rent 130,000원 |
+| Job seeker | 80,000원 | 180,000원 | Family 0원 · dormitory 45,000원 · shared lease 85,000원 · solo rent 130,000원 |
+| Worker | 600,000원 | 340,000원 | Family 0원 · dormitory 45,000원 · shared lease 85,000원 · solo rent 130,000원 |
+
+The weekly review and Work & Economy tab show income, expenses, housing, ending balance, and any shortfall. Existing version 1 saves remain compatible because cashflow and NPC support fields are optional and default to zero when absent.
