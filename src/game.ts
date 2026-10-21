@@ -10,6 +10,9 @@ export interface Character {
   year: number;
   background: Background;
   gender: "남성" | "여성";
+  heightCm?: number;
+  weightKg?: number;
+  affiliation?: string;
   portraitId?: string;
   region: string;
   housing: string;
@@ -53,6 +56,9 @@ export interface Contact {
   role: string;
   gender?: "남성" | "여성";
   age?: number;
+  heightCm?: number;
+  weightKg?: number;
+  affiliation?: string;
   portraitId?: string;
   portraitAgeBand?: import("./portrait-catalog").PortraitAgeBand;
   occupation?: string;
@@ -144,6 +150,9 @@ export interface CharacterDraft {
   year: number | "";
   background: Background | "";
   gender: "남성" | "여성" | "";
+  heightCm: number | "";
+  weightKg: number | "";
+  affiliation: string;
   region: string;
   housing: string;
   education: string;
@@ -156,6 +165,34 @@ export const backgroundLabels: Record<Background, string> = {
   jobseeker: "취업준비생",
   worker: "직장인",
 };
+
+export function generateBodyMetrics(gender: Character["gender"], seed: number, heightOverride?: number): { heightCm: number; weightKg: number } {
+  const [, heightRoll] = nextRandom(seed ^ createSeed("height"));
+  const [, bmiRoll] = nextRandom(seed ^ createSeed("bmi"));
+  const heightCm = heightOverride ?? Math.round((gender === "남성" ? 174 : 162) + (heightRoll - 0.5) * 18);
+  const bmi = 19 + bmiRoll * 7;
+  return { heightCm, weightKg: Math.round(bmi * (heightCm / 100) ** 2) };
+}
+
+export function getPlayerAffiliation(character: Character): string {
+  if (character.affiliation?.trim()) return character.affiliation.trim();
+  if (character.background === "student") return character.education ? `${character.education} · 학교명 미입력` : "대학생 · 학교명 미입력";
+  if (character.background === "jobseeker") return character.education ? `${character.education} · 취업 준비 중` : "취업 준비 중 · 희망 분야 탐색";
+  return character.education ? `${character.education} · 회사명 미입력` : "직장인 · 회사·부서 미입력";
+}
+
+export function getContactAffiliation(role: string, background: Background): string {
+  if (/가족|사촌|친척|부모|형제|자매/.test(role)) return "가족";
+  if (/이웃/.test(role)) return "동네 생활권";
+  if (/동료|직장|업무|팀원|협력자/.test(role)) return "직장 · 업무 관계";
+  if (/수업|학과|학교|동아리|대학/.test(role)) return "학교 · 학업 관계";
+  if (/스터디|취업|교육 과정|커뮤니티/.test(role)) return "취업 준비 · 학습 모임";
+  if (/온라인/.test(role)) return "온라인 커뮤니티";
+  if (/취미|모임/.test(role)) return "취미 모임";
+  if (/소개/.test(role)) return "지인 소개";
+  if (/친구/.test(role)) return "오래된 개인적 인연";
+  return background === "student" ? "학교·생활권 인맥" : background === "jobseeker" ? "구직 활동 인맥" : "직장 밖 인맥";
+}
 
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { choosePortraitId, getPortrait } from "./portrait-catalog";
@@ -228,12 +265,14 @@ export function generateContacts(background: Background, seed: number, playerAge
     const age = Math.max(19, playerAge + (family ? 10 : senior ? 3 : -2) + Math.floor(ageRoll * 7));
     const portraitId = choosePortraitId(gender, age, next, usedPortraits);
     usedPortraits.push(portraitId);
-    return { id: `person-${i + 1}`, name, role, gender, age, portraitId, portraitAgeBand: getPortrait(portraitId)?.ageBand, occupation: occupations[background][Math.floor(jobRoll * occupations[background].length)], personality: traits[Math.floor(traitRoll * traits.length)], goal: goals[Math.floor(goalRoll * goals.length)], goalProgress: Math.floor(goalRoll * 3), goalSupport: 0, goalStage: ["계획 세우기", "한 걸음 진행", "기회 기다리기"][Math.floor(goalRoll * 3)], mood: "평소와 같음", lastAutonomousAction: "이번 주 계획을 생각하는 중", memories: [], warmth: 46 + Math.floor(value * 23), note: i < 2 ? "최근 연락이 이어지고 있다" : "아직 자세히 알지 못한다" };
+    const body = generateBodyMetrics(gender, next ^ createSeed(`${role}:${age}`));
+    return { id: `person-${i + 1}`, name, role, gender, age, ...body, affiliation: getContactAffiliation(role, background), portraitId, portraitAgeBand: getPortrait(portraitId)?.ageBand, occupation: occupations[background][Math.floor(jobRoll * occupations[background].length)], personality: traits[Math.floor(traitRoll * traits.length)], goal: goals[Math.floor(goalRoll * goals.length)], goalProgress: Math.floor(goalRoll * 3), goalSupport: 0, goalStage: ["계획 세우기", "한 걸음 진행", "기회 기다리기"][Math.floor(goalRoll * 3)], mood: "평소와 같음", lastAutonomousAction: "이번 주 계획을 생각하는 중", memories: [], warmth: 46 + Math.floor(value * 23), note: i < 2 ? "최근 연락이 이어지고 있다" : "아직 자세히 알지 못한다" };
   });
 }
 export function createGame(character: Character, seed = createSeed(`${character.name}:${character.year}:${character.age}:${character.background}`)): GameState {
   const money = character.startingMoney ?? (character.background === "student" ? 420_000 : character.background === "jobseeker" ? 650_000 : 1_850_000);
-  const player = { ...character, portraitId: character.portraitId ?? choosePortraitId(character.gender, character.age, seed) };
+  const body = generateBodyMetrics(character.gender, seed, character.heightCm);
+  const player = { ...character, ...body, weightKg: character.weightKg ?? body.weightKg, affiliation: getPlayerAffiliation(character), portraitId: character.portraitId ?? choosePortraitId(character.gender, character.age, seed) };
   return {
     version: 1, character: player, week: 1, day: 1, phase: "playing", seed,
     evaluatedDays: [], seenEvents: [], npcStoryStages: {}, npcStoryLastWeek: {}, npcStoryChoices: {},
