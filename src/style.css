@@ -183,6 +183,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .goal-progress { margin: 20px 0 7px; background: var(--line); }
 .goal-card > small { color: var(--muted); font-size: 10px; }
 .muted-panel { background: var(--surface-soft); box-shadow: none; }
+.archive-list { display: grid; gap: 10px; margin-top: 14px; }
+.archive-row { display: grid; gap: 3px; padding: 11px 13px; border-radius: 14px; background: var(--surface); }
+.archive-row strong { font-size: 13px; }
+.archive-row span, .archive-row small { color: var(--muted); font-size: 10px; line-height: 1.55; }
 .muted-panel h3 { margin: 0 0 7px; font-size: 13px; }
 .timeline { margin-top: 24px; }
 .timeline-row { min-height: 75px; display: grid; grid-template-columns: 15px 1fr; gap: 13px; }
