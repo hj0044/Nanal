@@ -9,6 +9,7 @@ export interface Character {
   year: number;
   background: Background;
   gender: "남성" | "여성";
+  portraitId?: string;
   region: string;
   housing: string;
   education?: string;
@@ -28,6 +29,8 @@ export interface Contact {
   role: string;
   gender?: "남성" | "여성";
   age?: number;
+  portraitId?: string;
+  portraitAgeBand?: import("./portrait-catalog").PortraitAgeBand;
   occupation?: string;
   personality?: string;
   goal?: string;
@@ -105,6 +108,7 @@ export const backgroundLabels: Record<Background, string> = {
 };
 
 import { commonEventLibrary, eventLibrary } from "./scenarios";
+import { choosePortraitId, getPortrait } from "./portrait-catalog";
 
 const firstNames = ["지우", "서준", "하은", "민재", "수빈", "도윤", "예린", "현우", "유진", "지민", "은서", "준호", "채원", "시우", "다은", "건우", "소연", "태민", "나연", "우진"];
 const roles: Record<Background, string[]> = {
@@ -134,12 +138,18 @@ function nextRandom(state: number): [number, number] {
   const next = x >>> 0;
   return [next, next / 4294967296];
 }
-export function generateContacts(background: Background, seed: number, playerAge = 24): Contact[] {
+export function generateContacts(background: Background, seed: number, playerAge = 24, excludedPortraitIds: string[] = []): Contact[] {
   let state = seed;
+  const usedPortraits = [...excludedPortraitIds];
+  const contactGenders: Array<"남성" | "여성"> = [...Array(6).fill("여성"), ...Array(6).fill("남성")];
+  for (let i = contactGenders.length - 1; i > 0; i -= 1) {
+    const [, roll] = nextRandom(seed + 997 + i);
+    const j = Math.floor(roll * (i + 1));
+    [contactGenders[i], contactGenders[j]] = [contactGenders[j], contactGenders[i]];
+  }
   return roles[background].map((role, i) => {
     const [next, value] = nextRandom(state + i + 1);
     const [afterName, nameRoll] = nextRandom(next);
-    const [, genderRoll] = nextRandom(afterName);
     const [afterTrait, traitRoll] = nextRandom(afterName + 101);
     const [afterGoal, goalRoll] = nextRandom(afterTrait + 211);
     const [afterJob, jobRoll] = nextRandom(afterGoal + 307);
@@ -148,16 +158,21 @@ export function generateContacts(background: Background, seed: number, playerAge
     const name = `${surnames[Math.floor(value * surnames.length)]}${firstNames[Math.floor(nameRoll * firstNames.length)]}`;
     const family = /가족|사촌|친척/.test(role);
     const senior = /선배|부모|가족|친척/.test(role);
-    return { id: `person-${i + 1}`, name, role, gender: genderRoll < 0.5 ? "여성" : "남성", age: Math.max(19, playerAge + (family ? 10 : senior ? 3 : -2) + Math.floor(ageRoll * 7)), occupation: occupations[background][Math.floor(jobRoll * occupations[background].length)], personality: traits[Math.floor(traitRoll * traits.length)], goal: goals[Math.floor(goalRoll * goals.length)], warmth: 46 + Math.floor(value * 23), note: i < 2 ? "최근 연락이 이어지고 있다" : "아직 자세히 알지 못한다" };
+    const gender = contactGenders[i];
+    const age = Math.max(19, playerAge + (family ? 10 : senior ? 3 : -2) + Math.floor(ageRoll * 7));
+    const portraitId = choosePortraitId(gender, age, next, usedPortraits);
+    usedPortraits.push(portraitId);
+    return { id: `person-${i + 1}`, name, role, gender, age, portraitId, portraitAgeBand: getPortrait(portraitId)?.ageBand, occupation: occupations[background][Math.floor(jobRoll * occupations[background].length)], personality: traits[Math.floor(traitRoll * traits.length)], goal: goals[Math.floor(goalRoll * goals.length)], warmth: 46 + Math.floor(value * 23), note: i < 2 ? "최근 연락이 이어지고 있다" : "아직 자세히 알지 못한다" };
   });
 }
 export function createGame(character: Character, seed = createSeed(`${character.name}:${character.year}:${character.age}:${character.background}`)): GameState {
   const money = character.startingMoney ?? (character.background === "student" ? 420_000 : character.background === "jobseeker" ? 650_000 : 1_850_000);
+  const player = { ...character, portraitId: character.portraitId ?? choosePortraitId(character.gender, character.age, seed) };
   return {
-    version: 1, character, week: 1, day: 1, phase: "playing", seed,
+    version: 1, character: player, week: 1, day: 1, phase: "playing", seed,
     evaluatedDays: [], seenEvents: [], npcStoryStages: {}, npcStoryLastWeek: {}, npcStoryChoices: {},
     stats: { money, energy: 72, stress: 24, mood: 61, focus: 52 },
-    contacts: generateContacts(character.background, seed, character.age),
+    contacts: generateContacts(character.background, seed, character.age, [player.portraitId]),
     log: [`${character.year}년, ${character.name}의 새로운 생활이 시작됐다.`],
     settings: { palette: "clean", nightMode: "device", nightStart: "21:00", nightEnd: "07:00", topics: { affair: true, illness: true, pregnancy: true } },
   };

@@ -6,7 +6,8 @@ import {
   type SensitiveTopic, type Tab,
 } from "./game";
 import "./style.css";
-import portraitSheet from "./assets/people-portraits.webp";
+import portraitSheet from "./assets/npc-portrait-atlas-v1.webp";
+import { choosePortraitId, getPortrait, portraitPosition } from "./portrait-catalog";
 
 const SAVE_KEY = "nanal-save-v1";
 const backgroundChoices: Background[] = ["student", "jobseeker", "worker"];
@@ -14,8 +15,8 @@ const namePool = ["서윤", "민준", "지우", "하린", "도현", "예진", "�
 const regions = ["서울", "인천", "경기", "부산", "대구"];
 const housingChoices = ["가족과 동거", "자취", "기숙사", "전세·월세 동거"];
 const emptyDraft: CharacterDraft = { name: "", age: "", year: "", background: "", gender: "", region: "", housing: "", education: "", family: "", startingMoney: "" };
-function portraitStyle(gender?: "남성" | "여성"): React.CSSProperties {
-  return { backgroundImage: `url("${portraitSheet}")`, backgroundPosition: gender === "여성" ? "right center" : "left center" };
+function portraitStyle(portraitId?: string): React.CSSProperties {
+  return { backgroundImage: `url("${portraitSheet}")`, backgroundSize: "400% 400%", backgroundPosition: portraitPosition(portraitId) };
 }
 
 function readSave(): GameState | null {
@@ -28,16 +29,29 @@ function readSave(): GameState | null {
   } catch { return null; }
 }
 function normalizeSave(parsed: GameState): GameState {
-  const generated = generateContacts(parsed.character.background, parsed.seed, parsed.character.age);
+  const playerPortraitId = parsed.character.portraitId ?? createGame(parsed.character, parsed.seed).character.portraitId;
+  const generated = generateContacts(parsed.character.background, parsed.seed, parsed.character.age, playerPortraitId ? [playerPortraitId] : []);
+  const usedPortraitIds = playerPortraitId ? [playerPortraitId] : [];
   return {
     ...parsed,
+    character: { ...parsed.character, portraitId: playerPortraitId },
     recentEventIds: parsed.recentEventIds ?? [],
-    contacts: parsed.contacts.map((person, index) => ({ ...generated[index], ...person,
-      age: person.age ?? generated[index]?.age,
-      occupation: person.occupation ?? generated[index]?.occupation,
-      personality: person.personality ?? generated[index]?.personality,
-      goal: person.goal ?? generated[index]?.goal,
-    })),
+    contacts: parsed.contacts.map((person, index) => {
+      const merged = { ...generated[index], ...person };
+      const age = person.age ?? generated[index]?.age ?? parsed.character.age;
+      let portraitId = person.portraitId;
+      if (!portraitId || getPortrait(portraitId)?.gender !== merged.gender) {
+        portraitId = choosePortraitId(merged.gender ?? generated[index]?.gender ?? "여성", age, createSeed(`${parsed.seed}:${merged.id}`), usedPortraitIds);
+      }
+      usedPortraitIds.push(portraitId);
+      return {
+        ...merged, age, portraitId,
+        portraitAgeBand: getPortrait(portraitId)?.ageBand,
+        occupation: person.occupation ?? generated[index]?.occupation,
+        personality: person.personality ?? generated[index]?.personality,
+        goal: person.goal ?? generated[index]?.goal,
+      };
+    }),
   };
 }
 function App() {
@@ -221,7 +235,7 @@ function LifeView({ game, onAdvance, onChoice, onNextWeek, onSelectPerson }: { g
     <>
       <section className="home-hero">
         <div className="home-hero-copy"><span className="home-date">{dateLabel} ({weekday}) · {game.week}주차</span><h1>오늘도 좋은 하루예요!</h1><p>{game.character.name}님, 지금도 충분히 잘하고 있어요.</p><div className="home-profile-tags"><span>{game.character.age}세</span><span>{game.character.region}</span><span>{backgroundLabels[game.character.background]}</span></div></div>
-        <div className={`illustrated-portrait home-portrait ${game.character.gender === "남성" ? "portrait-male" : "portrait-female"}`} style={portraitStyle(game.character.gender)} role="img" aria-label={`${game.character.name} 캐릭터 일러스트`} />
+        <div className="illustrated-portrait home-portrait" style={portraitStyle(game.character.portraitId)} role="img" aria-label={`${game.character.name} 캐릭터 일러스트`} />
       </section>
       <section className="stats-grid home-stats" aria-label="오늘의 생활 요약">
         <StatCard label="소지금" value={formatMoney(game.stats.money)} detail="현재 보유 자금" tone="blue" />
@@ -236,7 +250,7 @@ function LifeView({ game, onAdvance, onChoice, onNextWeek, onSelectPerson }: { g
         </section>
       )}
       {showResult && game.lastChoice && <div className="toast-result"><span className="toast-check">✓</span><span>{game.lastChoice}</span><button onClick={() => setShowResult(false)} aria-label="닫기">×</button></div>}
-      {featured && <section className="feed-section"><div className="section-heading"><div><span className="section-kicker">PEOPLE AROUND YOU</span><h2>이번 생활의 인물</h2></div><span className="quiet-label">누르면 상세 정보</span></div><button className="featured-person" onClick={() => onSelectPerson(featured)}><span className={`illustrated-portrait featured-portrait ${featured.gender === "남성" ? "portrait-male" : featured.gender === "여성" ? "portrait-female" : "portrait-placeholder"}`} style={featured.gender ? portraitStyle(featured.gender) : undefined} aria-hidden="true">{!featured.gender && featured.name.slice(0, 1)}</span><span className="featured-copy"><strong>{featured.name} · {featured.role}</strong><span>{game.lastChoice || featured.note}</span><small>관계 온도 {featured.warmth} · 자세히 보기</small></span><span className="featured-arrow">›</span></button><div className="recent-log"><div className="section-heading"><h2>최근 이야기</h2><span className="quiet-label">이번 생의 흐름</span></div>{game.log.slice(0, 2).map((line, i) => <div className="feed-item" key={`${line}-${i}`}><span className={i === 0 ? "feed-marker current" : "feed-marker"} /><p>{line}</p><span className="feed-time">{i === 0 ? "방금" : "이전"}</span></div>)}</div></section>}
+      {featured && <section className="feed-section"><div className="section-heading"><div><span className="section-kicker">PEOPLE AROUND YOU</span><h2>이번 생활의 인물</h2></div><span className="quiet-label">누르면 상세 정보</span></div><button className="featured-person" onClick={() => onSelectPerson(featured)}><span className="illustrated-portrait featured-portrait" style={portraitStyle(featured.portraitId)} aria-hidden="true" /><span className="featured-copy"><strong>{featured.name} · {featured.role}</strong><span>{game.lastChoice || featured.note}</span><small>관계 온도 {featured.warmth} · 자세히 보기</small></span><span className="featured-arrow">›</span></button><div className="recent-log"><div className="section-heading"><h2>최근 이야기</h2><span className="quiet-label">이번 생의 흐름</span></div>{game.log.slice(0, 2).map((line, i) => <div className="feed-item" key={`${line}-${i}`}><span className={i === 0 ? "feed-marker current" : "feed-marker"} /><p>{line}</p><span className="feed-time">{i === 0 ? "방금" : "이전"}</span></div>)}</div></section>}
     </>
   );
 }
@@ -249,11 +263,11 @@ function EventPanel({ event, onChoice }: { event: NonNullable<GameState["pending
 }
 function PeopleView({ game, onSelectPerson }: { game: GameState; onSelectPerson: (person: Contact) => void }) {
   const average = Math.round(game.contacts.reduce((sum, item) => sum + item.warmth, 0) / game.contacts.length);
-  return <><PageTitle kicker="PEOPLE & RELATIONSHIPS" title="내 주변 사람들" subtitle="인물을 누르면 지금까지 쌓인 관계와 기억을 볼 수 있어요." /><div className="relationship-overview"><span className="overview-icon">♡</span><div><small>주요 인맥 {game.contacts.length}명</small><strong>관계 온도 평균 {average}</strong></div></div><div className="people-grid">{game.contacts.map((person, index) => <button className="person-card" key={person.id} onClick={() => onSelectPerson(person)} aria-label={`${person.name} 상세 정보 열기`}><span className={`illustrated-portrait person-avatar avatar-${index % 5} ${person.gender === "남성" ? "portrait-male" : person.gender === "여성" ? "portrait-female" : "portrait-placeholder"}`} style={person.gender ? portraitStyle(person.gender) : undefined} aria-hidden="true">{!person.gender && person.name.slice(0, 1)}</span><span className="person-info"><strong>{person.name}</strong><span>{person.role}</span><small>{person.note}</small></span><span className="warmth-meter"><span style={{ width: `${person.warmth}%` }} /></span><span className="person-open-hint">상세 보기 <b>›</b></span></button>)}</div></>;
+  return <><PageTitle kicker="PEOPLE & RELATIONSHIPS" title="내 주변 사람들" subtitle="인물을 누르면 지금까지 쌓인 관계와 기억을 볼 수 있어요." /><div className="relationship-overview"><span className="overview-icon">♡</span><div><small>주요 인맥 {game.contacts.length}명</small><strong>관계 온도 평균 {average}</strong></div></div><div className="people-grid">{game.contacts.map((person, index) => <button className="person-card" key={person.id} onClick={() => onSelectPerson(person)} aria-label={`${person.name} 상세 정보 열기`}><span className={`illustrated-portrait person-avatar avatar-${index % 5}`} style={portraitStyle(person.portraitId)} aria-hidden="true" /><span className="person-info"><strong>{person.name}</strong><span>{person.role}</span><small>{person.note}</small></span><span className="warmth-meter"><span style={{ width: `${person.warmth}%` }} /></span><span className="person-open-hint">상세 보기 <b>›</b></span></button>)}</div></>;
 }
 function closenessLabel(warmth: number) { return warmth >= 75 ? "가까운 사이" : warmth >= 50 ? "알아가는 중" : warmth >= 25 ? "가벼운 인맥" : "아직 서먹함"; }
 function PersonDetails({ person, onClose }: { person: Contact; onClose: () => void }) {
-  return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="person-details-modal" role="dialog" aria-modal="true" aria-labelledby="person-details-title" onClick={(event) => event.stopPropagation()}><div className="person-detail-cover"><button className="icon-button person-detail-close" aria-label="상세 정보 닫기" onClick={onClose}>×</button><span className={`illustrated-portrait detail-portrait ${person.gender === "남성" ? "portrait-male" : person.gender === "여성" ? "portrait-female" : "portrait-placeholder"}`} style={person.gender ? portraitStyle(person.gender) : undefined}>{!person.gender && person.name.slice(0, 1)}</span></div><div className="person-detail-body"><span className="section-kicker">RELATIONSHIP PROFILE</span><h2 id="person-details-title">{person.name}</h2><p className="person-detail-role">{person.role}{person.gender ? ` · ${person.gender}` : ""}</p><div className="profile-facts"><div><small>나이</small><strong>{person.age ?? "미상"}세</strong></div><div><small>직업</small><strong>{person.occupation ?? "정보 없음"}</strong></div><div><small>성격</small><strong>{person.personality ?? "조금씩 알아가는 중"}</strong></div><div><small>요즘 목표</small><strong>{person.goal ?? "아직 알 수 없음"}</strong></div></div><div className="relationship-score"><div><span>관계 온도</span><strong>{person.warmth}<small>/100</small></strong></div><b>{closenessLabel(person.warmth)}</b></div><div className="warmth-meter detail-meter"><span style={{ width: `${person.warmth}%` }} /></div><section className="memory-card"><span className="section-kicker">최근 기억</span><p>{person.note}</p></section><p className="person-detail-footnote">인물의 성격과 목표는 관계와 사건을 거치며 더 구체적으로 드러나요.</p><button className="primary-button full" onClick={onClose}>확인</button></div></section></div>;
+  return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="person-details-modal" role="dialog" aria-modal="true" aria-labelledby="person-details-title" onClick={(event) => event.stopPropagation()}><div className="person-detail-cover"><button className="icon-button person-detail-close" aria-label="상세 정보 닫기" onClick={onClose}>×</button><span className="illustrated-portrait detail-portrait" style={portraitStyle(person.portraitId)} /></div><div className="person-detail-body"><span className="section-kicker">RELATIONSHIP PROFILE</span><h2 id="person-details-title">{person.name}</h2><p className="person-detail-role">{person.role}{person.gender ? ` · ${person.gender}` : ""}</p><div className="profile-facts"><div><small>나이</small><strong>{person.age ?? "미상"}세</strong></div><div><small>직업</small><strong>{person.occupation ?? "정보 없음"}</strong></div><div><small>성격</small><strong>{person.personality ?? "조금씩 알아가는 중"}</strong></div><div><small>요즘 목표</small><strong>{person.goal ?? "아직 알 수 없음"}</strong></div></div><div className="relationship-score"><div><span>관계 온도</span><strong>{person.warmth}<small>/100</small></strong></div><b>{closenessLabel(person.warmth)}</b></div><div className="warmth-meter detail-meter"><span style={{ width: `${person.warmth}%` }} /></div><section className="memory-card"><span className="section-kicker">최근 기억</span><p>{person.note}</p></section><p className="person-detail-footnote">인물의 성격과 목표는 관계와 사건을 거치며 더 구체적으로 드러나요.</p><button className="primary-button full" onClick={onClose}>확인</button></div></section></div>;
 }
 function WorkView({ game }: { game: GameState }) {
   const label = backgroundLabels[game.character.background];

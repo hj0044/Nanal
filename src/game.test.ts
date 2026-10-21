@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { advanceDay, advanceDays, chooseEvent, createGame, generateContacts, getPersonalStoryEvents, startNextWeek, type Character } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
+import { getPortrait } from "./portrait-catalog";
 
 const character: Character = {
   name: "지우", age: 24, year: 2024, background: "student",
@@ -16,6 +17,19 @@ describe("first week simulation", () => {
     expect(first).toEqual(second);
     expect(new Set(first.map((contact) => contact.id)).size).toBe(12);
     expect(first.every((contact) => contact.age && contact.occupation && contact.personality && contact.goal)).toBe(true);
+    expect(first.every((contact) => contact.portraitId && contact.portraitAgeBand)).toBe(true);
+    expect(new Set(first.map((contact) => contact.portraitId)).size).toBe(12);
+    expect(first.every((contact) => contact.portraitId?.startsWith("npc-"))).toBe(true);
+  });
+
+  it("assigns the player and contacts distinct stable portraits from matching age and gender ranges", () => {
+    const first = createGame(character, 48291);
+    const second = createGame(character, 48291);
+    expect(first.character.portraitId).toBe(second.character.portraitId);
+    expect(first.contacts.map((person) => person.portraitId)).toEqual(second.contacts.map((person) => person.portraitId));
+    expect(new Set([first.character.portraitId, ...first.contacts.map((person) => person.portraitId)]).size).toBe(13);
+    expect(first.contacts.every((person) => getPortrait(person.portraitId)?.gender === person.gender)).toBe(true);
+    expect(first.contacts.every((person) => getPortrait(person.portraitId)?.ageBand === person.portraitAgeBand)).toBe(true);
   });
 
   it("provides a broad, unique pool of reviewed events per background", () => {

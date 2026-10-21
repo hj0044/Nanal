@@ -316,6 +316,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
   .home-stats .stat-card { min-height: 119px; padding: 11px 8px; }
   .home-stats .stat-card strong { white-space: normal; line-height: 1.25; }
   .featured-person { grid-template-columns: 76px minmax(0,1fr) 14px; gap: 9px; }
-  .featured-portrait { width: 76px; height: 82px; }
+  .featured-portrait { width: 76px; height: 76px; }
   .person-details-modal { max-height: 90vh; }
 }
