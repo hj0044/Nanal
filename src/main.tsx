@@ -39,7 +39,7 @@ function normalizeSave(parsed: GameState): GameState {
     recentEventIds: parsed.recentEventIds ?? [],
     archivedContacts: parsed.archivedContacts ?? [],
     relationshipRecords: parsed.relationshipRecords ?? [],
-    nextContactNumber: parsed.nextContactNumber ?? Math.max(13, ...parsed.contacts.map((person) => Number(person.id.replace("person-", "")) + 1)),
+    nextContactNumber: parsed.nextContactNumber ?? Math.max(13, ...[...parsed.contacts, ...(parsed.archivedContacts ?? [])].map((person) => Number(person.id.replace("person-", "")) + 1)),
     contacts: parsed.contacts.map((person, index) => {
       const merged = { ...generated[index], ...person };
       const age = person.age ?? generated[index]?.age ?? parsed.character.age;

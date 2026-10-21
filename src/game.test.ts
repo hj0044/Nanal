@@ -37,18 +37,34 @@ describe("first week simulation", () => {
     expect(first.every((contact) => getPortrait(contact.portraitId)?.gender === contact.gender)).toBe(true);
   });
 
-  it("archives long-absent relationships, records the departure, and introduces a new person", () => {
+  it("lets quiet relationships drift organically and keeps the roster uncapped", () => {
     const started = createGame(character, 4455);
-    const distant = started.contacts.map((person, index) => ({ ...person, warmth: index < 5 ? 10 : 55, lastInteractionWeek: 1 }));
-    const state = { ...started, week: 15, day: 7, phase: "playing" as const, contacts: distant, evaluatedDays: [1, 2, 3, 4, 5, 6, 7] };
-    const result = advanceDay(state);
-    expect(result.phase).toBe("summary");
-    expect(result.contacts).toHaveLength(12);
-    expect(result.archivedContacts).toHaveLength(1);
-    expect(result.relationshipRecords?.filter((record) => record.kind === "departure")).toHaveLength(1);
-    expect(result.relationshipRecords?.some((record) => record.kind === "arrival")).toBe(true);
-    expect(result.contacts.some((person) => person.id === "person-13")).toBe(true);
-    expect(result.contacts.every((person) => person.id !== "person-1")).toBe(true);
+    const quiet = started.contacts.map((person) => ({ ...person, warmth: 18, lastInteractionWeek: 1 }));
+    const resolveWeek = (seed: number, contacts = quiet, nextContactNumber = 13) => advanceDay({
+      ...started, week: 15, day: 7, seed, phase: "playing" as const, contacts, nextContactNumber,
+      evaluatedDays: [1, 2, 3, 4, 5, 6, 7],
+    });
+    const noDeparture = resolveWeek(4455);
+    expect(noDeparture.archivedContacts).toHaveLength(0);
+    expect(resolveWeek(4455)).toEqual(noDeparture);
+    const departureSeed = Array.from({ length: 2048 }, (_, index) => index + 1)
+      .find((seed) => (resolveWeek(seed).archivedContacts?.length ?? 0) > 0);
+    expect(departureSeed).toBeDefined();
+    const departure = resolveWeek(departureSeed!);
+    expect(departure.relationshipRecords?.some((record) => record.kind === "departure")).toBe(true);
+    expect(departure.contacts.length + (departure.archivedContacts?.length ?? 0)).toBeGreaterThanOrEqual(12);
+
+    const expandedRoster = [
+      ...started.contacts.map((person) => ({ ...person, warmth: 100, lastInteractionWeek: 16 })),
+      ...started.contacts.slice(0, 3).map((person, index) => ({ ...person, id: `person-extra-${index}`, warmth: 100, firstMetWeek: 15, lastInteractionWeek: 16 })),
+    ];
+    const resolveExpandedWeek = (seed: number) => advanceDay({
+      ...started, week: 16, day: 7, seed, phase: "playing" as const, contacts: expandedRoster, nextContactNumber: 16,
+      evaluatedDays: [1, 2, 3, 4, 5, 6, 7],
+    });
+    const arrival = resolveExpandedWeek(8192);
+    expect(arrival.contacts.length).toBe(expandedRoster.length + 1);
+    expect(arrival.relationshipRecords?.some((record) => record.kind === "arrival")).toBe(true);
   });
 
   it("assigns the player and contacts distinct stable portraits from matching age and gender ranges", () => {
@@ -260,7 +276,7 @@ describe("first week simulation", () => {
     const first = finishWeek(weekEnd);
     const replay = finishWeek(weekEnd);
     expect(replay).toEqual(first);
-    expect(first.contacts).toHaveLength(12);
+    expect(first.contacts.length).toBeGreaterThanOrEqual(12);
     expect(first.contacts.every((person) => person.goal && person.goalStage && person.mood && person.lastAutonomousAction)).toBe(true);
     expect(first.contacts.every((person) => (person.goalProgress ?? -1) >= 0 && (person.goalProgress ?? 4) <= 3)).toBe(true);
     expect(first.phase).toBe("summary");
