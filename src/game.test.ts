@@ -155,6 +155,18 @@ describe("first week simulation", () => {
     expect(social.log[1]).toContain(base.contacts[1].name);
   });
 
+  it("applies a social action to the selected NPC and records the right memory", () => {
+    const base = { ...createGame(character, 777), evaluatedDays: [1] };
+    const target = base.contacts[4];
+    const other = base.contacts[1];
+    const next = takeDailyAction(base, "social", target.id);
+    expect(next.contacts[4].warmth).toBe(target.warmth + 3);
+    expect(next.contacts[4].memories?.[0].text).toContain(target.name);
+    expect(next.contacts[1].warmth).toBe(other.warmth);
+    expect(next.contacts[1].memories).toEqual(other.memories);
+    expect(next.log[1]).toContain(target.name);
+  });
+
   it("keeps a recent-event cooldown across week boundaries", () => {
     let state = createGame(character, 54321);
     for (let guard = 0; guard < 30 && state.phase !== "summary"; guard += 1) {

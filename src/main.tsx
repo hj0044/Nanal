@@ -152,7 +152,7 @@ function App() {
         </div>
       </header>
       <main className="main-content">
-        {tab === "life" && <LifeView game={game} onAdvance={(days) => updateGame((current) => advanceDays(current, days))} onAction={(action) => updateGame((current) => takeDailyAction(current, action))} onChoice={(id) => updateGame((current) => chooseEvent(current, id))} onNextWeek={() => updateGame(startNextWeek)} onSelectPerson={setSelectedPerson} />}
+        {tab === "life" && <LifeView game={game} onAdvance={(days) => updateGame((current) => advanceDays(current, days))} onAction={(action, targetContactId) => updateGame((current) => takeDailyAction(current, action, targetContactId))} onChoice={(id) => updateGame((current) => chooseEvent(current, id))} onNextWeek={() => updateGame(startNextWeek)} onSelectPerson={setSelectedPerson} />}
         {tab === "people" && <PeopleView game={game} onSelectPerson={setSelectedPerson} />}
         {tab === "work" && <WorkView game={game} />}
         {tab === "goals" && <GoalsView game={game} />}
@@ -224,8 +224,9 @@ function Creator({ draft, setDraft, canStart, randomize, start, onImport, import
   );
 }
 
-function LifeView({ game, onAdvance, onAction, onChoice, onNextWeek, onSelectPerson }: { game: GameState; onAdvance: (days: 1 | 3 | 7) => void; onAction: (action: DailyAction) => void; onChoice: (id: string) => void; onNextWeek: () => void; onSelectPerson: (person: Contact) => void }) {
+function LifeView({ game, onAdvance, onAction, onChoice, onNextWeek, onSelectPerson }: { game: GameState; onAdvance: (days: 1 | 3 | 7) => void; onAction: (action: DailyAction, targetContactId?: string) => void; onChoice: (id: string) => void; onNextWeek: () => void; onSelectPerson: (person: Contact) => void }) {
   const [showResult, setShowResult] = useState(false);
+  const [socialTargetId, setSocialTargetId] = useState(game.contacts[1]?.id ?? game.contacts[0]?.id ?? "");
   const date = new Date(game.character.year, 0, (game.week - 1) * 7 + game.day);
   const dateLabel = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric" }).format(date);
   const weekday = new Intl.DateTimeFormat("ko-KR", { weekday: "short" }).format(date);
@@ -255,7 +256,7 @@ function LifeView({ game, onAdvance, onAction, onChoice, onNextWeek, onSelectPer
             ["rest", "충분히 쉬기", "에너지↑ · 스트레스↓"],
             ["social", "가까운 사람 만나기", "기분↑ · 관계 온도↑"],
             ["organize", "생활 정리하기", "집중도↑ · 부담↓"],
-          ] as [DailyAction, string, string][]).map(([action, title, detail]) => <button className="daily-action" key={action} disabled={actionUsed} onClick={() => { setShowResult(false); onAction(action); }}><strong>{title}</strong><small>{actionUsed ? "오늘 행동을 이미 선택했어요" : detail}</small></button>)}</div><div className="advance-options"><span className="fast-forward-label">그냥 진행</span>{([1, 3, 7] as const).map((days) => <button className="advance-button secondary-advance" key={days} onClick={() => { setShowResult(false); onAdvance(days); }}><span>{days === 1 ? "하루" : `${days}일`}</span><span className="arrow">→</span></button>)}</div></div>
+          ] as [DailyAction, string, string][]).map(([action, title, detail]) => <div className="daily-action-wrap" key={action}><button className="daily-action" disabled={actionUsed} onClick={() => { setShowResult(false); onAction(action, action === "social" ? socialTargetId : undefined); }}><strong>{title}</strong><small>{actionUsed ? "오늘 행동을 이미 선택했어요" : detail}</small></button>{action === "social" && <label className="social-target-field"><span>함께 보낼 사람</span><select aria-label="함께 시간을 보낼 사람" value={socialTargetId} disabled={actionUsed} onChange={(event) => setSocialTargetId(event.target.value)}>{game.contacts.map((person) => <option key={person.id} value={person.id}>{person.name} · {person.role}</option>)}</select></label>}</div>)}</div><div className="advance-options"><span className="fast-forward-label">그냥 진행</span>{([1, 3, 7] as const).map((days) => <button className="advance-button secondary-advance" key={days} onClick={() => { setShowResult(false); onAdvance(days); }}><span>{days === 1 ? "하루" : `${days}일`}</span><span className="arrow">→</span></button>)}</div></div>
         </section>
       )}
       {showResult && game.lastChoice && <div className="toast-result"><span className="toast-check">✓</span><span>{game.lastChoice}</span><button onClick={() => setShowResult(false)} aria-label="닫기">×</button></div>}
