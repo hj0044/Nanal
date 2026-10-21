@@ -207,7 +207,7 @@ function LifeView({ game, onAdvance, onChoice, onNextWeek, onSelectPerson }: { g
   return (
     <>
       <section className="home-hero">
-        <div className="home-hero-copy"><span className="home-date">{dateLabel} ({weekday}) · {game.week}주차</span><h1>오늘도 좋은 하루예요,<br /><em>{game.character.name}!</em></h1><p>지금도 충분히 잘하고 있어요.</p><div className="home-profile-tags"><span>{game.character.age}세</span><span>{game.character.region}</span><span>{backgroundLabels[game.character.background]}</span></div></div>
+        <div className="home-hero-copy"><span className="home-date">{dateLabel} ({weekday}) · {game.week}주차</span><h1>오늘도 좋은 하루예요!</h1><p>{game.character.name}님, 지금도 충분히 잘하고 있어요.</p><div className="home-profile-tags"><span>{game.character.age}세</span><span>{game.character.region}</span><span>{backgroundLabels[game.character.background]}</span></div></div>
         <div className={`illustrated-portrait home-portrait ${game.character.gender === "남성" ? "portrait-male" : "portrait-female"}`} style={portraitStyle(game.character.gender)} role="img" aria-label={`${game.character.name} 캐릭터 일러스트`} />
       </section>
       <section className="stats-grid home-stats" aria-label="오늘의 생활 요약">
