@@ -218,7 +218,7 @@ describe("first week simulation", () => {
     const followUp = getPersonalStoryEvents(nextWeek)[0];
     expect(followUp?.personalStory?.stage).toBe(1);
     expect(followUp?.body).toContain("함께 정리한 계획");
-    expect(state.contacts[0].memories?.[0].text).toContain("함께 가능한 선택지를 정리한다");
+    expect(state.contacts[0].memories?.[0].text).toBe(first.choices.find((choice) => choice.id === "story-plan")?.result);
   });
 
   it("gives each NPC independent goal state and reproducible weekly behavior", () => {
