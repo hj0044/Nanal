@@ -346,7 +346,15 @@ export function advanceDay(state: GameState): GameState {
   }
   next.log.unshift(`${next.week}주차 ${next.day}일 · 큰 일정 없이 하루를 보냈다.`);
   if (next.day >= 7) {
-    return { ...settleWeeklyCashflow(next), phase: "summary" };
+    const settled = settleWeeklyCashflow(next);
+    const npcTurn = simulateNpcWeek(settled);
+    return {
+      ...settled,
+      phase: "summary",
+      seed: npcTurn.seed,
+      contacts: npcTurn.contacts,
+      log: [...npcTurn.logs, ...settled.log],
+    };
   }
   next.day += 1;
   return next;
@@ -500,13 +508,11 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; seed: number;
 export function startNextWeek(state: GameState): GameState {
   if (state.phase !== "summary") return state;
   const week = state.week + 1;
-  const npcTurn = simulateNpcWeek(state);
   return {
-    ...state, week, day: 1, phase: "playing", seed: npcTurn.seed,
-    contacts: npcTurn.contacts,
+    ...state, week, day: 1, phase: "playing",
     evaluatedDays: [], actionDays: [], seenEvents: [], lastChoice: undefined,
     stats: { ...state.stats, energy: clamp(state.stats.energy + 12), stress: clamp(state.stats.stress - 7) },
-    log: [...npcTurn.logs, `${week}주차가 시작됐다. 지난주의 경험이 생활에 남아 있다.`, ...state.log],
+    log: [`${week}주차가 시작됐다. 지난주의 경험이 생활에 남아 있다.`, ...state.log],
   };
 }
 export function setPalette(state: GameState, palette: Palette): GameState {
