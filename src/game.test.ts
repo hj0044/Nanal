@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advanceDay, advanceDays, chooseEvent, createGame, generateContacts, getPersonalStoryEvents, normalizeContactName, startNextWeek, takeDailyAction, type Character } from "./game";
+import { advanceDay, advanceDays, chooseEvent, createGame, generateContacts, getPersonalStoryEvents, getWeeklyCashflowPlan, normalizeContactName, startNextWeek, takeDailyAction, type Character } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
 import { getPortrait, portraitCatalog } from "./portrait-catalog";
@@ -162,6 +162,7 @@ describe("first week simulation", () => {
     const next = takeDailyAction(base, "social", target.id);
     expect(next.contacts[4].warmth).toBe(target.warmth + 3);
     expect(next.contacts[4].memories?.[0].text).toContain(target.name);
+    expect(next.contacts[4].goalSupport).toBe((target.goalSupport ?? 0) + 1);
     expect(next.contacts[1].warmth).toBe(other.warmth);
     expect(next.contacts[1].memories).toEqual(other.memories);
     expect(next.log[1]).toContain(target.name);
@@ -231,6 +232,7 @@ describe("first week simulation", () => {
     expect(followUp?.personalStory?.stage).toBe(1);
     expect(followUp?.body).toContain("함께 정리한 계획");
     expect(state.contacts[0].memories?.[0].text).toBe(first.choices.find((choice) => choice.id === "story-plan")?.result);
+    expect(state.contacts[0].goalSupport).toBe(2);
   });
 
   it("gives each NPC independent goal state and reproducible weekly behavior", () => {
@@ -242,6 +244,48 @@ describe("first week simulation", () => {
     expect(first.contacts.every((person) => person.goal && person.goalStage && person.mood && person.lastAutonomousAction)).toBe(true);
     expect(first.contacts.every((person) => (person.goalProgress ?? -1) >= 0 && (person.goalProgress ?? 4) <= 3)).toBe(true);
     expect(first.log.some((line) => line.includes("주차가 시작됐다"))).toBe(true);
+  });
+
+  it("lets player support advance an NPC goal and unlock a goal-aware follow-up", () => {
+    const base = createGame(character, 404);
+    const contacts = base.contacts.map((person, index) => ({
+      ...person,
+      warmth: 10,
+      goalProgress: index === 0 ? 0 : person.goalProgress,
+      goalSupport: index === 0 ? 3 : 0,
+    }));
+    const next = startNextWeek({ ...base, phase: "summary", contacts });
+    const supported = next.contacts[0];
+    expect(supported.goalProgress).toBe(1);
+    expect(supported.goalSupport).toBe(2);
+    expect(supported.lastAutonomousAction).toContain("네가 건넨 응원");
+    expect(getPersonalStoryEvents(next)[0]?.personalStory?.contactId).toBe(supported.id);
+    expect(getPersonalStoryEvents(next)[0]?.body).toContain("네가 건넨 응원이");
+  });
+
+  it("settles each background's weekly cashflow once and records any shortfall", () => {
+    const studentPlan = getWeeklyCashflowPlan({ ...character, housing: "자취" });
+    expect(studentPlan).toMatchObject({ income: 150_000, livingExpenses: 155_000, housingExpenses: 130_000, expenses: 285_000, net: -135_000 });
+    const seekerPlan = getWeeklyCashflowPlan({ ...character, background: "jobseeker", housing: "자취" });
+    const workerPlan = getWeeklyCashflowPlan({ ...character, background: "worker", housing: "가족과 동거" });
+    expect(seekerPlan.net).toBeLessThan(0);
+    expect(workerPlan.net).toBeGreaterThan(0);
+
+    const base = createGame(character, 501);
+    const atWeekEnd = { ...base, day: 7, evaluatedDays: [7], stats: { ...base.stats, money: 300_000 } };
+    const summary = advanceDay(atWeekEnd);
+    expect(summary.phase).toBe("summary");
+    expect(summary.stats.money).toBe(300_000 + studentPlan.net);
+    expect(summary.weeklyCashflow).toMatchObject({ week: 1, income: 150_000, expenses: 285_000, endingBalance: 165_000 });
+    const nextWeek = startNextWeek(summary);
+    expect(nextWeek.stats.money).toBe(summary.stats.money);
+    expect(nextWeek.weeklyCashflow).toEqual(summary.weeklyCashflow);
+
+    const brokeSeeker = createGame({ ...character, background: "jobseeker", housing: "자취" }, 502);
+    const shortfall = advanceDay({ ...brokeSeeker, day: 7, evaluatedDays: [7], stats: { ...brokeSeeker.stats, money: 0, stress: 20 } });
+    expect(shortfall.stats.money).toBe(0);
+    expect(shortfall.weeklyCashflow?.unpaidExpenses).toBe(seekerPlan.expenses - seekerPlan.income);
+    expect(shortfall.stats.stress).toBe(25);
   });
 
   it("records social memories and fades them gradually at weekly boundaries", () => {
