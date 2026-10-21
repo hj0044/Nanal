@@ -3,3 +3,7 @@ dist/
 coverage/
 *.tsbuildinfo
 .DS_Store
+
+# Unapproved generated portrait artifacts and local editable kit sources
+.portrait-build/
+art/portrait-kits/
