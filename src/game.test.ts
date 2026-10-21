@@ -33,6 +33,7 @@ describe("first week simulation", () => {
     expect(first.contacts.every((person) => getPortrait(person.portraitId)?.ageBand === person.portraitAgeBand)).toBe(true);
     expect(portraitCatalog).toHaveLength(62);
     expect(new Set(portraitCatalog.map((portrait) => portrait.id)).size).toBe(62);
+    expect(getPortrait("p-m24-new-07")?.gender).toBe("여성");
     const individual = portraitCatalog.filter((portrait) => portrait.source === "single");
     expect(new Set(individual.map((portrait) => portrait.characterId)).size).toBe(individual.length);
   });

@@ -29,7 +29,9 @@ function readSave(): GameState | null {
   } catch { return null; }
 }
 function normalizeSave(parsed: GameState): GameState {
-  const playerPortraitId = parsed.character.portraitId ?? createGame(parsed.character, parsed.seed).character.portraitId;
+  const savedPlayerPortraitId = parsed.character.portraitId;
+  const playerPortraitId = savedPlayerPortraitId && getPortrait(savedPlayerPortraitId)?.gender === parsed.character.gender
+    ? savedPlayerPortraitId : createGame(parsed.character, parsed.seed).character.portraitId;
   const generated = generateContacts(parsed.character.background, parsed.seed, parsed.character.age, playerPortraitId ? [playerPortraitId] : []);
   const usedPortraitIds = playerPortraitId ? [playerPortraitId] : [];
   return {
