@@ -16,8 +16,8 @@ export const commonEventLibrary: LifeEvent[] = [
     eyebrow: "인맥 · 새로운 만남",
     body: "친구가 관심사가 잘 맞을 것 같은 사람을 소개해주겠다고 한다. 가볍게 이야기를 나누거나, 아직은 부담스럽다고 말할 수 있다.",
     choices: [
-      { id: "intro-accept", title: "연락처를 받고 편하게 대화를 시작한다", detail: "새 인연을 만들고 연락을 이어간다", result: "서로의 관심사를 나누며 대화를 시작했다. 잘 맞는지는 천천히 알아가기로 했다.", effect: { mood: 4, stress: 1, relationship: 2 }, contactIndex: 1 },
-      { id: "intro-group", title: "여럿이 만나는 자리부터 제안한다", detail: "부담을 낮추고 자연스럽게 알아간다", result: "친구들과 함께 만날 자리를 잡았다. 편한 분위기에서 서로를 알아갈 수 있게 됐다.", effect: { mood: 3, energy: -2, relationship: 3 }, contactIndex: 1 },
+      { id: "intro-accept", title: "연락처를 받고 편하게 대화를 시작한다", detail: "새 인연을 만들고 연락을 이어간다", result: "서로의 관심사를 나누며 대화를 시작했다. 잘 맞는지는 천천히 알아가기로 했다.", effect: { mood: 4, stress: 1, relationship: 2, newContactOpportunity: 1 }, contactIndex: 1, meetingContext: "친구의 소개로 나간 작은 모임" },
+      { id: "intro-group", title: "여럿이 만나는 자리부터 제안한다", detail: "부담을 낮추고 자연스럽게 알아간다", result: "친구들과 함께 만날 자리를 잡았다. 편한 분위기에서 서로를 알아갈 수 있게 됐다.", effect: { mood: 3, energy: -2, relationship: 3, newContactOpportunity: 0.8 }, contactIndex: 1, meetingContext: "친구들과 함께한 모임" },
       { id: "intro-decline", title: "고맙지만 이번에는 정중히 사양한다", detail: "지금의 생활 리듬을 우선한다", result: "소개는 다음 기회로 미뤘다. 친구도 네 상황을 이해해줬다.", effect: { stress: -2, relationship: 1 }, contactIndex: 1 },
     ],
   },
@@ -82,8 +82,8 @@ export const commonEventLibrary: LifeEvent[] = [
     eyebrow: "여가 · 새로운 경험",
     body: "친구가 운동이나 전시 모임에 같이 가자고 한다. 비용과 시간을 확인하고 참여 방식을 정할 수 있다.",
     choices: [
-      { id: "hobby-join", title: "이번 모임에 함께 간다", detail: "새 경험을 하고 관계도 이어간다", result: "새로운 활동을 경험하고 함께 간 사람과 이야기를 나눴다. 기분 전환이 됐다.", effect: { money: -20000, energy: -4, mood: 7, relationship: 3 }, contactIndex: 1 },
-      { id: "hobby-trial", title: "체험만 해보고 계속할지 결정한다", detail: "큰 지출 전에 나와 맞는지 살핀다", result: "체험으로 분위기와 난이도를 확인했다. 계속할지는 생활비와 일정에 맞춰 정하기로 했다.", effect: { money: -8000, focus: 2, mood: 4 } },
+      { id: "hobby-join", title: "이번 모임에 함께 간다", detail: "새 경험을 하고 관계도 이어간다", result: "새로운 활동을 경험하고 함께 간 사람과 이야기를 나눴다. 기분 전환이 됐다.", effect: { money: -20000, energy: -4, mood: 7, relationship: 3, newContactOpportunity: 0.8 }, contactIndex: 1, meetingContext: "관심사가 비슷한 취미 모임" },
+      { id: "hobby-trial", title: "체험만 해보고 계속할지 결정한다", detail: "큰 지출 전에 나와 맞는지 살핀다", result: "체험으로 분위기와 난이도를 확인했다. 계속할지는 생활비와 일정에 맞춰 정하기로 했다.", effect: { money: -8000, focus: 2, mood: 4, newContactOpportunity: 0.45 }, meetingContext: "관심사가 비슷한 취미 체험" },
       { id: "hobby-pass", title: "이번에는 쉬고 다음 기회를 기약한다", detail: "예산이나 체력을 고려한다", result: "이번에는 쉬기로 했다. 관심은 남겨두고 여유가 생기면 다시 참여하기로 했다.", effect: { energy: 4, stress: -2 } },
     ],
   },
