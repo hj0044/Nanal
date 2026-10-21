@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { advanceDay, advanceDays, chooseEvent, createGame, generateContacts, startNextWeek, type Character } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
+import { validateGeneratedEvent } from "./event-generation";
 
 const character: Character = {
   name: "지우", age: 24, year: 2024, background: "student",
@@ -20,8 +21,9 @@ describe("first week simulation", () => {
   it("provides a broad, unique pool of reviewed events per background", () => {
     const ids = [...commonEventLibrary, ...Object.values(eventLibrary).flat()].map((event) => event.id);
     expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toHaveLength(60);
     for (const background of ["student", "jobseeker", "worker"] as const) {
-      expect(eventLibrary[background].length + commonEventLibrary.length).toBeGreaterThanOrEqual(16);
+      expect(eventLibrary[background].length + commonEventLibrary.length).toBeGreaterThanOrEqual(25);
       expect([...eventLibrary[background], ...commonEventLibrary].every((event) => event.choices.length >= 2)).toBe(true);
     }
   });
@@ -100,5 +102,19 @@ describe("first week simulation", () => {
       expect(next.recentEventIds).toEqual(state.recentEventIds ?? []);
       expect(next.seenEvents).toEqual([]);
     }
+  });
+
+  it("validates future AI output and rejects unsafe effects or disabled topics", () => {
+    const settings = { affair: false, illness: true, pregnancy: false };
+    const candidate = {
+      id: "ai-campus-meeting", title: "새 모임 제안", eyebrow: "관계 · 약속", body: "친구가 모임에 초대했다.",
+      choices: [
+        { id: "join-a", title: "참여한다", detail: "새 사람을 만난다", result: "즐거운 시간을 보냈다.", effect: { mood: 3, relationship: 2 } },
+        { id: "skip-b", title: "다음에 간다", detail: "일정을 조정한다", result: "다음 기회를 잡기로 했다.", effect: { stress: -1 } },
+      ],
+    };
+    expect(validateGeneratedEvent(candidate, settings)?.choices).toHaveLength(2);
+    expect(validateGeneratedEvent({ ...candidate, choices: candidate.choices.map((choice) => ({ ...choice, effect: { money: 500_000 } })) }, settings)).toBeUndefined();
+    expect(validateGeneratedEvent({ ...candidate, topic: "affair" }, settings)).toBeUndefined();
   });
 });
