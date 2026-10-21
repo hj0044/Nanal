@@ -209,6 +209,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
   .stat-card { min-height: 90px; }
   .next-card { align-items: flex-start; flex-direction: column; }
   .advance-button { width: 100%; }
+  .advance-options { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .advance-options .advance-button { min-width: 0; width: 100%; padding: 0 10px; }
   .event-panel { grid-template-columns: 1fr; }
   .event-icon { width: 34px; height: 34px; }
   .people-grid { grid-template-columns: 1fr; }
@@ -294,6 +296,13 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .memory-card { margin-top: 19px; padding: 15px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-soft); }
 .memory-card p { margin: 7px 0 0; font-size: 12px; line-height: 1.65; }
 .person-detail-footnote { margin: 13px 0 4px; color: var(--muted); font-size: 9px; line-height: 1.6; }
+.advance-options { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+.advance-options .advance-button { min-width: 94px; min-height: 42px; }
+.profile-facts { margin-top: 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.profile-facts > div { min-height: 63px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+.profile-facts small, .profile-facts strong { display: block; }
+.profile-facts small { color: var(--muted); font-size: 9px; }
+.profile-facts strong { margin-top: 6px; font-size: 11px; line-height: 1.45; }
 @media (min-width: 720px) {
   .person-details-modal { border-radius: 24px; }
   .home-hero { min-height: 286px; padding: 31px; }

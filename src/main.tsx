@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  advanceDay, backgroundLabels, chooseEvent, createGame, createSeed, startNextWeek,
+  advanceDays, backgroundLabels, chooseEvent, createGame, createSeed, generateContacts, startNextWeek,
   type Background, type Character, type CharacterDraft, type Contact, type GameState, type Palette,
   type SensitiveTopic, type Tab,
 } from "./game";
@@ -24,8 +24,21 @@ function readSave(): GameState | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as GameState;
     if (parsed.version !== 1 || !parsed.character || !parsed.stats || !Array.isArray(parsed.contacts)) return null;
-    return parsed;
+    return normalizeSave(parsed);
   } catch { return null; }
+}
+function normalizeSave(parsed: GameState): GameState {
+  const generated = generateContacts(parsed.character.background, parsed.seed, parsed.character.age);
+  return {
+    ...parsed,
+    recentEventIds: parsed.recentEventIds ?? [],
+    contacts: parsed.contacts.map((person, index) => ({ ...generated[index], ...person,
+      age: person.age ?? generated[index]?.age,
+      occupation: person.occupation ?? generated[index]?.occupation,
+      personality: person.personality ?? generated[index]?.personality,
+      goal: person.goal ?? generated[index]?.goal,
+    })),
+  };
 }
 function App() {
   const [game, setGame] = useState<GameState | null>(() => readSave());
@@ -105,7 +118,7 @@ function App() {
     try {
       const parsed = JSON.parse(await file.text()) as GameState;
       if (parsed.version !== 1 || !parsed.character || !parsed.stats || !Array.isArray(parsed.contacts)) throw new Error("다른 형식의 저장 파일입니다.");
-      setGame(parsed); setShowCreator(false); setImportMessage("저장 파일을 불러왔어요.");
+      setGame(normalizeSave(parsed)); setShowCreator(false); setImportMessage("저장 파일을 불러왔어요.");
     } catch (error) { setImportMessage(error instanceof Error ? error.message : "파일을 읽지 못했어요."); }
   };
 
@@ -123,7 +136,7 @@ function App() {
         </div>
       </header>
       <main className="main-content">
-        {tab === "life" && <LifeView game={game} onAdvance={() => updateGame(advanceDay)} onChoice={(id) => updateGame((current) => chooseEvent(current, id))} onNextWeek={() => updateGame(startNextWeek)} onSelectPerson={setSelectedPerson} />}
+        {tab === "life" && <LifeView game={game} onAdvance={(days) => updateGame((current) => advanceDays(current, days))} onChoice={(id) => updateGame((current) => chooseEvent(current, id))} onNextWeek={() => updateGame(startNextWeek)} onSelectPerson={setSelectedPerson} />}
         {tab === "people" && <PeopleView game={game} onSelectPerson={setSelectedPerson} />}
         {tab === "work" && <WorkView game={game} />}
         {tab === "goals" && <GoalsView game={game} />}
@@ -195,7 +208,7 @@ function Creator({ draft, setDraft, canStart, randomize, start, onImport, import
   );
 }
 
-function LifeView({ game, onAdvance, onChoice, onNextWeek, onSelectPerson }: { game: GameState; onAdvance: () => void; onChoice: (id: string) => void; onNextWeek: () => void; onSelectPerson: (person: Contact) => void }) {
+function LifeView({ game, onAdvance, onChoice, onNextWeek, onSelectPerson }: { game: GameState; onAdvance: (days: 1 | 3 | 7) => void; onChoice: (id: string) => void; onNextWeek: () => void; onSelectPerson: (person: Contact) => void }) {
   const [showResult, setShowResult] = useState(false);
   const date = new Date(game.character.year, 0, (game.week - 1) * 7 + game.day);
   const dateLabel = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric" }).format(date);
@@ -219,8 +232,7 @@ function LifeView({ game, onAdvance, onChoice, onNextWeek, onSelectPerson }: { g
       {game.phase === "summary" && <section className="panel summary-panel"><div className="section-kicker">WEEKLY REVIEW</div><h2>이번 주를 돌아봤어요</h2><p>선택과 일정이 생활에 남았어요. 결과는 한 번의 성공이나 실패로 단정되지 않고 다음 주로 이어집니다.</p><div className="summary-chips"><span>에너지 {game.stats.energy}%</span><span>기분 {game.stats.mood}%</span><span>관계 {Math.round(game.contacts.reduce((sum, person) => sum + person.warmth, 0) / game.contacts.length)} 평균</span></div><button className="primary-button" onClick={onNextWeek}>다음 주 시작 <span>→</span></button></section>}
       {game.phase === "playing" && (
         <section className="next-card">
-          <div className="next-copy"><span className="section-kicker">NEXT STEP</span><h2>하루를 이어가 볼까요?</h2><p>상황에 맞는 일이 생기면 여기서 멈춰 선택을 기다릴게요.</p></div>
-          <button className="advance-button" onClick={() => { setShowResult(false); onAdvance(); }}><span>하루 진행</span><span className="arrow">→</span></button>
+          <div className="next-copy"><span className="section-kicker">NEXT STEP</span><h2>얼마나 진행할까요?</h2><p>사건이 생기거나 주간 정산에 도달하면 그 지점에서 멈춰요.</p><div className="advance-options">{([1, 3, 7] as const).map((days) => <button className="advance-button" key={days} onClick={() => { setShowResult(false); onAdvance(days); }}><span>{days === 1 ? "하루" : `${days}일`}</span><span className="arrow">→</span></button>)}</div></div>
         </section>
       )}
       {showResult && game.lastChoice && <div className="toast-result"><span className="toast-check">✓</span><span>{game.lastChoice}</span><button onClick={() => setShowResult(false)} aria-label="닫기">×</button></div>}
@@ -241,7 +253,7 @@ function PeopleView({ game, onSelectPerson }: { game: GameState; onSelectPerson:
 }
 function closenessLabel(warmth: number) { return warmth >= 75 ? "가까운 사이" : warmth >= 50 ? "알아가는 중" : warmth >= 25 ? "가벼운 인맥" : "아직 서먹함"; }
 function PersonDetails({ person, onClose }: { person: Contact; onClose: () => void }) {
-  return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="person-details-modal" role="dialog" aria-modal="true" aria-labelledby="person-details-title" onClick={(event) => event.stopPropagation()}><div className="person-detail-cover"><button className="icon-button person-detail-close" aria-label="상세 정보 닫기" onClick={onClose}>×</button><span className={`illustrated-portrait detail-portrait ${person.gender === "남성" ? "portrait-male" : person.gender === "여성" ? "portrait-female" : "portrait-placeholder"}`} style={person.gender ? portraitStyle(person.gender) : undefined}>{!person.gender && person.name.slice(0, 1)}</span></div><div className="person-detail-body"><span className="section-kicker">RELATIONSHIP PROFILE</span><h2 id="person-details-title">{person.name}</h2><p className="person-detail-role">{person.role}{person.gender ? ` · ${person.gender}` : ""}</p><div className="relationship-score"><div><span>관계 온도</span><strong>{person.warmth}<small>/100</small></strong></div><b>{closenessLabel(person.warmth)}</b></div><div className="warmth-meter detail-meter"><span style={{ width: `${person.warmth}%` }} /></div><section className="memory-card"><span className="section-kicker">최근 기억</span><p>{person.note}</p></section><p className="person-detail-footnote">관계의 거리감은 함께한 일과 연락이 쌓이면서 달라집니다.</p><button className="primary-button full" onClick={onClose}>확인</button></div></section></div>;
+  return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="person-details-modal" role="dialog" aria-modal="true" aria-labelledby="person-details-title" onClick={(event) => event.stopPropagation()}><div className="person-detail-cover"><button className="icon-button person-detail-close" aria-label="상세 정보 닫기" onClick={onClose}>×</button><span className={`illustrated-portrait detail-portrait ${person.gender === "남성" ? "portrait-male" : person.gender === "여성" ? "portrait-female" : "portrait-placeholder"}`} style={person.gender ? portraitStyle(person.gender) : undefined}>{!person.gender && person.name.slice(0, 1)}</span></div><div className="person-detail-body"><span className="section-kicker">RELATIONSHIP PROFILE</span><h2 id="person-details-title">{person.name}</h2><p className="person-detail-role">{person.role}{person.gender ? ` · ${person.gender}` : ""}</p><div className="profile-facts"><div><small>나이</small><strong>{person.age ?? "미상"}세</strong></div><div><small>직업</small><strong>{person.occupation ?? "정보 없음"}</strong></div><div><small>성격</small><strong>{person.personality ?? "조금씩 알아가는 중"}</strong></div><div><small>요즘 목표</small><strong>{person.goal ?? "아직 알 수 없음"}</strong></div></div><div className="relationship-score"><div><span>관계 온도</span><strong>{person.warmth}<small>/100</small></strong></div><b>{closenessLabel(person.warmth)}</b></div><div className="warmth-meter detail-meter"><span style={{ width: `${person.warmth}%` }} /></div><section className="memory-card"><span className="section-kicker">최근 기억</span><p>{person.note}</p></section><p className="person-detail-footnote">인물의 성격과 목표는 관계와 사건을 거치며 더 구체적으로 드러나요.</p><button className="primary-button full" onClick={onClose}>확인</button></div></section></div>;
 }
 function WorkView({ game }: { game: GameState }) {
   const label = backgroundLabels[game.character.background];
