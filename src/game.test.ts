@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advanceDay, advanceDays, chooseEvent, createGame, generateContacts, getPersonalStoryEvents, startNextWeek, takeDailyAction, type Character } from "./game";
+import { advanceDay, advanceDays, chooseEvent, createGame, generateContacts, getPersonalStoryEvents, normalizeContactName, startNextWeek, takeDailyAction, type Character } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
 import { getPortrait, portraitCatalog } from "./portrait-catalog";
@@ -10,6 +10,16 @@ const character: Character = {
 };
 
 describe("first week simulation", () => {
+  it("keeps generated NPC names consistent with gender and repairs old mismatched names", () => {
+    for (let seed = 0; seed < 100; seed += 1) {
+      const contacts = generateContacts("student", seed);
+      expect(contacts.every((person) => normalizeContactName(person.name, person.gender!, seed) === person.name)).toBe(true);
+    }
+    expect(normalizeContactName("김서준", "여성", 42)).not.toBe("김서준");
+    expect(normalizeContactName("박하은", "남성", 42)).not.toBe("박하은");
+    expect(normalizeContactName("김지우", "여성", 42)).toBe("김지우");
+  });
+
   it("creates twelve stable contacts for the selected background", () => {
     const first = generateContacts("student", 12345);
     const second = generateContacts("student", 12345);
