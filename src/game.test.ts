@@ -218,5 +218,46 @@ describe("first week simulation", () => {
     const followUp = getPersonalStoryEvents(nextWeek)[0];
     expect(followUp?.personalStory?.stage).toBe(1);
     expect(followUp?.body).toContain("함께 정리한 계획");
+    expect(state.contacts[0].memories?.[0].text).toContain("함께 가능한 선택지를 정리한다");
+  });
+
+  it("gives each NPC independent goal state and reproducible weekly behavior", () => {
+    const base = { ...createGame(character, 61024), phase: "summary" as const };
+    const first = startNextWeek(base);
+    const replay = startNextWeek(base);
+    expect(replay).toEqual(first);
+    expect(first.contacts).toHaveLength(12);
+    expect(first.contacts.every((person) => person.goal && person.goalStage && person.mood && person.lastAutonomousAction)).toBe(true);
+    expect(first.contacts.every((person) => (person.goalProgress ?? -1) >= 0 && (person.goalProgress ?? 4) <= 3)).toBe(true);
+    expect(first.log.some((line) => line.includes("주차가 시작됐다"))).toBe(true);
+  });
+
+  it("records social memories and fades them gradually at weekly boundaries", () => {
+    const base = { ...createGame(character, 777), evaluatedDays: [1] };
+    const social = takeDailyAction(base, "social");
+    const contact = social.contacts[1];
+    expect(contact.memories?.[0].text).toContain(contact.name);
+    expect(contact.memories?.[0].vividness).toBe(1);
+    const nextWeek = startNextWeek({ ...social, phase: "summary" });
+    expect(nextWeek.contacts[1].memories?.[0].vividness).toBeCloseTo(0.94);
+  });
+
+  it("moves a completed NPC goal forward without repeating the completion log", () => {
+    const base = {
+      ...createGame(character, 1),
+      phase: "summary" as const,
+      contacts: createGame(character, 1).contacts.map((person) => ({ ...person, goalProgress: 2, goalStage: "마무리 준비" })),
+    };
+    let completed: { name: string; goal: string; result: ReturnType<typeof startNextWeek> } | undefined;
+    for (let seed = 1; seed < 80 && !completed; seed += 1) {
+      const result = startNextWeek({ ...base, seed });
+      const person = result.contacts.find((contact, index) => contact.goal !== base.contacts[index].goal);
+      if (person) completed = { name: person.name, goal: base.contacts.find((contact) => contact.id === person.id)!.goal!, result };
+    }
+    expect(completed).toBeDefined();
+    const line = `${completed!.name}이(가) “${completed!.goal}”에서 한 단계를 마쳤어요.`;
+    expect(completed!.result.log.filter((entry) => entry === line)).toHaveLength(1);
+    const following = startNextWeek({ ...completed!.result, phase: "summary" });
+    expect(following.log.filter((entry) => entry === line)).toHaveLength(1);
   });
 });
