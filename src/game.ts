@@ -24,6 +24,12 @@ export interface Stats {
   mood: number;
   focus: number;
 }
+export interface NPCMemory {
+  id: string;
+  text: string;
+  week: number;
+  vividness: number;
+}
 export interface Contact {
   id: string;
   name: string;
@@ -35,6 +41,11 @@ export interface Contact {
   occupation?: string;
   personality?: string;
   goal?: string;
+  goalProgress?: number;
+  goalStage?: string;
+  mood?: string;
+  lastAutonomousAction?: string;
+  memories?: NPCMemory[];
   warmth: number;
   note: string;
 }
@@ -181,7 +192,7 @@ export function generateContacts(background: Background, seed: number, playerAge
     const age = Math.max(19, playerAge + (family ? 10 : senior ? 3 : -2) + Math.floor(ageRoll * 7));
     const portraitId = choosePortraitId(gender, age, next, usedPortraits);
     usedPortraits.push(portraitId);
-    return { id: `person-${i + 1}`, name, role, gender, age, portraitId, portraitAgeBand: getPortrait(portraitId)?.ageBand, occupation: occupations[background][Math.floor(jobRoll * occupations[background].length)], personality: traits[Math.floor(traitRoll * traits.length)], goal: goals[Math.floor(goalRoll * goals.length)], warmth: 46 + Math.floor(value * 23), note: i < 2 ? "최근 연락이 이어지고 있다" : "아직 자세히 알지 못한다" };
+    return { id: `person-${i + 1}`, name, role, gender, age, portraitId, portraitAgeBand: getPortrait(portraitId)?.ageBand, occupation: occupations[background][Math.floor(jobRoll * occupations[background].length)], personality: traits[Math.floor(traitRoll * traits.length)], goal: goals[Math.floor(goalRoll * goals.length)], goalProgress: Math.floor(goalRoll * 3), goalStage: ["계획 세우기", "한 걸음 진행", "기회 기다리기"][Math.floor(goalRoll * 3)], mood: "평소와 같음", lastAutonomousAction: "이번 주 계획을 생각하는 중", memories: [], warmth: 46 + Math.floor(value * 23), note: i < 2 ? "최근 연락이 이어지고 있다" : "아직 자세히 알지 못한다" };
   });
 }
 export function createGame(character: Character, seed = createSeed(`${character.name}:${character.year}:${character.age}:${character.background}`)): GameState {
@@ -358,13 +369,65 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
   };
   return next;
 }
+function addNpcMemory(contact: Contact, text: string, week: number): NPCMemory[] {
+  const previous = contact.memories ?? [];
+  return [
+    { id: `${contact.id}-memory-${week}-${previous.length}`, text, week, vividness: 1 },
+    ...previous,
+  ].slice(0, 8);
+}
+
+function simulateNpcWeek(state: GameState): { contacts: Contact[]; seed: number; logs: string[] } {
+  let seed = state.seed;
+  const logs: string[] = [];
+  const contacts = state.contacts.map((contact) => {
+    const [nextSeed, roll] = nextRandom(seed ^ createSeed(`${contact.id}:${state.week}`));
+    seed = nextSeed;
+    const warmth = contact.warmth;
+    const chance = clamp(55 + (warmth - 50) * 0.45, 30, 82) / 100;
+    const oldGoal = contact.goal ?? "자기만의 방향을 찾는 일";
+    const memories = (contact.memories ?? [])
+      .map((memory) => ({ ...memory, vividness: memory.vividness * 0.94 }))
+      .filter((memory) => memory.vividness >= 0.2);
+    const currentProgress = contact.goalProgress ?? 0;
+    const advanced = roll < chance;
+    let goal = oldGoal;
+    let goalProgress = advanced ? currentProgress + 1 : currentProgress;
+    let goalStage = advanced
+      ? ["계획 세우기", "한 걸음 진행", "마무리 준비", "완료"][Math.min(goalProgress, 3)]
+      : contact.goalStage ?? "기회 기다리기";
+    let mood = advanced ? "자기 일에 집중하는 중" : "일정이 조금 꼬임";
+    let lastAutonomousAction = advanced ? `“${goal}”을(를) 이어갔어요.` : "갑작스러운 일정 때문에 계획을 미뤘어요.";
+    if (goalProgress >= 3) {
+      const [goalSeed, goalRoll] = nextRandom(seed ^ createSeed(`${contact.id}:${state.week}:next-goal`));
+      seed = goalSeed;
+      const nextGoals = goals.filter((candidate) => candidate !== oldGoal);
+      goal = nextGoals[Math.floor(goalRoll * nextGoals.length)] ?? "새로운 기회를 살펴보기";
+      goalProgress = 0;
+      goalStage = "새 목표를 살펴보는 중";
+      mood = "작은 성취 뒤 다음 계획을 생각하는 중";
+      lastAutonomousAction = `“${oldGoal}”의 한 단계를 마치고 다음 목표를 찾기 시작했어요.`;
+      logs.push(`${contact.name}이(가) “${oldGoal}”에서 한 단계를 마쳤어요.`);
+      return {
+        ...contact, goal, goalProgress, goalStage, mood, lastAutonomousAction,
+        memories: addNpcMemory({ ...contact, memories }, lastAutonomousAction, state.week),
+      };
+    }
+    return { ...contact, goal, goalProgress, goalStage, mood, lastAutonomousAction, memories };
+  });
+  return { contacts, seed, logs };
+}
+
 export function startNextWeek(state: GameState): GameState {
   if (state.phase !== "summary") return state;
+  const week = state.week + 1;
+  const npcTurn = simulateNpcWeek(state);
   return {
-    ...state, week: state.week + 1, day: 1, phase: "playing",
+    ...state, week, day: 1, phase: "playing", seed: npcTurn.seed,
+    contacts: npcTurn.contacts,
     evaluatedDays: [], actionDays: [], seenEvents: [], lastChoice: undefined,
     stats: { ...state.stats, energy: clamp(state.stats.energy + 12), stress: clamp(state.stats.stress - 7) },
-    log: [`${state.week + 1}주차가 시작됐다. 지난주의 경험이 생활에 남아 있다.`, ...state.log],
+    log: [...npcTurn.logs, `${week}주차가 시작됐다. 지난주의 경험이 생활에 남아 있다.`, ...state.log],
   };
 }
 export function setPalette(state: GameState, palette: Palette): GameState {
