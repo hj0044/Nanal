@@ -83,6 +83,7 @@ export interface NPCRelationship {
   contactBId: string;
   warmth: number;
   kind: "family" | "friend" | "work" | "acquaintance";
+  romanceStatus?: "dating";
   lastInteractionWeek?: number;
 }
 export interface RelationshipRecord { id: string; week: number; kind: "arrival" | "drift" | "departure" | "reunion" | "memory"; contactId: string; contactName: string; text: string }
@@ -94,6 +95,8 @@ export interface Effect {
   focus?: number;
   relationship?: number;
   goalSupport?: number;
+  /** Changes the warmth between two NPCs in a relationship event. */
+  npcRelationship?: number;
   /** Adds a chance to meet someone through the selected event. */
   newContactOpportunity?: number;
 }
@@ -104,6 +107,8 @@ export interface EventChoice {
   result: string;
   effect: Effect;
   contactIndex?: number;
+  /** Stable NPC target captured when this event is selected. */
+  contactId?: string;
   meetingContext?: string;
 }
 export interface LifeEvent {
@@ -114,6 +119,8 @@ export interface LifeEvent {
   topic?: SensitiveTopic;
   personalStory?: { contactId: string; stage: number };
   reunion?: { contactId: string };
+  npcPair?: { linkId: string; kind: "bond" | "conflict" | "reconciliation" | "romance"; contactAId: string; contactBId: string; speakerId: string };
+  npcDialogue?: { speakerName: string; line: string };
   choices: EventChoice[];
 }
 export interface GameState {
@@ -132,6 +139,7 @@ export interface GameState {
   seenEvents: string[];
   recentEventIds?: string[];
   eventLastSeenWeek?: Record<string, number>;
+  eventFamilyLastSeenWeek?: Record<string, number>;
   npcStoryStages?: Record<string, number>;
   npcStoryLastWeek?: Record<string, number>;
   npcStoryChoices?: Record<string, string>;
@@ -453,19 +461,185 @@ export function getNpcReunionEvents(state: GameState): LifeEvent[] {
     }];
   });
 }
+function dialogueFor(contact: Contact, kind: "bond" | "conflict" | "reconciliation" | "romance"): string {
+  const name = contact.name;
+  const goal = contact.goal ?? "요즘 생각하는 일";
+  const trait = contact.personality ?? "차분하고 신중한";
+  if (kind === "romance") return /차분|신중|계획|현실/.test(trait)
+    ? `서로 마음을 확인하고 만나보기로 했어. “${goal}”도 서로 응원하면서 천천히 알아가고 싶어.`
+    : `우리 서로 좋아한다는 걸 확인했어. 부담 주지 않고, 편한 속도로 만나보기로 했어.`;
+  if (/활발|사교적|먼저 다가/.test(trait)) return kind === "conflict" ? `내가 말을 너무 빨리 꺼냈나 봐. ${name}이 어떻게 느꼈는지 먼저 들어볼게.` : `요즘 “${goal}”도 생각이 많았는데, ${name}이랑 얘기하니 한결 편하네.`;
+  if (/차분|신중|계획적|현실적/.test(trait)) return kind === "conflict" ? `서로 다르게 받아들인 부분을 정리해서 이야기하고 싶어.` : `급하게 결론 내리기보다, “${goal}” 얘기까지 천천히 나눠보고 싶어.`;
+  if (/다정|공감|걱정/.test(trait)) return kind === "conflict" ? `혹시 내가 상처 준 건 아닐까 걱정돼. 괜찮을 때 솔직히 말해줬으면 해.` : `네 얘기를 들으니 나도 마음을 조금 열어도 되겠다는 생각이 들어.`;
+  if (/독립|주관|경쟁|추진/.test(trait)) return kind === "conflict" ? `내 입장도 분명히 말하고 싶어. 그렇다고 사이를 끊고 싶은 건 아니야.` : `서로 다른 점은 그대로 두고, 같이 해볼 일을 찾아보면 좋겠어.`;
+  if (/즉흥|유쾌|호기심/.test(trait)) return kind === "conflict" ? `잠깐, 내가 너무 앞서갔지? 다음엔 먼저 물어볼게.` : `다음엔 우리 둘 다 좋아하는 걸 해보자. 얘기하다 보니 생각보다 잘 맞네.`;
+  return kind === "conflict" ? `조금 어색해졌지만 그냥 넘기고 싶지는 않아. 차분히 얘기해보자.` : `“${goal}” 얘기도 나누고 싶었어. 너랑 있으면 편하게 말할 수 있어.`;
+}
+export function getNpcRelationshipEvents(state: GameState): LifeEvent[] {
+  const active = new Map(state.contacts.map((contact) => [contact.id, contact]));
+  const candidates = (state.npcRelationships ?? []).flatMap((link) => {
+    const a = active.get(link.contactAId);
+    const b = active.get(link.contactBId);
+    if (!a || !b) return [];
+    const romanceReady = !link.romanceStatus && link.kind === "friend" && a.age != null && a.age >= 19 && b.age != null && b.age >= 19 && link.warmth >= 78 && createSeed(`${link.id}:mutual-interest`) % 4 === 0;
+    const kind: NonNullable<LifeEvent["npcPair"]>["kind"] | undefined = romanceReady
+      ? "romance"
+      : link.warmth <= 27
+      ? "conflict"
+      : link.warmth >= 28 && link.warmth <= 43 && (link.lastInteractionWeek ?? 0) >= state.week - 2
+        ? "reconciliation"
+        : link.warmth >= 76 && !link.romanceStatus ? "bond" : undefined;
+    if (!kind) return [];
+    const id = `npc-pair-${kind}-${link.id}`;
+    if ((state.eventLastSeenWeek?.[id] ?? -100) > state.week - 3) return [];
+    return [{ link, a, b, kind, id }];
+  }).sort((left, right) => {
+    const priority = (kind: string) => kind === "conflict" ? 0 : kind === "reconciliation" ? 1 : 2;
+    return priority(left.kind) - priority(right.kind) || left.link.warmth - right.link.warmth || left.link.id.localeCompare(right.link.id);
+  });
+  const selected = candidates[0];
+  if (!selected) return [];
+  const { link, a, b, kind, id } = selected;
+  const speaker = a.personality && createSeed(`${id}:${a.id}`) % 2 === 0 ? a : b;
+  const relation = link.kind === "family" ? "가족" : link.kind === "work" ? "동료" : link.kind === "friend" ? "친구" : "지인";
+  const closeness = kind === "bond";
+  const conflict = kind === "conflict";
+  const romance = kind === "romance";
+  const title = romance ? `${a.name}과 ${b.name}이 서로 마음을 확인했다` : conflict ? `${a.name}과 ${b.name} 사이에 오해가 생겼다` : closeness ? `${a.name}과 ${b.name}이 가까워지고 있다` : `${a.name}과 ${b.name}이 다시 대화를 시작했다`;
+  const body = romance
+    ? `${a.name}과 ${b.name}은 서로 호감이 있다는 걸 직접 확인했다. 두 사람은 만나보기로 했고, 주변의 응원보다 서로의 동의와 속도를 우선하기로 했다.`
+    : conflict
+    ? `${relation}인 두 사람이 약속과 말의 뜻을 다르게 받아들여 서먹해졌다. 둘 다 관계를 끊고 싶은 것은 아닌 듯하지만, 먼저 손을 내밀기 어렵다.`
+    : closeness
+      ? `${a.name}과 ${b.name}은 서로의 근황을 자주 나누며 가까워졌다. 우정이 깊어지는 중일 수도 있고, 서로 호감이 있다면 천천히 확인해볼 수도 있다. 어느 쪽이든 당사자의 마음과 속도를 존중해야 한다.`
+      : `${a.name}과 ${b.name}은 지난번 불편했던 일을 다시 꺼내 보기로 했다. 한쪽의 사과만으로 덮기보다 서로의 경계와 바라는 점을 확인할 수 있다.`;
+  const choices: EventChoice[] = romance ? [
+    { id: `${id}-encourage`, title: "두 사람의 결정을 응원한다", detail: "서로 편한 속도로 알아가도록 지지한다", result: `${a.name}과 ${b.name}이 서로의 마음과 경계를 확인한 결정을 응원했다. 두 사람은 만나보며 관계를 천천히 쌓아가기로 했다.`, effect: { mood: 2, npcRelationship: 5 } },
+    { id: `${id}-privacy`, title: "축하하고 사적인 이야기는 묻지 않는다", detail: "당사자가 먼저 나눌 때까지 기다린다", result: `${a.name}과 ${b.name}에게 축하를 전하고 사적인 이야기는 먼저 묻지 않았다. 필요할 때 편하게 말하라고 전했다.`, effect: { npcRelationship: 3 } },
+    { id: `${id}-neutral`, title: "평소처럼 대하며 지켜본다", detail: "관계의 변화를 두 사람이 직접 만들어가게 둔다", result: `${a.name}과 ${b.name}의 관계를 대신 규정하지 않고 평소처럼 대했다. 두 사람은 자신의 속도로 만남을 이어간다.`, effect: { npcRelationship: 1 } },
+  ] : conflict ? [
+    { id: `${id}-listen`, title: "두 사람 말을 따로 충분히 들어본다", detail: "누구 편도 들지 않고 각자 원하는 점을 확인한다", result: `${a.name}과 ${b.name}의 이야기를 각각 들었다. 서로 오해한 지점을 확인하고 직접 대화할 시간을 정했다.`, effect: { mood: 1, npcRelationship: 10 } },
+    { id: `${id}-mediate`, title: "함께 이야기할 자리를 제안한다", detail: "대화 규칙을 정하고 해결할 한 가지를 고른다", result: `${a.name}과 ${b.name}이 차례로 말할 수 있도록 도왔다. 당장 다 풀리진 않았지만 서로의 입장을 알게 됐다.`, effect: { stress: -1, npcRelationship: 6 } },
+    { id: `${id}-space`, title: "감정이 가라앉을 때까지 기다린다", detail: "화해를 강요하지 않고 각자의 공간을 존중한다", result: `${a.name}과 ${b.name}에게 먼저 진정할 시간을 줬다. 서둘러 결론 내리지 않기로 했다.`, effect: { stress: -1, npcRelationship: 1 } },
+  ] : closeness ? [
+    { id: `${id}-encourage`, title: "서로 직접 마음을 확인해보라고 응원한다", detail: "관계의 이름을 대신 정하지 않고 솔직한 대화를 권한다", result: `${a.name}과 ${b.name}에게 서로의 마음을 직접 확인하되 어떤 답이든 존중하라고 전했다. 두 사람은 편한 속도로 이야기해보기로 했다.`, effect: { mood: 2, npcRelationship: 5 } },
+    { id: `${id}-group`, title: "다 함께 만날 자리를 만든다", detail: "부담 없이 관계를 이어갈 기회를 마련한다", result: `${a.name}과 ${b.name}이 부담 없이 만날 수 있도록 여러 사람이 함께하는 자리를 잡았다.`, effect: { energy: -1, npcRelationship: 3 } },
+    { id: `${id}-respect`, title: "두 사람에게 맡기고 지켜본다", detail: "사적인 관계에 끼어들지 않는다", result: `${a.name}과 ${b.name}이 스스로 관계의 속도와 방향을 정하도록 맡겼다.`, effect: { focus: 1, npcRelationship: 1 } },
+  ] : [
+    { id: `${id}-apology`, title: "서로 상처 준 부분을 구체적으로 사과한다", detail: "잘못을 인정하고 다시 지킬 경계를 합의한다", result: `${a.name}과 ${b.name}이 각자 상처 준 부분을 짚어 사과했다. 다음에는 어떻게 할지 함께 정했다.`, effect: { mood: 2, stress: -2, npcRelationship: 12 } },
+    { id: `${id}-smallstep`, title: "작은 약속부터 다시 시작한다", detail: "완전한 화해를 서두르지 않는다", result: `${a.name}과 ${b.name}은 당장 예전처럼 지내려 하지 않고 작은 약속부터 지켜보기로 했다.`, effect: { stress: -1, npcRelationship: 7 } },
+    { id: `${id}-boundary`, title: "당분간 필요한 거리를 존중한다", detail: "화해보다 안전하고 편한 거리를 우선한다", result: `${a.name}과 ${b.name}이 원하는 거리를 서로 확인했다. 용서나 화해를 강요하지 않기로 했다.`, effect: { npcRelationship: 2 } },
+  ];
+  return [{ id, title, eyebrow: `${relation} 관계 · ${romance ? "연애" : conflict ? "갈등" : closeness ? "관계의 변화" : "화해"}`, body,
+    npcPair: { linkId: link.id, kind, contactAId: a.id, contactBId: b.id, speakerId: speaker.id },
+    npcDialogue: { speakerName: speaker.name, line: dialogueFor(speaker, kind) }, choices }];
+}
+export type EventFamily = "romance" | "family" | "career" | "study" | "work" | "money" | "health" | "housing" | "friendship" | "social" | "npc-story" | "daily";
+export function getEventFamily(event: LifeEvent): EventFamily {
+  if (event.personalStory || event.reunion || event.npcPair) return event.personalStory || event.reunion ? "npc-story" : event.npcPair?.kind === "romance" ? "romance" : "friendship";
+  const text = `${event.eyebrow} ${event.title}`;
+  if (/연애|데이트|호감|연인/.test(text)) return "romance";
+  if (/가족|부모|친척|형제|자매/.test(text)) return "family";
+  if (/취업|구직|채용|면접|이력서|진로|자격증/.test(text)) return "career";
+  if (/수업|학업|과제|시험|성적|장학|동아리|학교/.test(text)) return "study";
+  if (/업무|직장|회사|동료|마감|휴가|급여|월급/.test(text)) return "work";
+  if (/돈|생활비|지출|저축|통장|비용/.test(text)) return "money";
+  if (/건강|수면|컨디션|병원|스트레스|피로/.test(text)) return "health";
+  if (/주거|집|이사|룸메이트|청소|소음/.test(text)) return "housing";
+  if (/친구|안부|오해|화해|관계|대화/.test(text)) return "friendship";
+  if (/인맥|모임|소개|새로운 만남|취미|여가/.test(text)) return "social";
+  return "daily";
+}
+function eventDialogue(contact: Contact, family: EventFamily): string {
+  const trait = contact.personality ?? "차분하고 신중한";
+  const goal = contact.goal ?? "요즘 생각하는 일";
+  const topic: Record<EventFamily, string> = {
+    romance: "서로의 마음과 속도", family: "가족과 보내는 시간", career: `“${goal}”`, study: `요즘 공부와 앞으로의 계획`,
+    work: `“${goal}”와 이번 주 업무`, money: `생활비와 “${goal}” 계획`, health: "요즘 흐트러진 생활 리듬",
+    housing: "함께 지내는 공간에서 필요한 약속", friendship: "우리 사이에 쌓인 이야기", social: "새로운 사람과 나누는 대화",
+    "npc-story": `“${goal}”`, daily: `“${goal}”와 요즘 생활`,
+  };
+  if (/낯은 가리|말수는 적|조용/.test(trait)) return `이런 얘기를 먼저 꺼내기 쉽지 않았어. ${topic[family]}에 대해 네 생각도 듣고 싶어.`;
+  if (/활발|사교적|먼저 다가|즉흥|유쾌/.test(trait)) return `나 요즘 ${topic[family]} 때문에 생각이 많아! 같이 얘기해보면 좋겠어.`;
+  if (/다정|공감|세심/.test(trait)) return `네가 편할 때 ${topic[family]} 얘기를 나누고 싶어. 네 생각도 소중하게 듣고 싶어.`;
+  if (/독립|주관|경쟁|추진/.test(trait)) return `나는 ${topic[family]}에 대해 이렇게 생각하고 있어. 서로 원하는 걸 솔직히 맞춰보자.`;
+  if (/걱정|완벽/.test(trait)) return `혹시 부담스럽진 않을까 고민했어. ${topic[family]} 얘기를 천천히 해봐도 괜찮을까?`;
+  return `요즘 ${topic[family]}에 신경 쓰고 있어. 네 의견을 듣고 같이 방법을 찾아보고 싶어.`;
+}
+function eventChoiceReaction(contact: Contact, effect: Effect): string {
+  const trait = contact.personality ?? "";
+  if ((effect.relationship ?? 0) > 0) {
+    if (/낯은 가리|조용|말수는 적/.test(trait)) return `${contact.name}은(는) 바로 표현하진 않았지만 다음에도 편하게 이야기하자고 했다.`;
+    if (/현실적|계획적|책임감/.test(trait)) return `${contact.name}은(는) 다음에 어떻게 할지 구체적으로 정리해보자고 했다.`;
+    if (/다정|공감|세심/.test(trait)) return `${contact.name}은(는) 네가 자기 마음을 살펴준 점을 고마워했다.`;
+    return `${contact.name}은(는) 네 말을 기억해두겠다고 했다.`;
+  }
+  if ((effect.relationship ?? 0) < 0) {
+    if (/독립|주관/.test(trait)) return `${contact.name}은(는) 자기 입장도 존중해달라고 조심스럽게 말했다.`;
+    if (/걱정|공감|세심/.test(trait)) return `${contact.name}은(는) 괜찮다고 했지만 당분간 생각할 시간이 필요해 보였다.`;
+    return `${contact.name}은(는) 답을 서두르지 않고 조금 거리를 두기로 했다.`;
+  }
+  if (/계획|현실|책임감/.test(trait)) return `${contact.name}은(는) 다음 행동을 정리해두고 연락하기로 했다.`;
+  return `${contact.name}은(는) 그날의 대화를 기억해두겠다고 했다.`;
+}
+export function personalizeAuthoredEvent(event: LifeEvent, state: GameState): LifeEvent {
+  if (event.npcPair || event.personalStory || event.reunion) return event;
+  const family = getEventFamily(event);
+  const targetedChoices = event.choices.flatMap((choice) => {
+    const contact = choice.contactIndex === undefined ? undefined : state.contacts[choice.contactIndex];
+    return contact ? [{ choice, contact }] : [];
+  });
+  if (!targetedChoices.length) return event;
+  const counts = new Map<string, { contact: Contact; count: number }>();
+  for (const { contact } of targetedChoices) {
+    const entry = counts.get(contact.id);
+    if (entry) entry.count += 1;
+    else counts.set(contact.id, { contact, count: 1 });
+  }
+  const primary = [...counts.values()].sort((a, b) => b.count - a.count || b.contact.warmth - a.contact.warmth || a.contact.id.localeCompare(b.contact.id))[0].contact;
+  const choices = event.choices.map((choice) => {
+    const contact = choice.contactIndex === undefined ? undefined : state.contacts[choice.contactIndex];
+    if (!contact) return choice;
+    const response = `${choice.result} ${eventChoiceReaction(contact, choice.effect)}`;
+    return { ...choice, contactId: contact.id, result: response };
+  });
+  return {
+    ...event,
+    body: `${event.body} ${primary.name}도 요즘 “${primary.goal ?? "자기만의 방향"}”을(를) 생각하고 있어, 이 선택을 눈여겨보고 있다.`,
+    npcDialogue: { speakerName: primary.name, line: eventDialogue(primary, family) },
+    choices,
+  };
+}
 function nextEligibleEvent(state: GameState): [LifeEvent | undefined, number] {
   const recent = state.recentEventIds ?? [];
   const lastSeen = state.eventLastSeenWeek ?? {};
-  const eligible = [...eventLibrary[state.character.background], ...commonEventLibrary, ...getPersonalStoryEvents(state), ...getNpcReunionEvents(state)].filter((event) => !state.seenEvents.includes(event.id) && (!event.topic || state.settings.topics[event.topic]));
-  const cooled = eligible.filter((event) => state.week - (lastSeen[event.id] ?? -100) >= 3 && !recent.includes(event.id));
-  const olderButEligible = eligible.filter((event) => state.week - (lastSeen[event.id] ?? -100) >= 3);
-  const options = cooled.length ? cooled : olderButEligible.length ? olderButEligible : eligible;
+  const familyLastSeen = state.eventFamilyLastSeenWeek ?? {};
+  const eligible = [...eventLibrary[state.character.background], ...commonEventLibrary, ...getPersonalStoryEvents(state), ...getNpcReunionEvents(state), ...getNpcRelationshipEvents(state)]
+    .filter((event) => !state.seenEvents.includes(event.id) && (!event.topic || state.settings.topics[event.topic]))
+    .map((event) => personalizeAuthoredEvent(event, state));
+  const notRecentlyPlayed = eligible.filter((event) => !recent.includes(event.id));
+  const fullyCooled = notRecentlyPlayed.filter((event) =>
+    state.week - (lastSeen[event.id] ?? -100) >= 8
+    && (event.personalStory || event.reunion || event.npcPair || state.week - (familyLastSeen[getEventFamily(event)] ?? -100) >= 2));
+  const eventCooled = notRecentlyPlayed.filter((event) => state.week - (lastSeen[event.id] ?? -100) >= 8);
+  const options = fullyCooled.length ? fullyCooled : eventCooled.length ? eventCooled : notRecentlyPlayed.length ? notRecentlyPlayed : eligible;
   const [afterRoll, roll] = nextRandom(state.seed);
   if (!options.length) return [undefined, afterRoll];
-  const chance = 0.42 + Math.max(0, state.stats.stress - 30) / 300;
-  if (roll > Math.min(chance, 0.58)) return [undefined, afterRoll];
+  const urgency = (state.stats.stress >= 70 ? 0.12 : state.stats.stress >= 55 ? 0.06 : 0)
+    + (state.stats.energy <= 25 ? 0.09 : state.stats.energy <= 40 ? 0.04 : 0)
+    + (state.stats.money <= 50_000 ? 0.09 : state.stats.money <= 120_000 ? 0.04 : 0);
+  const chance = Math.min(0.52, 0.3 + urgency);
+  if (roll > chance) return [undefined, afterRoll];
   const [afterSelect, indexRoll] = nextRandom(afterRoll);
-  const eventWeight = (event: LifeEvent) => event.reunion ? 12 : event.personalStory ? 7 : 1;
+  const eventWeight = (event: LifeEvent) => {
+    const family = getEventFamily(event);
+    let weight = event.npcPair ? 10 : event.reunion ? 14 : event.personalStory ? 12 : 1;
+    if (family === "money") weight *= state.stats.money < 180_000 ? 3 : state.stats.money < 450_000 ? 1.7 : 1;
+    if (family === "health") weight *= state.stats.energy < 45 || state.stats.stress > 65 ? 2.2 : 1;
+    if ((family === "friendship" || family === "romance") && state.contacts.length > 0 && state.contacts.reduce((sum, contact) => sum + contact.warmth, 0) / state.contacts.length < 38) weight *= 1.7;
+    if (family === "career" && state.character.background === "jobseeker") weight *= 1.5;
+    return weight;
+  };
   const totalWeight = options.reduce((sum, event) => sum + eventWeight(event), 0);
   let ticket = indexRoll * totalWeight;
   const selected = options.find((event) => {
@@ -560,14 +734,22 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
   const choice = state.pendingEvent.choices.find((item) => item.id === choiceId);
   if (!choice) return state;
   const effect = choice.effect;
+  const pairMeta = state.pendingEvent.npcPair;
+  const npcRelationships = pairMeta ? (state.npcRelationships ?? []).map((link) => link.id === pairMeta.linkId
+    ? { ...link, warmth: clamp(link.warmth + (effect.npcRelationship ?? 0)), lastInteractionWeek: state.week, ...(pairMeta.kind === "romance" ? { romanceStatus: "dating" as const } : {}) }
+    : link) : state.npcRelationships;
+  const pairResult = pairMeta ? state.contacts.map((contact) => contact.id === pairMeta.contactAId || contact.id === pairMeta.contactBId
+    ? { ...contact, note: choice.result, memories: addNpcMemory(contact, choice.result, state.week) }
+    : contact) : state.contacts;
   const next: GameState = {
     ...state,
     phase: "playing",
     pendingEvent: undefined,
     lastChoice: choice.result,
     seenEvents: [...state.seenEvents, state.pendingEvent.id],
-    recentEventIds: [...(state.recentEventIds ?? []), state.pendingEvent.id].slice(-3),
+    recentEventIds: [...(state.recentEventIds ?? []), state.pendingEvent.id].slice(-8),
     eventLastSeenWeek: { ...(state.eventLastSeenWeek ?? {}), [state.pendingEvent.id]: state.week },
+    eventFamilyLastSeenWeek: { ...(state.eventFamilyLastSeenWeek ?? {}), [getEventFamily(state.pendingEvent)]: state.week },
     weeklyMeetingMomentum: Math.min(5, (state.weeklyMeetingMomentum ?? 0) + (effect.newContactOpportunity ?? 0)),
     weeklyMeetingContext: choice.meetingContext ?? state.weeklyMeetingContext,
     npcReunionIds: state.pendingEvent.reunion
@@ -582,6 +764,7 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
     npcStoryChoices: state.pendingEvent.personalStory ? {
       ...(state.npcStoryChoices ?? {}), [state.pendingEvent.personalStory.contactId]: choice.id,
     } : state.npcStoryChoices,
+    npcRelationships,
     stats: {
       money: Math.max(0, state.stats.money + (effect.money ?? 0)),
       energy: clamp(state.stats.energy + (effect.energy ?? 0)),
@@ -589,14 +772,15 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
       mood: clamp(state.stats.mood + (effect.mood ?? 0)),
       focus: clamp(state.stats.focus + (effect.focus ?? 0)),
     },
-    contacts: state.contacts.map((contact, index) => {
-      const storyContactIndex = state.pendingEvent?.personalStory
+    contacts: pairResult.map((contact, index) => {
+      const targetContactIndex = state.pendingEvent?.personalStory
         ? state.contacts.findIndex((item) => item.id === state.pendingEvent?.personalStory?.contactId)
-        : choice.contactIndex;
-      if (index !== storyContactIndex || !(effect.relationship || effect.goalSupport || state.pendingEvent?.personalStory)) return contact;
+        : choice.contactId ? state.contacts.findIndex((item) => item.id === choice.contactId) : choice.contactIndex;
+      if (index !== targetContactIndex || !(effect.relationship || effect.goalSupport || state.pendingEvent?.personalStory || choice.contactId)) return contact;
       return {
         ...contact,
         warmth: clamp(contact.warmth + (effect.relationship ?? 0)),
+        lastInteractionWeek: state.week,
         goalSupport: clamp((contact.goalSupport ?? 0) + (effect.goalSupport ?? 0), 0, 3),
         note: choice.result,
         memories: addNpcMemory(contact, choice.result, state.week),
