@@ -6,7 +6,7 @@ import {
   type SensitiveTopic, type Tab,
 } from "./game";
 import "./style.css";
-import { choosePortraitId, getPortrait, getPortraitImageUrl, portraitPosition } from "./portrait-catalog";
+import { choosePortraitId, getPortrait, getPortraitFallbackImageUrl, getPortraitImageUrl, portraitPosition } from "./portrait-catalog";
 
 const SAVE_KEY = "nanal-save-v1";
 const backgroundChoices: Background[] = ["student", "jobseeker", "worker"];
@@ -15,7 +15,17 @@ const housingChoices = ["가족과 동거", "자취", "기숙사", "전세·월�
 const emptyDraft: CharacterDraft = { name: "", age: "", year: "", background: "", gender: "", heightCm: "", weightKg: "", affiliation: "", region: "", housing: "", education: "", family: "", startingMoney: "" };
 function portraitStyle(portraitId?: string): React.CSSProperties {
   const portrait = getPortrait(portraitId);
-  return { backgroundImage: `url("${getPortraitImageUrl(portraitId)}")`, backgroundSize: portrait?.source === "atlas" ? "400% 400%" : "cover", backgroundPosition: portraitPosition(portraitId) };
+  const primaryUrl = getPortraitImageUrl(portraitId);
+  const fallbackUrl = getPortraitFallbackImageUrl(portraitId);
+  // Layer the bundled original underneath the CDN version to survive missing remote files.
+  const urls = primaryUrl === fallbackUrl ? [primaryUrl] : [primaryUrl, fallbackUrl];
+  const size = portrait?.source === "atlas" ? "400% 400%" : "cover";
+  const position = portraitPosition(portraitId);
+  return {
+    backgroundImage: urls.map((url) => `url(${JSON.stringify(url)})`).join(", "),
+    backgroundSize: urls.map(() => size).join(", "),
+    backgroundPosition: urls.map(() => position).join(", "),
+  };
 }
 
 function readSave(): GameState | null {
