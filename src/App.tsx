@@ -98,7 +98,7 @@ export default function App() {
           <select value={age} onChange={(e) => setAge(Number(e.target.value))}>{Array.from({ length: 12 }, (_, i) => i + 19).map((n) => <option key={n} value={n}>{n}세</option>)}</select>
         </label>
         <label className="field-label">시작 연도
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))}>{Array.from({ length: 7 }, (_, i) => 2020 + i).map((n) => <option key={n}>{n}년</option>)}</select>
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))}>{Array.from({ length: 7 }, (_, i) => 2020 + i).map((n) => <option key={n} value={n}>{n}년</option>)}</select>
         </label>
       </div>
       <fieldset className="background-picker">
@@ -126,7 +126,7 @@ export default function App() {
       {tab === "life" && <>
         <section className="welcome-row">
           <div><p className="eyebrow">{game.year}년 · {game.week}주차</p><h1>{game.name}의 <em>이번 주</em></h1><p className="subline">{game.age}세 · {BACKGROUNDS[game.background].label}</p></div>
-          <div className="season-chip">🍂<small>가을</small></div>
+          <div className="season-chip">🗓️<small>한 주</small></div>
         </section>
         <div className="goal-banner"><span>지금 마음에 둔 목표</span><strong>{game.playerGoal}</strong></div>
         <section className="stat-grid">
