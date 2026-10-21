@@ -6,8 +6,7 @@ import {
   type SensitiveTopic, type Tab,
 } from "./game";
 import "./style.css";
-import portraitSheet from "./assets/npc-portrait-atlas-v1.webp";
-import { choosePortraitId, getPortrait, portraitPosition } from "./portrait-catalog";
+import { choosePortraitId, getPortrait, getPortraitImageUrl, portraitPosition } from "./portrait-catalog";
 
 const SAVE_KEY = "nanal-save-v1";
 const backgroundChoices: Background[] = ["student", "jobseeker", "worker"];
@@ -16,7 +15,8 @@ const regions = ["서울", "인천", "경기", "부산", "대구"];
 const housingChoices = ["가족과 동거", "자취", "기숙사", "전세·월세 동거"];
 const emptyDraft: CharacterDraft = { name: "", age: "", year: "", background: "", gender: "", region: "", housing: "", education: "", family: "", startingMoney: "" };
 function portraitStyle(portraitId?: string): React.CSSProperties {
-  return { backgroundImage: `url("${portraitSheet}")`, backgroundSize: "400% 400%", backgroundPosition: portraitPosition(portraitId) };
+  const portrait = getPortrait(portraitId);
+  return { backgroundImage: `url("${getPortraitImageUrl(portraitId)}")`, backgroundSize: portrait?.source === "atlas" ? "400% 400%" : "cover", backgroundPosition: portraitPosition(portraitId) };
 }
 
 function readSave(): GameState | null {
@@ -40,7 +40,7 @@ function normalizeSave(parsed: GameState): GameState {
       const merged = { ...generated[index], ...person };
       const age = person.age ?? generated[index]?.age ?? parsed.character.age;
       let portraitId = person.portraitId;
-      if (!portraitId || getPortrait(portraitId)?.gender !== merged.gender) {
+      if (!portraitId || usedPortraitIds.includes(portraitId) || getPortrait(portraitId)?.gender !== merged.gender) {
         portraitId = choosePortraitId(merged.gender ?? generated[index]?.gender ?? "여성", age, createSeed(`${parsed.seed}:${merged.id}`), usedPortraitIds);
       }
       usedPortraitIds.push(portraitId);

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { advanceDay, advanceDays, chooseEvent, createGame, generateContacts, getPersonalStoryEvents, startNextWeek, type Character } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
-import { getPortrait } from "./portrait-catalog";
+import { getPortrait, portraitCatalog } from "./portrait-catalog";
 
 const character: Character = {
   name: "지우", age: 24, year: 2024, background: "student",
@@ -19,7 +19,8 @@ describe("first week simulation", () => {
     expect(first.every((contact) => contact.age && contact.occupation && contact.personality && contact.goal)).toBe(true);
     expect(first.every((contact) => contact.portraitId && contact.portraitAgeBand)).toBe(true);
     expect(new Set(first.map((contact) => contact.portraitId)).size).toBe(12);
-    expect(first.every((contact) => contact.portraitId?.startsWith("npc-"))).toBe(true);
+    expect(first.every((contact) => getPortrait(contact.portraitId))).toBe(true);
+    expect(first.every((contact) => getPortrait(contact.portraitId)?.gender === contact.gender)).toBe(true);
   });
 
   it("assigns the player and contacts distinct stable portraits from matching age and gender ranges", () => {
@@ -30,6 +31,17 @@ describe("first week simulation", () => {
     expect(new Set([first.character.portraitId, ...first.contacts.map((person) => person.portraitId)]).size).toBe(13);
     expect(first.contacts.every((person) => getPortrait(person.portraitId)?.gender === person.gender)).toBe(true);
     expect(first.contacts.every((person) => getPortrait(person.portraitId)?.ageBand === person.portraitAgeBand)).toBe(true);
+    expect(portraitCatalog).toHaveLength(62);
+    expect(new Set(portraitCatalog.map((portrait) => portrait.id)).size).toBe(62);
+    const individual = portraitCatalog.filter((portrait) => portrait.source === "single");
+    expect(new Set(individual.map((portrait) => portrait.characterId)).size).toBe(individual.length);
+  });
+
+  it("keeps all twelve contact portraits unique across a range of seeds", () => {
+    for (let seed = 0; seed < 40; seed += 1) {
+      const portraits = generateContacts("worker", seed, 28).map((person) => person.portraitId);
+      expect(new Set(portraits).size).toBe(12);
+    }
   });
 
   it("provides a broad, unique pool of reviewed events per background", () => {

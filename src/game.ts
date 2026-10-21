@@ -141,15 +141,10 @@ function nextRandom(state: number): [number, number] {
 export function generateContacts(background: Background, seed: number, playerAge = 24, excludedPortraitIds: string[] = []): Contact[] {
   let state = seed;
   const usedPortraits = [...excludedPortraitIds];
-  const contactGenders: Array<"남성" | "여성"> = [...Array(6).fill("여성"), ...Array(6).fill("남성")];
-  for (let i = contactGenders.length - 1; i > 0; i -= 1) {
-    const [, roll] = nextRandom(seed + 997 + i);
-    const j = Math.floor(roll * (i + 1));
-    [contactGenders[i], contactGenders[j]] = [contactGenders[j], contactGenders[i]];
-  }
   return roles[background].map((role, i) => {
     const [next, value] = nextRandom(state + i + 1);
     const [afterName, nameRoll] = nextRandom(next);
+    const [, genderRoll] = nextRandom(afterName);
     const [afterTrait, traitRoll] = nextRandom(afterName + 101);
     const [afterGoal, goalRoll] = nextRandom(afterTrait + 211);
     const [afterJob, jobRoll] = nextRandom(afterGoal + 307);
@@ -158,7 +153,7 @@ export function generateContacts(background: Background, seed: number, playerAge
     const name = `${surnames[Math.floor(value * surnames.length)]}${firstNames[Math.floor(nameRoll * firstNames.length)]}`;
     const family = /가족|사촌|친척/.test(role);
     const senior = /선배|부모|가족|친척/.test(role);
-    const gender = contactGenders[i];
+    const gender = genderRoll < 0.5 ? "여성" : "남성";
     const age = Math.max(19, playerAge + (family ? 10 : senior ? 3 : -2) + Math.floor(ageRoll * 7));
     const portraitId = choosePortraitId(gender, age, next, usedPortraits);
     usedPortraits.push(portraitId);

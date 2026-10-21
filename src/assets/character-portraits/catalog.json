@@ -1,0 +1,1631 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-21",
+  "ageEstimateNote": "Generated-character portraits; age ranges are visual estimates, not real-person identity data.",
+  "selectionPolicy": {
+    "genderMatch": "exact",
+    "ageMatch": "overlapping range first",
+    "fallback": "nearest estimated age range",
+    "stableSelection": "hash of character key; selected asset ID is stored on the character save"
+  },
+  "assets": [
+    {
+      "assetId": "p-f30-01",
+      "characterId": "c-f30-01",
+      "variantGroupId": "c-f30-01",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 28,
+        "max": 38,
+        "confidence": "medium"
+      },
+      "hairId": "hair-updo-dark",
+      "outfitId": "outfit-beige-blouse",
+      "expressionId": "expression-neutral",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "glasses",
+        "office-casual",
+        "shoulder-length"
+      ],
+      "sourceId": "exec-0ab901b0-9cf5-496a-bda2-c80b3b23147c",
+      "sourceFilename": "exec-0ab901b0-9cf5-496a-bda2-c80b3b23147c.png",
+      "filename": "characters/p-f30-01.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f20-01",
+      "characterId": "c-f20-01",
+      "variantGroupId": "c-f20-01",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 20,
+        "max": 30,
+        "confidence": "medium"
+      },
+      "hairId": "hair-short-bob-brown",
+      "outfitId": "outfit-striped-knit",
+      "expressionId": "expression-gentle-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "casual",
+        "youthful"
+      ],
+      "sourceId": "exec-0cbf62d1-6ac1-45e0-ae48-37ff5f963353",
+      "sourceFilename": "exec-0cbf62d1-6ac1-45e0-ae48-37ff5f963353.png",
+      "filename": "characters/p-f20-01.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m60-01",
+      "characterId": "c-m60-01",
+      "variantGroupId": "c-m60-01",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 58,
+        "max": 72,
+        "confidence": "medium"
+      },
+      "hairId": "hair-gray-short",
+      "outfitId": "outfit-beige-cardigan",
+      "expressionId": "expression-warm-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "senior",
+        "cardigan"
+      ],
+      "sourceId": "exec-230b5d31-ebc2-4219-9ea5-117d7c262886",
+      "sourceFilename": "exec-230b5d31-ebc2-4219-9ea5-117d7c262886.png",
+      "filename": "characters/p-m60-01.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m60-02",
+      "characterId": "c-m60-01",
+      "variantGroupId": "c-m60-01",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 58,
+        "max": 72,
+        "confidence": "medium"
+      },
+      "hairId": "hair-gray-short",
+      "outfitId": "outfit-beige-cardigan",
+      "expressionId": "expression-warm-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "senior",
+        "glasses",
+        "variant"
+      ],
+      "sourceId": "exec-2dfddc95-2238-4338-a7b2-271a1ab64fcf",
+      "sourceFilename": "exec-2dfddc95-2238-4338-a7b2-271a1ab64fcf.png",
+      "filename": "characters/p-m60-02.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f20-02",
+      "characterId": "c-f20-protagonist",
+      "variantGroupId": "c-f20-protagonist",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 22,
+        "max": 32,
+        "confidence": "medium"
+      },
+      "hairId": "hair-updo-dark",
+      "outfitId": "outfit-black-office-blazer",
+      "expressionId": "expression-gentle-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "office",
+        "same-character-variant"
+      ],
+      "sourceId": "exec-2fd0f7cb-bcda-4621-ad8e-7bc2cd7d360a",
+      "sourceFilename": "exec-2fd0f7cb-bcda-4621-ad8e-7bc2cd7d360a.png",
+      "filename": "characters/p-f20-02.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m20-01",
+      "characterId": "c-m20-01",
+      "variantGroupId": "c-m20-01",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 22,
+        "max": 32,
+        "confidence": "medium"
+      },
+      "hairId": "hair-wavy-black",
+      "outfitId": "outfit-navy-shirt",
+      "expressionId": "expression-calm",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "casual",
+        "dark-hair"
+      ],
+      "sourceId": "exec-319347d8-8684-4742-9075-270c057265e3",
+      "sourceFilename": "exec-319347d8-8684-4742-9075-270c057265e3.png",
+      "filename": "characters/p-m20-01.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f20-03",
+      "characterId": "c-f20-protagonist",
+      "variantGroupId": "c-f20-protagonist",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 22,
+        "max": 32,
+        "confidence": "medium"
+      },
+      "hairId": "hair-short-bob-brown",
+      "outfitId": "outfit-green-knit",
+      "expressionId": "expression-gentle-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "weekend",
+        "same-character-variant"
+      ],
+      "sourceId": "exec-3530c99f-3f48-467c-8891-eaf48ac34cde",
+      "sourceFilename": "exec-3530c99f-3f48-467c-8891-eaf48ac34cde.png",
+      "filename": "characters/p-f20-03.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f40-01",
+      "characterId": "c-f40-01",
+      "variantGroupId": "c-f40-01",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 40,
+        "max": 54,
+        "confidence": "medium"
+      },
+      "hairId": "hair-short-brown",
+      "outfitId": "outfit-red-top",
+      "expressionId": "expression-soft-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "middle-aged",
+        "casual"
+      ],
+      "sourceId": "exec-3c03ee8a-d57e-4e4e-8868-06f1f0a4bc4e",
+      "sourceFilename": "exec-3c03ee8a-d57e-4e4e-8868-06f1f0a4bc4e.png",
+      "filename": "characters/p-f40-01.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m30-01",
+      "characterId": "c-m30-01",
+      "variantGroupId": "c-m30-01",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 25,
+        "max": 36,
+        "confidence": "medium"
+      },
+      "hairId": "hair-wavy-brown",
+      "outfitId": "outfit-brown-jacket",
+      "expressionId": "expression-calm",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "casual",
+        "layered"
+      ],
+      "sourceId": "exec-3f8d2497-2fdc-49a0-91bf-a7b5b3f9bc1e",
+      "sourceFilename": "exec-3f8d2497-2fdc-49a0-91bf-a7b5b3f9bc1e.png",
+      "filename": "characters/p-m30-01.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m50-01",
+      "characterId": "c-m50-01",
+      "variantGroupId": "c-m50-01",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 48,
+        "max": 60,
+        "confidence": "medium"
+      },
+      "hairId": "hair-gray-short",
+      "outfitId": "outfit-blue-shirt",
+      "expressionId": "expression-warm-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "middle-aged",
+        "glasses"
+      ],
+      "sourceId": "exec-63ba3a0a-eb1d-43be-bf14-0a55dded0231",
+      "sourceFilename": "exec-63ba3a0a-eb1d-43be-bf14-0a55dded0231.png",
+      "filename": "characters/p-m50-01.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m45-01",
+      "characterId": "c-m45-01",
+      "variantGroupId": "c-m45-01",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 44,
+        "max": 58,
+        "confidence": "medium"
+      },
+      "hairId": "hair-gray-short",
+      "outfitId": "outfit-dark-cardigan",
+      "expressionId": "expression-neutral",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "middle-aged",
+        "studio-background"
+      ],
+      "sourceId": "exec-899a2471-6aee-40ba-ae52-b5d60551efc4",
+      "sourceFilename": "exec-899a2471-6aee-40ba-ae52-b5d60551efc4.png",
+      "filename": "characters/p-m45-01.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f65-01",
+      "characterId": "c-f65-01",
+      "variantGroupId": "c-f65-01",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 62,
+        "max": 78,
+        "confidence": "medium"
+      },
+      "hairId": "hair-gray-curly",
+      "outfitId": "outfit-navy-cardigan",
+      "expressionId": "expression-warm-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "senior",
+        "floral-blouse"
+      ],
+      "sourceId": "exec-9530f144-8a80-4dd1-a008-994ebf707b57",
+      "sourceFilename": "exec-9530f144-8a80-4dd1-a008-994ebf707b57.png",
+      "filename": "characters/p-f65-01.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m60-03",
+      "characterId": "c-m60-03",
+      "variantGroupId": "c-m60-03",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 55,
+        "max": 70,
+        "confidence": "medium"
+      },
+      "hairId": "hair-gray-short",
+      "outfitId": "outfit-olive-polo",
+      "expressionId": "expression-neutral",
+      "visualStyle": "photorealistic-portrait",
+      "tags": [
+        "senior",
+        "studio-background"
+      ],
+      "sourceId": "exec-9c7ba71d-f086-4773-b6ec-f7531dee96f9",
+      "sourceFilename": "exec-9c7ba71d-f086-4773-b6ec-f7531dee96f9.png",
+      "filename": "characters/p-m60-03.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": false
+    },
+    {
+      "assetId": "p-m20-02",
+      "characterId": "c-m20-02",
+      "variantGroupId": "c-m20-02",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 20,
+        "max": 30,
+        "confidence": "medium"
+      },
+      "hairId": "hair-black-straight",
+      "outfitId": "outfit-charcoal-tshirt",
+      "expressionId": "expression-calm",
+      "visualStyle": "anime-illustration",
+      "tags": [
+        "anime-style"
+      ],
+      "sourceId": "exec-aa174ba2-e1e7-4593-bd35-96e1749073f8",
+      "sourceFilename": "exec-aa174ba2-e1e7-4593-bd35-96e1749073f8.png",
+      "filename": "characters/p-m20-02.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": false
+    },
+    {
+      "assetId": "p-f30-02",
+      "characterId": "c-f30-02",
+      "variantGroupId": "c-f30-02",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 28,
+        "max": 40,
+        "confidence": "medium"
+      },
+      "hairId": "hair-short-dark",
+      "outfitId": "outfit-blue-shirt",
+      "expressionId": "expression-neutral",
+      "visualStyle": "photorealistic-portrait",
+      "tags": [
+        "studio-background"
+      ],
+      "sourceId": "exec-b59e793c-4fda-4306-9af1-5ebf32bad986",
+      "sourceFilename": "exec-b59e793c-4fda-4306-9af1-5ebf32bad986.png",
+      "filename": "characters/p-f30-02.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": false
+    },
+    {
+      "assetId": "p-f30-03",
+      "characterId": "c-f30-03",
+      "variantGroupId": "c-f30-03",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 30,
+        "max": 42,
+        "confidence": "medium"
+      },
+      "hairId": "hair-shoulder-brown",
+      "outfitId": "outfit-lilac-blouse",
+      "expressionId": "expression-neutral",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "office-casual"
+      ],
+      "sourceId": "exec-cb75dd69-e37a-4cec-af81-aac24593dedc",
+      "sourceFilename": "exec-cb75dd69-e37a-4cec-af81-aac24593dedc.png",
+      "filename": "characters/p-f30-03.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f20-04",
+      "characterId": "c-f20-protagonist",
+      "variantGroupId": "c-f20-protagonist",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 22,
+        "max": 32,
+        "confidence": "medium"
+      },
+      "hairId": "hair-long-dark",
+      "outfitId": "outfit-peach-knit",
+      "expressionId": "expression-gentle-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "base-look",
+        "same-character-variant"
+      ],
+      "sourceId": "exec-e2d176f8-0bd3-4cf2-9187-dcb2a50c92ab",
+      "sourceFilename": "exec-e2d176f8-0bd3-4cf2-9187-dcb2a50c92ab.png",
+      "filename": "characters/p-f20-04.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m20-03",
+      "characterId": "c-m20-03",
+      "variantGroupId": "c-m20-03",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 20,
+        "max": 30,
+        "confidence": "medium"
+      },
+      "hairId": "hair-black-short",
+      "outfitId": "outfit-charcoal-knit",
+      "expressionId": "expression-neutral",
+      "visualStyle": "photorealistic-portrait",
+      "tags": [
+        "studio-background"
+      ],
+      "sourceId": "exec-e629b96d-8c2a-4b2a-af15-593af0d12a40",
+      "sourceFilename": "exec-e629b96d-8c2a-4b2a-af15-593af0d12a40.png",
+      "filename": "characters/p-m20-03.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": false
+    },
+    {
+      "assetId": "p-m30-02",
+      "characterId": "c-m30-02",
+      "variantGroupId": "c-m30-02",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 24,
+        "max": 36,
+        "confidence": "medium"
+      },
+      "hairId": "hair-black-short",
+      "outfitId": "outfit-black-jacket",
+      "expressionId": "expression-neutral",
+      "visualStyle": "photorealistic-portrait",
+      "tags": [
+        "studio-background"
+      ],
+      "sourceId": "exec-e857b5d3-e955-40a5-b463-f42b3966f98e",
+      "sourceFilename": "exec-e857b5d3-e955-40a5-b463-f42b3966f98e.png",
+      "filename": "characters/p-m30-02.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": false
+    },
+    {
+      "assetId": "p-m20-04",
+      "characterId": "c-m20-04",
+      "variantGroupId": "c-m20-04",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 20,
+        "max": 30,
+        "confidence": "medium"
+      },
+      "hairId": "hair-black-wavy",
+      "outfitId": "outfit-white-hoodie",
+      "expressionId": "expression-calm",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "casual"
+      ],
+      "sourceId": "exec-eac86dd8-398c-47a5-b1aa-da8270d939c7",
+      "sourceFilename": "exec-eac86dd8-398c-47a5-b1aa-da8270d939c7.png",
+      "filename": "characters/p-m20-04.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f70-01",
+      "characterId": "c-f70-01",
+      "variantGroupId": "c-f70-01",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 65,
+        "max": 82,
+        "confidence": "medium"
+      },
+      "hairId": "hair-gray-curly",
+      "outfitId": "outfit-rose-cardigan",
+      "expressionId": "expression-warm-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "senior"
+      ],
+      "sourceId": "exec-ede44675-b4b8-4e5f-b639-5d63ab9d6aea",
+      "sourceFilename": "exec-ede44675-b4b8-4e5f-b639-5d63ab9d6aea.png",
+      "filename": "characters/p-f70-01.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f30-04",
+      "characterId": "c-f30-04",
+      "variantGroupId": "c-f30-04",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 28,
+        "max": 40,
+        "confidence": "medium"
+      },
+      "hairId": "hair-long-dark",
+      "outfitId": "outfit-green-scrubs",
+      "expressionId": "expression-neutral",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "workwear",
+        "scrubs"
+      ],
+      "sourceId": "exec-f1147df4-448e-4b15-9e47-b405e8bfb438",
+      "sourceFilename": "exec-f1147df4-448e-4b15-9e47-b405e8bfb438.png",
+      "filename": "characters/p-f30-04.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m30-03",
+      "characterId": "c-m30-03",
+      "variantGroupId": "c-m30-03",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 24,
+        "max": 36,
+        "confidence": "medium"
+      },
+      "hairId": "hair-black-wavy",
+      "outfitId": "outfit-gray-sweater",
+      "expressionId": "expression-neutral",
+      "visualStyle": "photorealistic-portrait",
+      "tags": [
+        "studio-background"
+      ],
+      "sourceId": "exec-f1bc0f51-be11-48d9-b5b1-7f72efc8e394",
+      "sourceFilename": "exec-f1bc0f51-be11-48d9-b5b1-7f72efc8e394.png",
+      "filename": "characters/p-m30-03.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": false
+    },
+    {
+      "assetId": "p-m20-ref-01",
+      "characterId": "c-m20-ref-01",
+      "variantGroupId": "c-ref-pair-male",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 22,
+        "max": 32,
+        "confidence": "medium"
+      },
+      "hairId": "hair-wavy-black",
+      "outfitId": "outfit-navy-crewneck",
+      "expressionId": "expression-gentle-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "reference-pair-crop",
+        "style-reference"
+      ],
+      "sourceId": "exec-8b972a38-9de0-4b4c-bcc6-f40abb044b29",
+      "sourceFilename": "exec-8b972a38-9de0-4b4c-bcc6-f40abb044b29.png",
+      "crop": "male",
+      "filename": "characters/p-m20-ref-01.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f20-ref-01",
+      "characterId": "c-f20-ref-01",
+      "variantGroupId": "c-ref-pair-female",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 22,
+        "max": 32,
+        "confidence": "medium"
+      },
+      "hairId": "hair-long-dark",
+      "outfitId": "outfit-peach-knit",
+      "expressionId": "expression-gentle-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "reference-pair-crop",
+        "style-reference"
+      ],
+      "sourceId": "exec-8b972a38-9de0-4b4c-bcc6-f40abb044b29",
+      "sourceFilename": "exec-8b972a38-9de0-4b4c-bcc6-f40abb044b29.png",
+      "crop": "female",
+      "filename": "characters/p-f20-ref-01.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m22-new-01",
+      "characterId": "c-m22-new-01",
+      "variantGroupId": "c-m22-new-01",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 18,
+        "max": 26,
+        "confidence": "medium"
+      },
+      "hairId": "messy-fringe",
+      "outfitId": "dark-hoodie",
+      "expressionId": "neutral",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "mild-acne",
+        "student-casual",
+        "everyday"
+      ],
+      "sourceId": "exec-bf40e501-809b-48e8-85ea-a536a2afdd04",
+      "sourceFilename": "exec-bf40e501-809b-48e8-85ea-a536a2afdd04.png",
+      "filename": "characters/p-m22-new-01.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f24-new-02",
+      "characterId": "c-f24-new-02",
+      "variantGroupId": "c-f24-new-02",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 20,
+        "max": 28,
+        "confidence": "medium"
+      },
+      "hairId": "loose-ponytail",
+      "outfitId": "gray-sweatshirt",
+      "expressionId": "calm",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "freckles",
+        "everyday",
+        "casual"
+      ],
+      "sourceId": "exec-5d749435-b89b-436d-82c8-c13432f6218c",
+      "sourceFilename": "exec-5d749435-b89b-436d-82c8-c13432f6218c.png",
+      "filename": "characters/p-f24-new-02.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m28-new-03",
+      "characterId": "c-m28-new-03",
+      "variantGroupId": "c-m28-new-03",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 24,
+        "max": 32,
+        "confidence": "medium"
+      },
+      "hairId": "short-wavy",
+      "outfitId": "olive-shirt",
+      "expressionId": "smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "stubble",
+        "stocky",
+        "everyday"
+      ],
+      "sourceId": "exec-63a83f88-0e19-4654-a712-e94dd4fc3878",
+      "sourceFilename": "exec-63a83f88-0e19-4654-a712-e94dd4fc3878.png",
+      "filename": "characters/p-m28-new-03.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f31-new-04",
+      "characterId": "c-f31-new-04",
+      "variantGroupId": "c-f31-new-04",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 27,
+        "max": 35,
+        "confidence": "medium"
+      },
+      "hairId": "short-practical",
+      "outfitId": "navy-cardigan",
+      "expressionId": "calm",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "tired-eyes",
+        "fuller-face",
+        "everyday"
+      ],
+      "sourceId": "exec-3a82b387-261c-4d0b-ab23-5e871ed0959d",
+      "sourceFilename": "exec-3a82b387-261c-4d0b-ab23-5e871ed0959d.png",
+      "filename": "characters/p-f31-new-04.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m35-new-05",
+      "characterId": "c-m35-new-05",
+      "variantGroupId": "c-m35-new-05",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 31,
+        "max": 39,
+        "confidence": "medium"
+      },
+      "hairId": "untidy-wavy",
+      "outfitId": "checked-shirt",
+      "expressionId": "reserved",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "under-eye-circles",
+        "slim",
+        "stubble"
+      ],
+      "sourceId": "exec-4a7e656e-22ff-4e11-9665-c7a399a27f3f",
+      "sourceFilename": "exec-4a7e656e-22ff-4e11-9665-c7a399a27f3f.png",
+      "filename": "characters/p-m35-new-05.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f27-new-06",
+      "characterId": "c-f27-new-06",
+      "variantGroupId": "c-f27-new-06",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 23,
+        "max": 31,
+        "confidence": "medium"
+      },
+      "hairId": "short-bob",
+      "outfitId": "mustard-knit",
+      "expressionId": "confident",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "strong-jaw",
+        "athletic",
+        "everyday"
+      ],
+      "sourceId": "exec-23894e29-2277-449d-9020-bae843cb7111",
+      "sourceFilename": "exec-23894e29-2277-449d-9020-bae843cb7111.png",
+      "filename": "characters/p-f27-new-06.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m24-new-07",
+      "characterId": "c-m24-new-07",
+      "variantGroupId": "c-m24-new-07",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 20,
+        "max": 28,
+        "confidence": "medium"
+      },
+      "hairId": "messy-shag",
+      "outfitId": "denim-jacket",
+      "expressionId": "cheerful",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "round-cheeks",
+        "stubble",
+        "stocky"
+      ],
+      "sourceId": "exec-c7acaa76-d89c-4447-84e6-3b4a2bfb6563",
+      "sourceFilename": "exec-c7acaa76-d89c-4447-84e6-3b4a2bfb6563.png",
+      "filename": "characters/p-m24-new-07.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f36-new-08",
+      "characterId": "c-f36-new-08",
+      "variantGroupId": "c-f36-new-08",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 32,
+        "max": 39,
+        "confidence": "medium"
+      },
+      "hairId": "loose-bun",
+      "outfitId": "brown-sweater",
+      "expressionId": "thoughtful",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "fuller-face",
+        "plain-style",
+        "everyday"
+      ],
+      "sourceId": "exec-ef93e735-ac84-45a8-9f6f-818d5ac5ec4d",
+      "sourceFilename": "exec-ef93e735-ac84-45a8-9f6f-818d5ac5ec4d.png",
+      "filename": "characters/p-f36-new-08.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m30-new-09",
+      "characterId": "c-m30-new-09",
+      "variantGroupId": "c-m30-new-09",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 26,
+        "max": 34,
+        "confidence": "medium"
+      },
+      "hairId": "close-cropped",
+      "outfitId": "blue-work-shirt",
+      "expressionId": "gentle",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "textured-skin",
+        "sturdy-build",
+        "darker-complexion"
+      ],
+      "sourceId": "exec-40815782-1897-4819-a119-c09cff38dd56",
+      "sourceFilename": "exec-40815782-1897-4819-a119-c09cff38dd56.png",
+      "filename": "characters/p-m30-new-09.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f22-new-10",
+      "characterId": "c-f22-new-10",
+      "variantGroupId": "c-f22-new-10",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 18,
+        "max": 26,
+        "confidence": "medium"
+      },
+      "hairId": "straight-bangs",
+      "outfitId": "lilac-hoodie",
+      "expressionId": "shy",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "freckles",
+        "blemish",
+        "slim"
+      ],
+      "sourceId": "exec-89fd5176-a94e-4dca-971a-71fdfb1d2971",
+      "sourceFilename": "exec-89fd5176-a94e-4dca-971a-71fdfb1d2971.png",
+      "filename": "characters/p-f22-new-10.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m38-new-11",
+      "characterId": "c-m38-new-11",
+      "variantGroupId": "c-m38-new-11",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 34,
+        "max": 39,
+        "confidence": "medium"
+      },
+      "hairId": "thinning-short",
+      "outfitId": "charcoal-polo",
+      "expressionId": "friendly",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "thinning-hair",
+        "fuller-build",
+        "laugh-lines"
+      ],
+      "sourceId": "exec-33078954-d286-4e91-837f-6d4a608cf019",
+      "sourceFilename": "exec-33078954-d286-4e91-837f-6d4a608cf019.png",
+      "filename": "characters/p-m38-new-11.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f34-new-12",
+      "characterId": "c-f34-new-12",
+      "variantGroupId": "c-f34-new-12",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 30,
+        "max": 38,
+        "confidence": "medium"
+      },
+      "hairId": "short-curly",
+      "outfitId": "coral-blouse",
+      "expressionId": "smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "uneven-smile",
+        "curly-hair",
+        "everyday"
+      ],
+      "sourceId": "exec-f7389d5f-1521-416c-82eb-8c0ba1ef291c",
+      "sourceFilename": "exec-f7389d5f-1521-416c-82eb-8c0ba1ef291c.png",
+      "filename": "characters/p-f34-new-12.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m26-new-13",
+      "characterId": "c-m26-new-13",
+      "variantGroupId": "c-m26-new-13",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 22,
+        "max": 30,
+        "confidence": "medium"
+      },
+      "hairId": "uneven-wavy",
+      "outfitId": "cream-sweatshirt",
+      "expressionId": "sincere",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "long-face",
+        "slim",
+        "large-ears"
+      ],
+      "sourceId": "exec-7b9a0a3d-c0e8-4ee9-a2e9-e30d114746ed",
+      "sourceFilename": "exec-7b9a0a3d-c0e8-4ee9-a2e9-e30d114746ed.png",
+      "filename": "characters/p-m26-new-13.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f29-new-14",
+      "characterId": "c-f29-new-14",
+      "variantGroupId": "c-f29-new-14",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 25,
+        "max": 33,
+        "confidence": "medium"
+      },
+      "hairId": "shoulder-length",
+      "outfitId": "green-jacket",
+      "expressionId": "neutral",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "asymmetrical-features",
+        "strong-nose",
+        "everyday"
+      ],
+      "sourceId": "exec-5569f16d-fabe-4028-a073-2a945d675a4b",
+      "sourceFilename": "exec-5569f16d-fabe-4028-a073-2a945d675a4b.png",
+      "filename": "characters/p-f29-new-14.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m33-new-15",
+      "characterId": "c-m33-new-15",
+      "variantGroupId": "c-m33-new-15",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 29,
+        "max": 37,
+        "confidence": "medium"
+      },
+      "hairId": "unstyled-wavy",
+      "outfitId": "burgundy-sweatshirt",
+      "expressionId": "tired",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "puffy-eyes",
+        "stubble",
+        "everyday"
+      ],
+      "sourceId": "exec-efa8bb10-cc91-4a59-b171-8f56fc4ed9c7",
+      "sourceFilename": "exec-efa8bb10-cc91-4a59-b171-8f56fc4ed9c7.png",
+      "filename": "characters/p-m33-new-15.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f38-new-16",
+      "characterId": "c-f38-new-16",
+      "variantGroupId": "c-f38-new-16",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 34,
+        "max": 39,
+        "confidence": "medium"
+      },
+      "hairId": "short-layered",
+      "outfitId": "beige-knit",
+      "expressionId": "warm-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "glasses",
+        "fine-lines",
+        "everyday"
+      ],
+      "sourceId": "exec-43ecc6b4-0ef4-4d5e-bbf1-cc3e74a78805",
+      "sourceFilename": "exec-43ecc6b4-0ef4-4d5e-bbf1-cc3e74a78805.png",
+      "filename": "characters/p-f38-new-16.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m21-new-17",
+      "characterId": "c-m21-new-17",
+      "variantGroupId": "c-m21-new-17",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 18,
+        "max": 25,
+        "confidence": "medium"
+      },
+      "hairId": "fluffy-uncombed",
+      "outfitId": "white-tee",
+      "expressionId": "earnest",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "acne",
+        "slouched-posture",
+        "student-casual"
+      ],
+      "sourceId": "exec-ead5bbe7-44ac-4afa-a720-29caf6087633",
+      "sourceFilename": "exec-ead5bbe7-44ac-4afa-a720-29caf6087633.png",
+      "filename": "characters/p-m21-new-17.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f25-new-18",
+      "characterId": "c-f25-new-18",
+      "variantGroupId": "c-f25-new-18",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 21,
+        "max": 29,
+        "confidence": "medium"
+      },
+      "hairId": "short-pixie",
+      "outfitId": "denim-shirt",
+      "expressionId": "lively",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "small-mole",
+        "visible-pores",
+        "uneven-smile"
+      ],
+      "sourceId": "exec-7cc4f828-e685-4a19-bc5e-ba8b002cefc1",
+      "sourceFilename": "exec-7cc4f828-e685-4a19-bc5e-ba8b002cefc1.png",
+      "filename": "characters/p-f25-new-18.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f23-b2-01",
+      "characterId": "c-f23-b2-01",
+      "variantGroupId": "c-f23-b2-01",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 19,
+        "max": 27,
+        "confidence": "medium"
+      },
+      "hairId": "copper-bob",
+      "outfitId": "striped-shirt-apron",
+      "expressionId": "friendly",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "glasses",
+        "freckles",
+        "cafe-worker"
+      ],
+      "sourceId": "exec-ff251717-81be-46fc-9938-c8a089da59ef",
+      "sourceFilename": "exec-ff251717-81be-46fc-9938-c8a089da59ef.png",
+      "filename": "characters/p-f23-b2-01.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m29-b2-02",
+      "characterId": "c-m29-b2-02",
+      "variantGroupId": "c-m29-b2-02",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 25,
+        "max": 33,
+        "confidence": "medium"
+      },
+      "hairId": "short-curls",
+      "outfitId": "dark-green-workwear",
+      "expressionId": "relaxed",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "stubble",
+        "medium-skin-tone",
+        "workwear"
+      ],
+      "sourceId": "exec-9122710c-794e-4c9c-a5ae-56fccafebbea",
+      "sourceFilename": "exec-9122710c-794e-4c9c-a5ae-56fccafebbea.png",
+      "filename": "characters/p-m29-b2-02.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f26-b2-03",
+      "characterId": "c-f26-b2-03",
+      "variantGroupId": "c-f26-b2-03",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 22,
+        "max": 30,
+        "confidence": "medium"
+      },
+      "hairId": "very-short",
+      "outfitId": "black-tee",
+      "expressionId": "confident",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "androgynous-style",
+        "athletic",
+        "broad-jaw"
+      ],
+      "sourceId": "exec-b69a78df-94ae-47e1-88f5-84cf3a1f98db",
+      "sourceFilename": "exec-b69a78df-94ae-47e1-88f5-84cf3a1f98db.png",
+      "filename": "characters/p-f26-b2-03.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m34-b2-04",
+      "characterId": "c-m34-b2-04",
+      "variantGroupId": "c-m34-b2-04",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 30,
+        "max": 38,
+        "confidence": "medium"
+      },
+      "hairId": "buzz-cut",
+      "outfitId": "faded-workwear",
+      "expressionId": "guarded",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "tattoos",
+        "crooked-nose",
+        "stubble"
+      ],
+      "sourceId": "exec-751bf0f6-6b81-40ea-bfda-b8e5020a6b17",
+      "sourceFilename": "exec-751bf0f6-6b81-40ea-bfda-b8e5020a6b17.png",
+      "filename": "characters/p-m34-b2-04.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f32-b2-05",
+      "characterId": "c-f32-b2-05",
+      "variantGroupId": "c-f32-b2-05",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 28,
+        "max": 36,
+        "confidence": "medium"
+      },
+      "hairId": "uneven-fringe",
+      "outfitId": "lavender-cardigan",
+      "expressionId": "friendly",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "acne-marks",
+        "fuller-build",
+        "everyday"
+      ],
+      "sourceId": "exec-4a778457-6642-432e-8ecd-09fe8f23adc6",
+      "sourceFilename": "exec-4a778457-6642-432e-8ecd-09fe8f23adc6.png",
+      "filename": "characters/p-f32-b2-05.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m37-b2-06",
+      "characterId": "c-m37-b2-06",
+      "variantGroupId": "c-m37-b2-06",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 33,
+        "max": 39,
+        "confidence": "medium"
+      },
+      "hairId": "receding-hairline",
+      "outfitId": "striped-office-shirt",
+      "expressionId": "mild-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "glasses",
+        "under-eye-circles",
+        "slim"
+      ],
+      "sourceId": "exec-ec97e4f9-d3b0-42c3-bc9d-0baeaecf5dc9",
+      "sourceFilename": "exec-ec97e4f9-d3b0-42c3-bc9d-0baeaecf5dc9.png",
+      "filename": "characters/p-m37-b2-06.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f25-b2-07",
+      "characterId": "c-f25-b2-07",
+      "variantGroupId": "c-f25-b2-07",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 21,
+        "max": 29,
+        "confidence": "medium"
+      },
+      "hairId": "tied-windblown",
+      "outfitId": "sports-jacket",
+      "expressionId": "confident",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "athletic",
+        "freckles",
+        "outdoors"
+      ],
+      "sourceId": "exec-204bec40-a9ab-46a6-b495-54207ac42c66",
+      "sourceFilename": "exec-204bec40-a9ab-46a6-b495-54207ac42c66.png",
+      "filename": "characters/p-f25-b2-07.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m23-b2-08",
+      "characterId": "c-m23-b2-08",
+      "variantGroupId": "c-m23-b2-08",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 19,
+        "max": 27,
+        "confidence": "medium"
+      },
+      "hairId": "long-straight",
+      "outfitId": "mustard-sweater",
+      "expressionId": "thoughtful",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "glasses",
+        "long-hair",
+        "slim"
+      ],
+      "sourceId": "exec-34774668-00cf-4863-9063-420ec9de01a3",
+      "sourceFilename": "exec-34774668-00cf-4863-9063-420ec9de01a3.png",
+      "filename": "characters/p-m23-b2-08.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f35-b2-09",
+      "characterId": "c-f35-b2-09",
+      "variantGroupId": "c-f35-b2-09",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 31,
+        "max": 39,
+        "confidence": "medium"
+      },
+      "hairId": "curly-shoulder-length",
+      "outfitId": "denim-shirt",
+      "expressionId": "bright-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "curly-hair",
+        "smile-lines",
+        "sturdy-build"
+      ],
+      "sourceId": "exec-3ec34b47-037f-4556-a625-801256c98b7d",
+      "sourceFilename": "exec-3ec34b47-037f-4556-a625-801256c98b7d.png",
+      "filename": "characters/p-f35-b2-09.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m31-b2-10",
+      "characterId": "c-m31-b2-10",
+      "variantGroupId": "c-m31-b2-10",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 27,
+        "max": 35,
+        "confidence": "medium"
+      },
+      "hairId": "short-tidy",
+      "outfitId": "cream-sweatshirt",
+      "expressionId": "kind",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "vitiligo",
+        "everyday",
+        "natural-skin"
+      ],
+      "sourceId": "exec-ff915c50-134c-4ebc-b6a8-aa7971dc17dd",
+      "sourceFilename": "exec-ff915c50-134c-4ebc-b6a8-aa7971dc17dd.png",
+      "filename": "characters/p-m31-b2-10.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f28-b2-11",
+      "characterId": "c-f28-b2-11",
+      "variantGroupId": "c-f28-b2-11",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 24,
+        "max": 32,
+        "confidence": "medium"
+      },
+      "hairId": "long-braid",
+      "outfitId": "green-blouse",
+      "expressionId": "gentle",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "braid",
+        "warm-medium-skin",
+        "everyday"
+      ],
+      "sourceId": "exec-91967297-f803-4cae-8092-f3f5f6188b8c",
+      "sourceFilename": "exec-91967297-f803-4cae-8092-f3f5f6188b8c.png",
+      "filename": "characters/p-f28-b2-11.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m27-b2-12",
+      "characterId": "c-m27-b2-12",
+      "variantGroupId": "c-m27-b2-12",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 23,
+        "max": 31,
+        "confidence": "medium"
+      },
+      "hairId": "bleached-short",
+      "outfitId": "washed-black-sweatshirt",
+      "expressionId": "tired",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "eyebrow-scar",
+        "slim",
+        "everyday"
+      ],
+      "sourceId": "exec-ff6d0b58-80f7-4200-b7ab-0f2684d9d34c",
+      "sourceFilename": "exec-ff6d0b58-80f7-4200-b7ab-0f2684d9d34c.png",
+      "filename": "characters/p-m27-b2-12.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f30-b2-13",
+      "characterId": "c-f30-b2-13",
+      "variantGroupId": "c-f30-b2-13",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 26,
+        "max": 34,
+        "confidence": "medium"
+      },
+      "hairId": "shaved-undercut",
+      "outfitId": "red-plaid-shirt",
+      "expressionId": "self-assured",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "freckles",
+        "short-hair",
+        "broad-cheekbones"
+      ],
+      "sourceId": "exec-226d8b9d-6e1e-4817-81c7-bb541ef5044b",
+      "sourceFilename": "exec-226d8b9d-6e1e-4817-81c7-bb541ef5044b.png",
+      "filename": "characters/p-f30-b2-13.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m32-b2-14",
+      "characterId": "c-m32-b2-14",
+      "variantGroupId": "c-m32-b2-14",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 28,
+        "max": 36,
+        "confidence": "medium"
+      },
+      "hairId": "curly-perm",
+      "outfitId": "orange-windbreaker",
+      "expressionId": "crooked-tooth-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "large-ears",
+        "stocky",
+        "bright-clothing"
+      ],
+      "sourceId": "exec-2186e7fa-eb8e-43bb-b3ac-f0ba40998355",
+      "sourceFilename": "exec-2186e7fa-eb8e-43bb-b3ac-f0ba40998355.png",
+      "filename": "characters/p-m32-b2-14.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f21-b2-15",
+      "characterId": "c-f21-b2-15",
+      "variantGroupId": "c-f21-b2-15",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 18,
+        "max": 25,
+        "confidence": "medium"
+      },
+      "hairId": "uneven-bangs",
+      "outfitId": "navy-hoodie",
+      "expressionId": "embarrassed-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "acne",
+        "braces",
+        "student-casual"
+      ],
+      "sourceId": "exec-bfbb7fe5-854b-4357-922e-47bcadf565ad",
+      "sourceFilename": "exec-bfbb7fe5-854b-4357-922e-47bcadf565ad.png",
+      "filename": "characters/p-f21-b2-15.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m39-b2-16",
+      "characterId": "c-m39-b2-16",
+      "variantGroupId": "c-m39-b2-16",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 35,
+        "max": 39,
+        "confidence": "medium"
+      },
+      "hairId": "salt-and-pepper",
+      "outfitId": "mechanic-shirt",
+      "expressionId": "serious-kind",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "gray-temples",
+        "fine-lines",
+        "heavy-build"
+      ],
+      "sourceId": "exec-74b7f337-80ed-4f02-9f61-cdde76efefc4",
+      "sourceFilename": "exec-74b7f337-80ed-4f02-9f61-cdde76efefc4.png",
+      "filename": "characters/p-m39-b2-16.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-f37-b2-17",
+      "characterId": "c-f37-b2-17",
+      "variantGroupId": "c-f37-b2-17",
+      "gender": "여성",
+      "ageEstimate": {
+        "min": 33,
+        "max": 39,
+        "confidence": "medium"
+      },
+      "hairId": "short-practical",
+      "outfitId": "teal-knit",
+      "expressionId": "warm-smile",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "hearing-aids",
+        "fine-lines",
+        "everyday"
+      ],
+      "sourceId": "exec-8b8197c3-fdbe-4fd8-a928-4e20ec23aba0",
+      "sourceFilename": "exec-8b8197c3-fdbe-4fd8-a928-4e20ec23aba0.png",
+      "filename": "characters/p-f37-b2-17.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    },
+    {
+      "assetId": "p-m25-b2-18",
+      "characterId": "c-m25-b2-18",
+      "variantGroupId": "c-m25-b2-18",
+      "gender": "남성",
+      "ageEstimate": {
+        "min": 21,
+        "max": 29,
+        "confidence": "medium"
+      },
+      "hairId": "very-curly",
+      "outfitId": "red-jacket",
+      "expressionId": "cheerful",
+      "visualStyle": "semi-realistic-illustration",
+      "tags": [
+        "chipped-tooth",
+        "facial-asymmetry",
+        "fuller-build"
+      ],
+      "sourceId": "exec-ebd2faa5-0261-4885-9539-ef1c9ee51f15",
+      "sourceFilename": "exec-ebd2faa5-0261-4885-9539-ef1c9ee51f15.png",
+      "filename": "characters/p-m25-b2-18.webp",
+      "width": 512,
+      "height": 512,
+      "format": "webp",
+      "runtimeEligible": true
+    }
+  ]
+}
