@@ -328,3 +328,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
   .featured-portrait { width: 76px; height: 76px; }
   .person-details-modal { max-height: 90vh; }
 }
+
+.npc-weekly-note { margin: 16px 0 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface-soft); color: var(--muted); font-size: 11px; line-height: 1.7; }
+.npc-weekly-note strong { color: var(--text); }
+.memory-action { padding-top: 10px; border-top: 1px solid var(--line); color: var(--accent-dark); font-size: 10px !important; }
