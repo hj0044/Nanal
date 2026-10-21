@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advanceDay, advanceDays, chooseEvent, createGame, generateBodyMetrics, generateContacts, getContactAffiliation, getNpcReunionEvents, getPersonalStoryEvents, getPlayerAffiliation, getRelationshipProfile, getWeeklyCashflowPlan, normalizeContactName, startNextWeek, takeDailyAction, type Character } from "./game";
+import { advanceDay, advanceDays, chooseEvent, createGame, createInitialNPCRelationships, generateBodyMetrics, generateContacts, getContactAffiliation, getNpcReunionEvents, getPersonalStoryEvents, getPlayerAffiliation, getRelationshipProfile, getWeeklyCashflowPlan, normalizeContactName, startNextWeek, takeDailyAction, type Character } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
 import { getPortrait, portraitCatalog } from "./portrait-catalog";
@@ -35,6 +35,36 @@ describe("first week simulation", () => {
     expect(new Set(first.map((contact) => contact.portraitId)).size).toBe(12);
     expect(first.every((contact) => getPortrait(contact.portraitId))).toBe(true);
     expect(first.every((contact) => getPortrait(contact.portraitId)?.gender === contact.gender)).toBe(true);
+  });
+
+  it("varies the starting social circle by game seed while keeping a few grounding relationships", () => {
+    const first = generateContacts("student", 10101);
+    const replay = generateContacts("student", 10101);
+    const newLife = generateContacts("student", 20202);
+    expect(first).toEqual(replay);
+    expect(newLife.map((person) => person.role)).not.toEqual(first.map((person) => person.role));
+    expect(first.some((person) => /가족/.test(person.role))).toBe(true);
+    expect(first.some((person) => /친구/.test(person.role))).toBe(true);
+    expect(new Set(first.map((person) => person.role)).size).toBe(12);
+  });
+
+  it("builds a reproducible NPC social web and evolves ties independently over time", () => {
+    const started = createGame(character, 6251);
+    const replay = createGame(character, 6251);
+    expect(started.npcRelationships).toEqual(replay.npcRelationships);
+    expect(createInitialNPCRelationships(started.contacts, 6251)).toEqual(started.npcRelationships);
+    expect(started.npcRelationships!.length).toBeGreaterThan(0);
+    expect(new Set(started.npcRelationships!.map((link) => link.id)).size).toBe(started.npcRelationships!.length);
+    const pair = started.npcRelationships![0];
+    const oneTie = [{ ...pair, warmth: 50, kind: "friend" as const }];
+    const resolveWithSeed = (seed: number) => advanceDay({
+      ...started, week: 2, day: 7, seed, phase: "playing", npcRelationships: oneTie,
+      evaluatedDays: [1, 2, 3, 4, 5, 6, 7],
+    });
+    const changingSeed = Array.from({ length: 300 }, (_, index) => index + 1)
+      .find((seed) => resolveWithSeed(seed).npcRelationships?.[0].warmth !== 50);
+    expect(changingSeed).toBeDefined();
+    expect(resolveWithSeed(changingSeed!)).toEqual(resolveWithSeed(changingSeed!));
   });
 
   it("provides stable demographic and affiliation details for the protagonist and NPCs", () => {
