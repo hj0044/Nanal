@@ -66,7 +66,12 @@ export interface Contact {
   memories?: NPCMemory[];
   warmth: number;
   note: string;
+  firstMetWeek?: number;
+  lastInteractionWeek?: number;
+  archivedWeek?: number;
+  returnCount?: number;
 }
+export interface RelationshipRecord { id: string; week: number; kind: "arrival" | "drift" | "departure" | "reunion" | "memory"; contactId: string; contactName: string; text: string }
 export interface Effect {
   money?: number;
   energy?: number;
@@ -111,6 +116,9 @@ export interface GameState {
   weeklyCashflow?: WeeklyCashflow;
   stats: Stats;
   contacts: Contact[];
+  archivedContacts?: Contact[];
+  relationshipRecords?: RelationshipRecord[];
+  nextContactNumber?: number;
   log: string[];
   pendingEvent?: LifeEvent;
   lastChoice?: string;
@@ -222,7 +230,8 @@ export function createGame(character: Character, seed = createSeed(`${character.
     version: 1, character: player, week: 1, day: 1, phase: "playing", seed,
     evaluatedDays: [], seenEvents: [], npcStoryStages: {}, npcStoryLastWeek: {}, npcStoryChoices: {},
     stats: { money, energy: 72, stress: 24, mood: 61, focus: 52 },
-    contacts: generateContacts(character.background, seed, character.age, [player.portraitId]),
+    contacts: generateContacts(character.background, seed, character.age, [player.portraitId]).map((person) => ({ ...person, firstMetWeek: 1, lastInteractionWeek: 1, returnCount: 0 })),
+    archivedContacts: [], relationshipRecords: [], nextContactNumber: 13,
     log: [`${character.year}년, ${character.name}의 새로운 생활이 시작됐다.`],
     settings: { palette: "clean", nightMode: "device", nightStart: "21:00", nightEnd: "07:00", topics: { affair: true, illness: true, pregnancy: true } },
   };
@@ -353,6 +362,9 @@ export function advanceDay(state: GameState): GameState {
       phase: "summary",
       seed: npcTurn.seed,
       contacts: npcTurn.contacts,
+      archivedContacts: npcTurn.archivedContacts,
+      relationshipRecords: npcTurn.relationshipRecords,
+      nextContactNumber: npcTurn.nextContactNumber,
       log: [...npcTurn.logs, ...settled.log],
     };
   }
@@ -459,10 +471,30 @@ function addNpcMemory(contact: Contact, text: string, week: number): NPCMemory[]
   ].slice(0, 8);
 }
 
-function simulateNpcWeek(state: GameState): { contacts: Contact[]; seed: number; logs: string[] } {
+function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedContacts: Contact[]; relationshipRecords: RelationshipRecord[]; nextContactNumber: number; seed: number; logs: string[] } {
   let seed = state.seed;
   const logs: string[] = [];
-  const contacts = state.contacts.map((contact) => {
+  const records = [...(state.relationshipRecords ?? [])];
+  const archived = [...(state.archivedContacts ?? [])];
+  let nextContactNumber = state.nextContactNumber ?? (state.contacts.length + archived.length + 1);
+  const survivors: Contact[] = [];
+  let departuresThisWeek = 0;
+  for (const [contactIndex, original] of state.contacts.entries()) {
+    let contact = original;
+    const weeksSinceContact = Math.max(0, state.week - (contact.lastInteractionWeek ?? contact.firstMetWeek ?? 1));
+    if (weeksSinceContact >= 4 && contact.warmth > 20) contact = { ...contact, warmth: Math.max(15, contact.warmth - Math.min(2, Math.floor((weeksSinceContact - 2) / 3))) };
+    if (departuresThisWeek < 1 && weeksSinceContact >= 12 && contact.warmth <= 25 && survivors.length + state.contacts.length - contactIndex > 7) {
+      departuresThisWeek += 1;
+      const departed = { ...contact, archivedWeek: state.week, note: "서로의 생활이 달라져 한동안 연락이 뜸해졌다." };
+      archived.push(departed);
+      const text = `${contact.name}과(와) 연락이 뜸해져 각자의 생활을 이어가게 됐다. 함께한 기억은 생애기록에 남아 있다.`;
+      logs.push(text);
+      records.push({ id: `departure-${contact.id}-${state.week}`, week: state.week, kind: "departure", contactId: contact.id, contactName: contact.name, text });
+      continue;
+    }
+    survivors.push(contact);
+  }
+  const contacts: Contact[] = survivors.map((contact) => {
     const [nextSeed, roll] = nextRandom(seed ^ createSeed(`${contact.id}:${state.week}`));
     seed = nextSeed;
     const warmth = contact.warmth;
@@ -502,7 +534,25 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; seed: number;
     }
     return { ...contact, goal, goalProgress, goalStage, mood, lastAutonomousAction, goalSupport: Math.max(0, playerSupport - 1), memories };
   });
-  return { contacts, seed, logs };
+  const reunionIndex = archived.findIndex((person) => state.week - (person.archivedWeek ?? state.week) >= 6);
+  const [, reunionRoll] = nextRandom(seed ^ createSeed(`reunion:${state.week}`));
+  if (reunionIndex >= 0 && reunionRoll < 0.18 && contacts.length < 12) {
+    const old = archived.splice(reunionIndex, 1)[0];
+    const returned = { ...old, archivedWeek: undefined, warmth: Math.min(35, Math.max(18, old.warmth - 12)), goalSupport: 0, memories: (old.memories ?? []).map((memory) => ({ ...memory, vividness: Math.min(memory.vividness, 0.28) })), lastInteractionWeek: state.week, returnCount: (old.returnCount ?? 0) + 1, note: "우연히 다시 만나 어색하지만 반갑게 안부를 나눴다." };
+    contacts.push(returned);
+    const text = `${old.name}과(와) 우연히 다시 만났다. 예전만큼 가깝지는 않지만, 서로의 근황을 나누며 새롭게 관계를 이어가기 시작했다.`;
+    logs.push(text);
+    records.push({ id: `reunion-${old.id}-${state.week}`, week: state.week, kind: "reunion", contactId: old.id, contactName: old.name, text });
+  } else if (contacts.length < 12) {
+    const [nextSeed, roll] = nextRandom(seed ^ createSeed(`arrival:${state.week}:${nextContactNumber}`)); seed = nextSeed;
+    const generated = generateContacts(state.character.background, Math.floor(roll * 0xffffffff), state.character.age, [state.character.portraitId ?? ""])[Math.floor(roll * 12)];
+    const person: Contact = { ...generated, id: `person-${nextContactNumber++}`, firstMetWeek: state.week, lastInteractionWeek: state.week, returnCount: 0, warmth: 42 + Math.floor(roll * 13), note: "최근 새롭게 알게 된 사람" };
+    contacts.push(person);
+    const text = `${person.name}을(를) 새롭게 알게 됐다. ${person.role}로 만나 가볍게 인사를 나눴다.`;
+    logs.push(text);
+    records.push({ id: `arrival-${person.id}-${state.week}`, week: state.week, kind: "arrival", contactId: person.id, contactName: person.name, text });
+  }
+  return { contacts, archivedContacts: archived, relationshipRecords: records, nextContactNumber, seed, logs };
 }
 
 export function startNextWeek(state: GameState): GameState {
