@@ -618,11 +618,9 @@ function nextEligibleEvent(state: GameState): [LifeEvent | undefined, number] {
     .filter((event) => !state.seenEvents.includes(event.id) && (!event.topic || state.settings.topics[event.topic]))
     .map((event) => personalizeAuthoredEvent(event, state));
   const notRecentlyPlayed = eligible.filter((event) => !recent.includes(event.id));
-  const fullyCooled = notRecentlyPlayed.filter((event) =>
+  const options = notRecentlyPlayed.filter((event) =>
     state.week - (lastSeen[event.id] ?? -100) >= 8
-    && (event.personalStory || event.reunion || event.npcPair || state.week - (familyLastSeen[getEventFamily(event)] ?? -100) >= 2));
-  const eventCooled = notRecentlyPlayed.filter((event) => state.week - (lastSeen[event.id] ?? -100) >= 8);
-  const options = fullyCooled.length ? fullyCooled : eventCooled.length ? eventCooled : notRecentlyPlayed.length ? notRecentlyPlayed : eligible;
+    && state.week - (familyLastSeen[getEventFamily(event)] ?? -100) >= 2);
   const [afterRoll, roll] = nextRandom(state.seed);
   if (!options.length) return [undefined, afterRoll];
   const urgency = (state.stats.stress >= 70 ? 0.12 : state.stats.stress >= 55 ? 0.06 : 0)
