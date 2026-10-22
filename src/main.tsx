@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  advanceDays, backgroundLabels, chooseEvent, createGame, createInitialNPCRelationships, createSeed, generateBodyMetrics, generateContacts, generateName, getContactAffiliation, getPlayerAffiliation, getWeeklyCashflowPlan, normalizeContactName, startNextWeek, takeDailyAction,
+  addPlayerGoal, advanceDays, backgroundLabels, chooseEvent, createGame, createInitialNPCRelationships, createSeed, generateBodyMetrics, generateContacts, generateName, getContactAffiliation, getPlayerAffiliation, getWeeklyCashflowPlan, normalizeContactName, playerGoalTemplates, setPlayerGoalStatus, startNextWeek, takeDailyAction,
   type Background, type Character, type CharacterDraft, type Contact, type DailyAction, type GameState, type Palette,
   type SensitiveTopic, type Tab,
 } from "./game";
@@ -46,6 +46,7 @@ function normalizeSave(parsed: GameState): GameState {
   const usedPortraitIds = playerPortraitId ? [playerPortraitId] : [];
   return {
     ...parsed,
+    playerGoals: parsed.playerGoals ?? [],
     character: {
       ...parsed.character, ...playerBody, weightKg: parsed.character.weightKg ?? playerBody.weightKg,
       affiliation: getPlayerAffiliation(parsed.character), portraitId: playerPortraitId,
@@ -189,7 +190,7 @@ function App() {
         {tab === "life" && <LifeView game={game} onAdvance={(days) => updateGame((current) => advanceDays(current, days))} onAction={(action, targetContactId) => updateGame((current) => takeDailyAction(current, action, targetContactId))} onChoice={(id) => updateGame((current) => chooseEvent(current, id))} onNextWeek={() => updateGame(startNextWeek)} onSelectPerson={setSelectedPerson} />}
         {tab === "people" && <PeopleView game={game} onSelectPerson={setSelectedPerson} onSelectPlayer={() => setShowPlayerProfile(true)} />}
         {tab === "work" && <WorkView game={game} />}
-        {tab === "goals" && <GoalsView game={game} />}
+        {tab === "goals" && <GoalsView game={game} onAdd={(id) => updateGame((current) => addPlayerGoal(current, id))} onStatus={(id, status) => updateGame((current) => setPlayerGoalStatus(current, id, status))} />}
         {tab === "record" && <RecordView game={game} />}
       </main>
       <nav className="bottom-nav" aria-label="주요 메뉴">
@@ -341,9 +342,22 @@ function WorkView({ game }: { game: GameState }) {
   const recentFlow = game.weeklyCashflow;
   return <><PageTitle kicker="WORK & ECONOMY" title="일과 경제" subtitle="현재 수입·지출은 플레이 테스트용 가정이며, 실제 생활비 통계와 다를 수 있습니다." /><div className="economy-hero"><span className="section-kicker">{label} · 플레이테스트 밸런스</span><strong>{formatMoney(game.stats.money)}</strong><small>현재 보유 생활비</small><p>주간 예상 증감 <b className={plan.net >= 0 ? "cashflow-positive" : "cashflow-negative"}>{netLabel}</b></p></div><div className="panel cashflow-panel"><div className="section-kicker">WEEKLY CASHFLOW · 테스트 값</div><h2>주간 기본 수입과 지출</h2><div className="cashflow-row"><span>{plan.incomeLabel}</span><strong className="cashflow-positive">+{formatMoney(plan.income)}</strong></div><div className="cashflow-row"><span>{plan.expenseLabel}</span><strong>−{formatMoney(plan.livingExpenses)}</strong></div><div className="cashflow-row"><span>주거비 · {game.character.housing}</span><strong>−{formatMoney(plan.housingExpenses)}</strong></div><div className="cashflow-row cashflow-total"><span>예상 주간 증감</span><strong className={plan.net >= 0 ? "cashflow-positive" : "cashflow-negative"}>{netLabel}</strong></div><p className="microcopy">이 금액은 게임 밸런스용 임시값이에요. 주 1회 정산되며, 잔액이 모자라면 미납액과 스트레스 변화가 기록됩니다.</p>{recentFlow && <section className="recent-cashflow"><strong>{recentFlow.week}주차 정산 결과</strong><div className="cashflow-row"><span>수입 / 지출</span><span>+{formatMoney(recentFlow.income)} / −{formatMoney(recentFlow.expenses)}</span></div><div className="cashflow-row"><span>정산 후 잔액</span><strong>{formatMoney(recentFlow.endingBalance)}</strong></div>{recentFlow.unpaidExpenses > 0 && <div className="cashflow-shortfall">미납 {formatMoney(recentFlow.unpaidExpenses)} · 스트레스가 증가했어요.</div>}</section>}</div></>;
 }
-function GoalsView({ game }: { game: GameState }) {
-  const goal = game.character.background === "student" ? "학업과 생활의 균형 찾기" : game.character.background === "jobseeker" ? "내게 맞는 일과 준비 방향 찾기" : "일과 생활의 지속 가능한 리듬 만들기";
-  return <><PageTitle kicker="GOALS & GROWTH" title="지금의 목표" subtitle="목표는 상황이 달라지면 바뀔 수 있어요." /><div className="goal-card"><div className="goal-icon">✳</div><span className="section-kicker">추천 목표 · 수정 가능</span><h2>{goal}</h2><p>현재는 시제품 추천이에요. 다음 단계에서 직접 추가·수정하고 진행 과정을 기록할 수 있게 만들 예정입니다.</p><div className="goal-progress"><span style={{ width: "22%" }} /></div><small>첫 걸음 전 · 상황 살펴보기</small></div><div className="panel muted-panel"><h3>이번 주에 남긴 변화</h3><p>{game.lastChoice || "선택한 행동과 생활의 변화가 여기에 모여요."}</p></div></>;
+function GoalsView({ game, onAdd, onStatus }: { game: GameState; onAdd: (id: string) => void; onStatus: (id: string, status: "active" | "paused") => void }) {
+  const goals = game.playerGoals ?? [];
+  const active = goals.filter((goal) => goal.status === "active");
+  const available = playerGoalTemplates.filter((template) => !active.some((goal) => goal.id === template.id));
+  const [selectedTemplate, setSelectedTemplate] = useState(available[0]?.id ?? "");
+  useEffect(() => { if (!available.some((goal) => goal.id === selectedTemplate)) setSelectedTemplate(available[0]?.id ?? ""); }, [available, selectedTemplate]);
+  const categoryLabel: Record<string, string> = { career: "일·진로", learning: "학습", relationship: "관계", health: "건강", finance: "경제", personal: "생활" };
+  return <><PageTitle kicker="GOALS & GROWTH" title="내 목표와 변화" subtitle="목표는 행동과 사건의 영향을 받아 자라고, 상황에 따라 잠시 멈출 수도 있어요." />
+    <section className="panel goal-management"><div className="section-heading"><div><span className="section-kicker">ACTIVE GOALS</span><h2>진행 중인 목표</h2></div><small>{active.length}/3</small></div>
+      {active.length === 0 && <p className="muted-copy">아직 정한 목표가 없어요. 지금 마음이 가는 목표 하나부터 골라보세요.</p>}
+      {active.map((goal) => <article className="player-goal-card" key={goal.id}><div className="player-goal-heading"><div><small>{categoryLabel[goal.category]} · {goal.progress}/{goal.target}</small><strong>{goal.title}</strong></div><button className="text-button" onClick={() => onStatus(goal.id, "paused")}>잠시 멈춤</button></div><div className="goal-progress"><span style={{ width: `${Math.round(goal.progress / goal.target * 100)}%` }} /></div><p>관련 행동이나 사건을 선택하면 진척돼요. 서로 다른 분야 목표는 동시에 최대 3개까지 진행할 수 있어요.</p></article>)}
+      {active.length < 3 && available.length > 0 && <div className="goal-add-row"><label className="field"><span>새 목표</span><select value={selectedTemplate} onChange={(event) => setSelectedTemplate(event.target.value)}>{available.map((goal) => <option key={goal.id} value={goal.id}>{goal.title}</option>)}</select></label><button className="primary-button" disabled={!selectedTemplate} onClick={() => selectedTemplate && onAdd(selectedTemplate)}>목표 추가</button></div>}
+    </section>
+    {goals.some((goal) => goal.status === "paused") && <section className="panel"><div className="section-heading"><h2>잠시 멈춘 목표</h2></div>{goals.filter((goal) => goal.status === "paused").map((goal) => <div className="paused-goal-row" key={goal.id}><span>{goal.title} · {goal.progress}/{goal.target}</span><button className="text-button" disabled={active.length >= 3} onClick={() => onStatus(goal.id, "active")}>다시 시작</button></div>)}</section>}
+    {goals.some((goal) => goal.status === "completed") && <section className="panel"><div className="section-heading"><h2>이룬 목표</h2></div>{goals.filter((goal) => goal.status === "completed").map((goal) => <div className="paused-goal-row completed-goal" key={goal.id}><span>✓ {goal.title}</span><small>{goal.completedWeek}주차에 완료</small></div>)}</section>}
+    <section className="panel muted-panel"><h3>이번 주에 남긴 변화</h3><p>{game.lastChoice || "선택한 행동과 생활의 변화가 여기에 모여요."}</p><p className="microcopy">집중은 일·진로 또는 학습, 휴식은 건강, 만남은 관계, 생활 정리는 경제 목표에 반영돼요. 관련 사건의 선택도 목표를 움직입니다.</p></section></>;
 }
 function RecordView({ game }: { game: GameState }) {
   const history = [...(game.relationshipRecords ?? [])].reverse();
