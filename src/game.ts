@@ -155,6 +155,8 @@ export interface LifeEvent {
   reunion?: { contactId: string };
   npcPair?: { linkId: string; kind: "bond" | "conflict" | "reconciliation" | "romance"; contactAId: string; contactBId: string; speakerId: string };
   npcDialogue?: { speakerName: string; line: string };
+  /** Marks an event whose copy was rewritten by the server; optional for save compatibility. */
+  narrativeCopyGenerated?: boolean;
   choices: EventChoice[];
 }
 export interface GameState {
