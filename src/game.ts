@@ -1,3 +1,5 @@
+import { createAppearance, type AppearanceState, type PortraitAssetRef } from "./appearance";
+
 export type Background = "student" | "jobseeker" | "worker";
 export type Palette = "clean" | "warm" | "dark";
 export type SensitiveTopic = "affair" | "illness" | "pregnancy";
@@ -14,6 +16,8 @@ export interface Character {
   weightKg?: number;
   affiliation?: string;
   portraitId?: string;
+  appearance?: AppearanceState;
+  portraitAssets?: PortraitAssetRef;
   region: string;
   housing: string;
   education?: string;
@@ -60,6 +64,8 @@ export interface Contact {
   weightKg?: number;
   affiliation?: string;
   portraitId?: string;
+  appearance?: AppearanceState;
+  portraitAssets?: PortraitAssetRef;
   portraitAgeBand?: import("./portrait-catalog").PortraitAgeBand;
   occupation?: string;
   personality?: string;
@@ -295,7 +301,7 @@ export function generateContacts(background: Background, seed: number, playerAge
     const portraitId = choosePortraitId(gender, age, next, usedPortraits);
     usedPortraits.push(portraitId);
     const body = generateBodyMetrics(gender, next ^ createSeed(`${role}:${age}`));
-    return { id: `person-${i + 1}`, name, role, gender, age, ...body, affiliation: getContactAffiliation(role, background), portraitId, portraitAgeBand: getPortrait(portraitId)?.ageBand, occupation: occupations[background][Math.floor(jobRoll * occupations[background].length)], personality: traits[Math.floor(traitRoll * traits.length)], goal: goals[Math.floor(goalRoll * goals.length)], goalProgress: Math.floor(goalRoll * 3), goalSupport: 0, goalStage: ["계획 세우기", "한 걸음 진행", "기회 기다리기"][Math.floor(goalRoll * 3)], mood: "평소와 같음", lastAutonomousAction: "이번 주 계획을 생각하는 중", memories: [], warmth: 46 + Math.floor(value * 23), note: i < 2 ? "최근 연락이 이어지고 있다" : "아직 자세히 알지 못한다" };
+    return { id: `person-${i + 1}`, name, role, gender, age, ...body, affiliation: getContactAffiliation(role, background), portraitId, appearance: createAppearance(next ^ createSeed(`npc:${i + 1}:appearance`), gender, age, body.heightCm, body.weightKg), portraitAgeBand: getPortrait(portraitId)?.ageBand, occupation: occupations[background][Math.floor(jobRoll * occupations[background].length)], personality: traits[Math.floor(traitRoll * traits.length)], goal: goals[Math.floor(goalRoll * goals.length)], goalProgress: Math.floor(goalRoll * 3), goalSupport: 0, goalStage: ["계획 세우기", "한 걸음 진행", "기회 기다리기"][Math.floor(goalRoll * 3)], mood: "평소와 같음", lastAutonomousAction: "이번 주 계획을 생각하는 중", memories: [], warmth: 46 + Math.floor(value * 23), note: i < 2 ? "최근 연락이 이어지고 있다" : "아직 자세히 알지 못한다" };
   });
 }
 function relationshipKind(a: Contact, b: Contact): NPCRelationship["kind"] {
@@ -343,7 +349,12 @@ function evolveNPCRelationships(contacts: Contact[], previous: NPCRelationship[]
 export function createGame(character: Character, seed = createSeed(`${character.name}:${character.year}:${character.age}:${character.background}`)): GameState {
   const money = character.startingMoney ?? (character.background === "student" ? 420_000 : character.background === "jobseeker" ? 650_000 : 1_850_000);
   const body = generateBodyMetrics(character.gender, seed, character.heightCm);
-  const player = { ...character, ...body, weightKg: character.weightKg ?? body.weightKg, affiliation: getPlayerAffiliation(character), portraitId: character.portraitId ?? choosePortraitId(character.gender, character.age, seed) };
+  const player = { ...character, ...body, weightKg: character.weightKg ?? body.weightKg, affiliation: getPlayerAffiliation(character), portraitId: character.portraitId ?? choosePortraitId(character.gender, character.age, seed),
+    appearance: character.appearance ?? createAppearance(
+      seed ^ createSeed("player:appearance"), character.gender, character.age,
+      body.heightCm, character.weightKg ?? body.weightKg,
+    ),
+  };
   const contacts = generateContacts(character.background, seed, character.age, [player.portraitId]).map((person) => ({ ...person, firstMetWeek: 1, lastInteractionWeek: 1, returnCount: 0 }));
   return {
     version: 1, character: player, week: 1, day: 1, phase: "playing", seed,
