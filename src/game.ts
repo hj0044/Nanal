@@ -14,6 +14,7 @@ export interface Character {
   weightKg?: number;
   affiliation?: string;
   portraitId?: string;
+  appearanceHistory?: AppearanceSnapshot[];
   region: string;
   housing: string;
   education?: string;
@@ -89,6 +90,7 @@ export interface Contact {
   affiliation?: string;
   portraitId?: string;
   portraitAgeBand?: import("./portrait-catalog").PortraitAgeBand;
+  appearanceHistory?: AppearanceSnapshot[];
   occupation?: string;
   personality?: string;
   goal?: string;
@@ -106,6 +108,7 @@ export interface Contact {
   returnCount?: number;
   historicalBond?: number;
 }
+export interface AppearanceSnapshot { week: number; age: number; portraitId: string; reason: "manual" | "age-stage" }
 export interface NPCRelationship {
   id: string;
   contactAId: string;
@@ -207,6 +210,8 @@ export interface CharacterDraft {
   education: string;
   family: string;
   startingMoney: string;
+  /** Optional player-selected face; empty means assign automatically per save. */
+  portraitId?: string;
 }
 
 export const backgroundLabels: Record<Background, string> = {
@@ -244,7 +249,7 @@ export function getContactAffiliation(role: string, background: Background): str
 }
 
 import { commonEventLibrary, eventLibrary } from "./scenarios";
-import { choosePortraitId, getPortrait } from "./portrait-catalog";
+import { choosePortraitId, getPortrait, getPortraitAgeVariant } from "./portrait-catalog";
 
 // Keep generated names aligned with the character's selected gender. Korean names
 // can be unisex, so these pools favor names commonly associated with each gender.
@@ -1040,11 +1045,28 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
 export function startNextWeek(state: GameState): GameState {
   if (state.phase !== "summary") return state;
   const week = state.week + 1;
+  const yearTurn = week > 1 && (week - 1) % 52 === 0;
+  const agePerson = <T extends { age?: number; portraitId?: string; portraitAgeBand?: string; appearanceHistory?: AppearanceSnapshot[]; warmth?: number; name?: string }>(person: T): T => {
+    if (!yearTurn || person.age === undefined) return person;
+    const age = person.age + 1;
+    const portraitId = getPortraitAgeVariant(person.portraitId, age) ?? person.portraitId;
+    const appearanceHistory = portraitId && person.portraitId && portraitId !== person.portraitId
+      ? [...(person.appearanceHistory ?? []), { week, age: person.age, portraitId: person.portraitId, reason: "age-stage" as const }]
+      : person.appearanceHistory;
+    return { ...person, age, portraitId, portraitAgeBand: getPortrait(portraitId)?.ageBand ?? person.portraitAgeBand, appearanceHistory };
+  };
+  const agedCharacter = yearTurn ? agePerson(state.character) : state.character;
+  const agedContacts = yearTurn ? state.contacts.map(agePerson) : state.contacts;
+  const agedArchived = yearTurn ? (state.archivedContacts ?? []).map(agePerson) : state.archivedContacts;
+  const notableAgeChanges = yearTurn ? [
+    agedCharacter.portraitId !== state.character.portraitId ? `${state.character.name}의 모습이 세월에 따라 달라졌다.` : "",
+    ...agedContacts.filter((person, index) => person.portraitId !== state.contacts[index]?.portraitId && (person.warmth ?? 0) >= 70).map((person) => `${person.name}의 인상이 세월에 따라 달라졌다.`),
+  ].filter(Boolean) : [];
   return {
-    ...state, week, day: 1, phase: "playing",
+    ...state, character: agedCharacter, contacts: agedContacts, archivedContacts: agedArchived, week, day: 1, phase: "playing",
     evaluatedDays: [], actionDays: [], weeklyActions: {}, weeklyMeetingMomentum: 0, weeklyMeetingContext: undefined, seenEvents: [], lastChoice: undefined,
     stats: { ...state.stats, energy: clamp(state.stats.energy + 12), stress: clamp(state.stats.stress - 7) },
-    log: [`${week}주차가 시작됐다. 지난주의 경험이 생활에 남아 있다.`, ...state.log],
+    log: [...notableAgeChanges, `${week}주차가 시작됐다. 지난주의 경험이 생활에 남아 있다.`, ...state.log],
   };
 }
 export function setPalette(state: GameState, palette: Palette): GameState {

@@ -353,6 +353,20 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .profile-facts small, .profile-facts strong { display: block; }
 .profile-facts small { color: var(--muted); font-size: 9px; }
 .profile-facts strong { margin-top: 6px; font-size: 11px; line-height: 1.45; }
+.appearance-picker { margin: 14px 0; padding: 12px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface-soft); }
+.appearance-picker summary { cursor: pointer; font-size: 11px; font-weight: 700; }
+.appearance-picker summary small { margin-left: 6px; color: var(--muted); font-weight: 500; }
+.portrait-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; max-height: 270px; overflow: auto; padding: 10px 2px 2px; }
+.portrait-choice { min-width: 0; padding: 4px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--muted); cursor: pointer; }
+.portrait-choice.selected { border: 2px solid var(--accent-dark); color: var(--accent-dark); }
+.portrait-choice-image { width: 100%; aspect-ratio: 1; border-radius: 8px; }
+.portrait-choice small { display: block; overflow: hidden; padding: 3px 0 1px; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.appearance-history { margin: 12px 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.appearance-history > strong { font-size: 10px; }
+.appearance-history > div { display: flex; gap: 9px; overflow-x: auto; padding-top: 8px; }
+.appearance-history > div > span { flex: 0 0 58px; text-align: center; }
+.appearance-history i { width: 52px; height: 52px; margin: 0 auto 4px; border-radius: 50%; }
+.appearance-history small { color: var(--muted); font-size: 8px; }
 @media (min-width: 720px) {
   .person-details-modal { border-radius: 24px; }
   .home-hero { min-height: 286px; padding: 31px; }

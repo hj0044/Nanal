@@ -1,4 +1,3 @@
-import atlasUrl from "./assets/npc-portrait-atlas-v1.webp";
 import sourceManifest from "./assets/character-portraits/catalog.json";
 
 export type PersonGender = "남성" | "여성";
@@ -12,9 +11,7 @@ export interface PortraitRecord {
   ageMin: number;
   ageMax: number;
   ageBand: PortraitAgeBand;
-  column?: number;
-  row?: number;
-  source: "atlas" | "single";
+  source: "single";
   filename?: string;
 }
 
@@ -31,23 +28,10 @@ const imageUrls = import.meta.glob<string>("./assets/character-portraits/*.webp"
   eager: true, query: "?url", import: "default",
 });
 const ageBand = (min: number, max: number) => `${min}–${max}세`;
-const atlasAges = [21, 23, 26, 28, 31, 33, 25, 29, 35, 37, 22, 24, 34, 38, 27, 30];
-const atlasGenders: PersonGender[] = ["여성", "남성", "여성", "남성", "남성", "여성", "남성", "여성", "여성", "남성", "여성", "남성", "남성", "여성", "남성", "여성"];
-const atlasPortraits: PortraitRecord[] = atlasAges.map((age, index) => ({
-  id: `npc-${String(index + 1).padStart(2, "0")}`,
-  gender: atlasGenders[index], age, ageMin: age, ageMax: age,
-  ageBand: ageBand(Math.floor(age / 5) * 5, Math.floor(age / 5) * 5 + 4),
-  column: index % 4, row: Math.floor(index / 4), source: "atlas",
-}));
 const usedCharacterIds = new Set<string>();
-const individualPortraits: PortraitRecord[] = (sourceManifest.assets as SourceAsset[])
-  .filter((asset) => asset.runtimeEligible && asset.ageEstimate.min <= 39 && asset.ageEstimate.max >= 20)
+const eligiblePortraits: PortraitRecord[] = (sourceManifest.assets as SourceAsset[])
+  .filter((asset) => asset.runtimeEligible)
   .filter((asset) => imageUrls[`./assets/character-portraits/${asset.filename.split("/").pop()}`])
-  .filter((asset) => {
-    if (usedCharacterIds.has(asset.characterId)) return false;
-    usedCharacterIds.add(asset.characterId);
-    return true;
-  })
   .map((asset) => ({
     id: asset.assetId, characterId: asset.characterId, gender: asset.gender,
     age: Math.round((asset.ageEstimate.min + asset.ageEstimate.max) / 2),
@@ -55,11 +39,47 @@ const individualPortraits: PortraitRecord[] = (sourceManifest.assets as SourceAs
     ageBand: ageBand(asset.ageEstimate.min, asset.ageEstimate.max),
     filename: asset.filename.split("/").pop(), source: "single",
   }));
+export const portraitVariantCatalog: PortraitRecord[] = eligiblePortraits;
+const individualPortraits: PortraitRecord[] = eligiblePortraits
+  .filter((asset) => {
+    const characterId = asset.characterId ?? asset.id;
+    if (usedCharacterIds.has(characterId)) return false;
+    usedCharacterIds.add(characterId);
+    return true;
+  });
 
-export const portraitCatalog: PortraitRecord[] = [...atlasPortraits, ...individualPortraits];
+// Only individually registered generated portraits enter new games. Legacy
+// atlas IDs resolve to undefined and are reassigned while loading old saves.
+export const portraitCatalog: PortraitRecord[] = [...individualPortraits];
 
 export function getPortrait(id?: string): PortraitRecord | undefined {
   return portraitCatalog.find((portrait) => portrait.id === id);
+}
+
+/** Stable visual identity shared by approved alternate portraits of one person. */
+export function getPortraitIdentityId(id?: string): string | undefined {
+  const portrait = getPortrait(id);
+  return portrait?.characterId ?? portrait?.id;
+}
+
+/** Resolve an approved same-person image for a new age stage, if the art pack has one. */
+export function getPortraitAgeVariant(id: string | undefined, age: number): string | undefined {
+  const current = getPortrait(id);
+  if (!current?.characterId || (age >= current.ageMin && age <= current.ageMax)) return id;
+  const options = portraitVariantCatalog
+    .filter((portrait) => portrait.characterId === current.characterId && age >= portrait.ageMin && age <= portrait.ageMax)
+    .sort((a, b) => Math.abs(a.age - age) - Math.abs(b.age - age));
+  return options[0]?.id ?? id;
+}
+
+/** Age- and gender-matched faces, with identities already used in this save removed. */
+export function getPortraitCandidates(gender: PersonGender, age: number, excludedIdentities: string[] = []): PortraitRecord[] {
+  const excluded = new Set(excludedIdentities.map((id) => getPortraitIdentityId(id) ?? id));
+  const pool = portraitCatalog.filter((portrait) =>
+    portrait.gender === gender && !excluded.has(getPortraitIdentityId(portrait.id) ?? portrait.id),
+  );
+  const distance = (portrait: PortraitRecord) => age < portrait.ageMin ? portrait.ageMin - age : age > portrait.ageMax ? age - portrait.ageMax : 0;
+  return pool.sort((a, b) => distance(a) - distance(b) || Math.abs(a.age - age) - Math.abs(b.age - age) || a.id.localeCompare(b.id));
 }
 
 // This is a public image-delivery URL, not an API key. The original assets remain available.
@@ -76,22 +96,21 @@ export function getImageKitPortraitUrl(endpoint: string | undefined, filename: s
 
 export function getPortraitFallbackImageUrl(id?: string): string {
   const portrait = getPortrait(id) ?? portraitCatalog[0];
-  if (portrait.source === "atlas") return atlasUrl;
-  return imageUrls[`./assets/character-portraits/${portrait.filename}`] ?? atlasUrl;
+  return imageUrls[`./assets/character-portraits/${portrait.filename}`] ?? "";
 }
 
 export function getPortraitImageUrl(id?: string): string {
   const portrait = getPortrait(id) ?? portraitCatalog[0];
-  const filename = portrait.source === "atlas" ? "npc-portrait-atlas-v1.webp" : portrait.filename;
+  const filename = portrait.filename;
   return getImageKitPortraitUrl(
     import.meta.env.VITE_IMAGEKIT_URL_ENDPOINT,
-    filename ?? "npc-portrait-atlas-v1.webp",
+    filename ?? "",
     import.meta.env.VITE_IMAGEKIT_PORTRAIT_PATH || "nanal/portraits",
   ) ?? getPortraitFallbackImageUrl(id);
 }
 
 export function choosePortraitId(gender: PersonGender, age: number, seed: number, excluded: string[] = []): string {
-  const available = portraitCatalog.filter((portrait) => portrait.gender === gender && !excluded.includes(portrait.id));
+  const available = getPortraitCandidates(gender, age, excluded);
   const pool = available.length ? available : portraitCatalog.filter((portrait) => portrait.gender === gender);
   const overlapping = pool.filter((portrait) => age >= portrait.ageMin && age <= portrait.ageMax);
   const candidates = overlapping.length ? overlapping : pool.filter((portrait) => {
@@ -109,8 +128,6 @@ export function choosePortraitId(gender: PersonGender, age: number, seed: number
   return candidates[mixed % candidates.length].id;
 }
 
-export function portraitPosition(id?: string): string {
-  const portrait = getPortrait(id) ?? portraitCatalog[0];
-  if (portrait.source === "single") return "center";
-  return `${(portrait.column! / 3) * 100}% ${(portrait.row! / 3) * 100}%`;
+export function portraitPosition(_id?: string): string {
+  return "center";
 }

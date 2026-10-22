@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { addPlayerGoal, advanceDay, advanceDays, chooseEvent, contactArchivedNpc, createGame, createInitialNPCRelationships, generateBodyMetrics, generateContacts, getContactAffiliation, getEventFamily, getNpcRelationshipEvents, getNpcReunionEvents, getPersonalStoryEvents, getPlayerAffiliation, getRelationshipProfile, getWeeklyCashflowPlan, normalizeContactName, personalizeAuthoredEvent, setPlayerGoalStatus, startNextWeek, takeDailyAction, type Character } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
-import { getImageKitPortraitUrl, getPortrait, portraitCatalog } from "./portrait-catalog";
+import { getImageKitPortraitUrl, getPortrait, getPortraitCandidates, getPortraitIdentityId, portraitCatalog } from "./portrait-catalog";
 
 const character: Character = {
   name: "지우", age: 24, year: 2024, background: "student",
@@ -202,13 +202,41 @@ describe("first week simulation", () => {
     expect(first.character.portraitId).toBe(second.character.portraitId);
     expect(first.contacts.map((person) => person.portraitId)).toEqual(second.contacts.map((person) => person.portraitId));
     expect(new Set([first.character.portraitId, ...first.contacts.map((person) => person.portraitId)]).size).toBe(13);
+    expect(new Set([first.character.portraitId, ...first.contacts.map((person) => person.portraitId)].map(getPortraitIdentityId)).size).toBe(13);
     expect(first.contacts.every((person) => getPortrait(person.portraitId)?.gender === person.gender)).toBe(true);
     expect(first.contacts.every((person) => getPortrait(person.portraitId)?.ageBand === person.portraitAgeBand)).toBe(true);
-    expect(portraitCatalog).toHaveLength(62);
-    expect(new Set(portraitCatalog.map((portrait) => portrait.id)).size).toBe(62);
+    expect(portraitCatalog).toHaveLength(46);
+    expect(new Set(portraitCatalog.map((portrait) => portrait.id)).size).toBe(46);
+    expect(getPortrait("npc-01")).toBeUndefined();
     expect(getPortrait("p-m24-new-07")?.gender).toBe("여성");
     const individual = portraitCatalog.filter((portrait) => portrait.source === "single");
     expect(new Set(individual.map((portrait) => portrait.characterId)).size).toBe(individual.length);
+  });
+
+  it("offers age- and gender-matched manual faces while excluding identities already used in the save", () => {
+    const selected = portraitCatalog.find((portrait) => portrait.gender === "여성")!;
+    const options = getPortraitCandidates("여성", selected.age, [selected.id]);
+    expect(options.every((portrait) => portrait.gender === "여성")).toBe(true);
+    expect(options.some((portrait) => getPortraitIdentityId(portrait.id) === getPortraitIdentityId(selected.id))).toBe(false);
+    expect(options[0].ageMin <= selected.age && options[0].ageMax >= selected.age).toBe(true);
+  });
+
+  it("keeps a manually chosen player face and never assigns that visual identity to an NPC", () => {
+    const chosen = portraitCatalog.find((portrait) => portrait.gender === character.gender && character.age >= portrait.ageMin && character.age <= portrait.ageMax)!;
+    const game = createGame({ ...character, portraitId: chosen.id }, 72391);
+    const identities = [game.character.portraitId, ...game.contacts.map((person) => person.portraitId)].map(getPortraitIdentityId);
+    expect(game.character.portraitId).toBe(chosen.id);
+    expect(new Set(identities).size).toBe(identities.length);
+  });
+
+  it("ages the player and NPCs once at each simulated year boundary", () => {
+    const state = createGame(character, 72392);
+    const next = startNextWeek({ ...state, week: 52, phase: "summary" });
+    expect(next.week).toBe(53);
+    expect(next.character.age).toBe(character.age + 1);
+    expect(next.contacts.every((person, index) => person.age === state.contacts[index].age! + 1)).toBe(true);
+    const ordinaryWeek = startNextWeek({ ...state, week: 1, phase: "summary" });
+    expect(ordinaryWeek.character.age).toBe(character.age);
   });
 
   it("reassigns portraits for a new game seed but keeps each save reproducible", () => {
