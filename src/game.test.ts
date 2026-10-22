@@ -14,6 +14,20 @@ function finishWeek(state: ReturnType<typeof createGame>) {
 }
 
 describe("first week simulation", () => {
+  it("keeps the featured person tied to the latest targeted interaction", () => {
+    const state = createGame(character, 71000);
+    const target = state.contacts[3];
+    const social = takeDailyAction(state, "social", target.id);
+    expect(social.lastChoiceContactIds).toEqual([target.id]);
+    expect(social.contacts[3].note).toContain(target.name);
+
+    const ambientEvent = chooseEvent({ ...state, phase: "event", pendingEvent: {
+      id: "ambient-check", title: "하루의 선택", eyebrow: "일상", body: "잠시 생각했다.",
+      choices: [{ id: "quiet", title: "계속 생각한다", detail: "", result: "잠시 생각을 정리했다.", effect: {} }],
+    } }, "quiet");
+    expect(ambientEvent.lastChoiceContactIds).toEqual([]);
+  });
+
   it("connects daily actions to save-local player goals and caps concurrent goals at three", () => {
     let state = createGame(character, 71001);
     state = addPlayerGoal(state, "learning-skill");

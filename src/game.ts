@@ -188,6 +188,8 @@ export interface GameState {
   log: string[];
   pendingEvent?: LifeEvent;
   lastChoice?: string;
+  /** NPCs directly involved in the latest player action or event choice. */
+  lastChoiceContactIds?: string[];
   settings: {
     palette: Palette;
     nightMode: "off" | "device" | "schedule";
@@ -782,6 +784,9 @@ export function takeDailyAction(state: GameState, action: DailyAction, targetCon
     : selected.log;
   const next: GameState = {
     ...state,
+    lastChoiceContactIds: selectedContactIndex !== undefined && selectedContactIndex >= 0
+      ? [state.contacts[selectedContactIndex].id]
+      : [],
     actionDays: [...(state.actionDays ?? []), actionDay],
     weeklyActions: { ...(state.weeklyActions ?? {}), [action]: ((state.weeklyActions ?? {})[action] ?? 0) + 1 },
     stats: {
@@ -806,6 +811,15 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
   if (!choice) return state;
   const effect = choice.effect;
   const pairMeta = state.pendingEvent.npcPair;
+  const involvedContactIds = pairMeta
+    ? [pairMeta.contactAId, pairMeta.contactBId]
+    : state.pendingEvent.personalStory?.contactId || state.pendingEvent.reunion?.contactId
+      ? [state.pendingEvent.personalStory?.contactId ?? state.pendingEvent.reunion!.contactId]
+      : choice.contactId
+        ? [choice.contactId]
+        : choice.contactIndex !== undefined && state.contacts[choice.contactIndex]
+          ? [state.contacts[choice.contactIndex].id]
+          : [];
   const npcRelationships = pairMeta ? (state.npcRelationships ?? []).map((link) => link.id === pairMeta.linkId
     ? { ...link, warmth: clamp(link.warmth + (effect.npcRelationship ?? 0)), lastInteractionWeek: state.week, ...(pairMeta.kind === "romance" ? { romanceStatus: "dating" as const } : {}) }
     : link) : state.npcRelationships;
@@ -814,6 +828,7 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
     : contact) : state.contacts;
   const next: GameState = {
     ...state,
+    lastChoiceContactIds: involvedContactIds,
     phase: "playing",
     pendingEvent: undefined,
     lastChoice: choice.result,

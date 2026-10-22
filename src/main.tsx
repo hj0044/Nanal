@@ -268,7 +268,7 @@ function LifeView({ game, onAdvance, onAction, onChoice, onNextWeek, onSelectPer
   const date = new Date(game.character.year, 0, (game.week - 1) * 7 + game.day);
   const dateLabel = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric" }).format(date);
   const weekday = new Intl.DateTimeFormat("ko-KR", { weekday: "short" }).format(date);
-  const featured = game.contacts[0];
+  const featured = game.lastChoiceContactIds?.map((id) => game.contacts.find((person) => person.id === id)).find(Boolean) ?? game.contacts[0];
   const energyLabel = game.stats.energy >= 70 ? "좋음" : game.stats.energy >= 40 ? "보통" : "피곤함";
   const scheduleLabel = game.phase === "event" ? "이벤트 선택" : game.phase === "summary" ? "주간 정산" : "일상 진행";
   const actionUsed = (game.actionDays ?? []).includes(`${game.week}-${game.day}`);
@@ -302,7 +302,7 @@ function LifeView({ game, onAdvance, onAction, onChoice, onNextWeek, onSelectPer
         </section>
       )}
       {showResult && game.lastChoice && <div className="toast-result"><span className="toast-check">✓</span><span>{game.lastChoice}</span><button onClick={() => setShowResult(false)} aria-label="닫기">×</button></div>}
-      {featured && <section className="feed-section"><div className="section-heading"><div><span className="section-kicker">PEOPLE AROUND YOU</span><h2>이번 생활의 인물</h2></div><span className="quiet-label">누르면 상세 정보</span></div><button className="featured-person" onClick={() => onSelectPerson(featured)}><CharacterAvatar name={featured.name} className="featured-portrait" /><span className="featured-copy"><strong>{featured.name} · {featured.role}</strong><span>{game.lastChoice || featured.note}</span><small>관계 온도 {featured.warmth} · 자세히 보기</small></span><span className="featured-arrow">›</span></button><div className="recent-log"><div className="section-heading"><h2>최근 이야기</h2><span className="quiet-label">이번 생의 흐름</span></div>{game.log.slice(0, 2).map((line, i) => <div className="feed-item" key={`${line}-${i}`}><span className={i === 0 ? "feed-marker current" : "feed-marker"} /><p>{line}</p><span className="feed-time">{i === 0 ? "방금" : "이전"}</span></div>)}</div></section>}
+      {featured && <section className="feed-section"><div className="section-heading"><div><span className="section-kicker">PEOPLE AROUND YOU</span><h2>이번 생활의 인물</h2></div><span className="quiet-label">누르면 상세 정보</span></div><button className="featured-person" onClick={() => onSelectPerson(featured)}><CharacterAvatar name={featured.name} className="featured-portrait" /><span className="featured-copy"><strong>{featured.name} · {featured.role}</strong><span>{featured.note}</span><small>관계 온도 {featured.warmth} · 자세히 보기</small></span><span className="featured-arrow">›</span></button><div className="recent-log"><div className="section-heading"><h2>최근 이야기</h2><span className="quiet-label">이번 생의 흐름</span></div>{game.log.slice(0, 2).map((line, i) => <div className="feed-item" key={`${line}-${i}`}><span className={i === 0 ? "feed-marker current" : "feed-marker"} /><p>{line}</p><span className="feed-time">{i === 0 ? "방금" : "이전"}</span></div>)}</div></section>}
     </>
   );
 }
