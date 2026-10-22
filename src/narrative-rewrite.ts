@@ -135,7 +135,8 @@ export function buildNarrativeRewriteRequest(event: LifeEvent, state: GameState)
       family: getEventFamily(event),
       title: scrub(event.title), eyebrow: scrub(event.eyebrow), body: scrub(event.body),
       speakerPresent: Boolean(event.npcDialogue),
-      choices: event.choices.map(({ id, title, detail, result }) => ({ id, title: scrub(title), detail: scrub(detail), result: scrub(result) })),
+      // Use positional aliases: some authored choice IDs include NPC relationship IDs.
+      choices: event.choices.map(({ title, detail, result }, index) => ({ id: `choice-${index}`, title: scrub(title), detail: scrub(detail), result: scrub(result) })),
     },
   };
 }
@@ -161,9 +162,10 @@ export function applyNarrativeRewrite(event: LifeEvent, value: unknown, state: G
     if (typeof choice.id !== "string" || returned.has(choice.id)) return undefined;
     returned.set(choice.id, choice);
   }
-  if (returned.size !== event.choices.length || event.choices.some((choice) => !returned.has(choice.id))) return undefined;
-  const choices = event.choices.map((choice) => {
-    const rewritten = returned.get(choice.id)!;
+  const expectedIds = event.choices.map((_, index) => `choice-${index}`);
+  if (returned.size !== expectedIds.length || expectedIds.some((id) => !returned.has(id))) return undefined;
+  const choices = event.choices.map((choice, index) => {
+    const rewritten = returned.get(`choice-${index}`)!;
     const rewrittenTitle = cleanText(rewritten.title, 64);
     const detail = cleanText(rewritten.detail, 100);
     const result = cleanText(rewritten.result, 220);
@@ -184,6 +186,7 @@ export function applyNarrativeRewrite(event: LifeEvent, value: unknown, state: G
 }
 
 export async function rewriteNarrative(event: LifeEvent, state: GameState, signal: AbortSignal): Promise<LifeEvent | undefined> {
+  if (event.choices.length < 2 || event.choices.length > 3) return undefined;
   const response = await fetch("/api/narrative-event", {
     method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
     body: JSON.stringify(buildNarrativeRewriteRequest(event, state)), signal,
