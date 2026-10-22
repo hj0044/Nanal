@@ -1,1 +1,6 @@
-/// <reference types="vite/client" />\ndeclare module "*.webp" {\n  const assetUrl: string;\n  export default assetUrl;\n}\n\n
+/// <reference types="vite/client" />
+declare module "*.webp" {
+  const assetUrl: string;
+  export default assetUrl;
+}
+
