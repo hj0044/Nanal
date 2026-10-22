@@ -19,6 +19,8 @@ describe("first week simulation", () => {
     state = addPlayerGoal(state, "learning-skill");
     state = addPlayerGoal(state, "career-direction");
     state = addPlayerGoal(state, "relationship-close");
+    const duplicateCategory = addPlayerGoal(state, "career-step");
+    expect(duplicateCategory.playerGoals).toHaveLength(3);
     const full = addPlayerGoal(state, "health-rhythm");
     expect(full.playerGoals).toHaveLength(3);
     const advanced = takeDailyAction(state, "focus");
