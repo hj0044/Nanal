@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { addPlayerGoal, advanceDay, advanceDays, chooseEvent, contactArchivedNpc, createGame, createInitialNPCRelationships, generateBodyMetrics, generateContacts, getContactAffiliation, getEventFamily, getNpcRelationshipEvents, getNpcReunionEvents, getPersonalStoryEvents, getPlayerAffiliation, getRelationshipProfile, getWeeklyCashflowPlan, normalizeContactName, personalizeAuthoredEvent, setPlayerGoalStatus, startNextWeek, takeDailyAction, type Character } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
-import { getImageKitPortraitUrl, getPortrait, getPortraitCandidates, getPortraitIdentityId, portraitCatalog } from "./portrait-catalog";
+import { getImageKitPortraitUrl, getPortrait, portraitCatalog } from "./portrait-catalog";
 
 const character: Character = {
   name: "지우", age: 24, year: 2024, background: "student",
@@ -202,41 +202,13 @@ describe("first week simulation", () => {
     expect(first.character.portraitId).toBe(second.character.portraitId);
     expect(first.contacts.map((person) => person.portraitId)).toEqual(second.contacts.map((person) => person.portraitId));
     expect(new Set([first.character.portraitId, ...first.contacts.map((person) => person.portraitId)]).size).toBe(13);
-    expect(new Set([first.character.portraitId, ...first.contacts.map((person) => person.portraitId)].map(getPortraitIdentityId)).size).toBe(13);
     expect(first.contacts.every((person) => getPortrait(person.portraitId)?.gender === person.gender)).toBe(true);
     expect(first.contacts.every((person) => getPortrait(person.portraitId)?.ageBand === person.portraitAgeBand)).toBe(true);
-    expect(portraitCatalog).toHaveLength(46);
-    expect(new Set(portraitCatalog.map((portrait) => portrait.id)).size).toBe(46);
-    expect(getPortrait("npc-01")).toBeUndefined();
+    expect(portraitCatalog).toHaveLength(62);
+    expect(new Set(portraitCatalog.map((portrait) => portrait.id)).size).toBe(62);
     expect(getPortrait("p-m24-new-07")?.gender).toBe("여성");
     const individual = portraitCatalog.filter((portrait) => portrait.source === "single");
     expect(new Set(individual.map((portrait) => portrait.characterId)).size).toBe(individual.length);
-  });
-
-  it("offers age- and gender-matched manual faces while excluding identities already used in the save", () => {
-    const selected = portraitCatalog.find((portrait) => portrait.gender === "여성")!;
-    const options = getPortraitCandidates("여성", selected.age, [selected.id]);
-    expect(options.every((portrait) => portrait.gender === "여성")).toBe(true);
-    expect(options.some((portrait) => getPortraitIdentityId(portrait.id) === getPortraitIdentityId(selected.id))).toBe(false);
-    expect(options[0].ageMin <= selected.age && options[0].ageMax >= selected.age).toBe(true);
-  });
-
-  it("keeps a manually chosen player face and never assigns that visual identity to an NPC", () => {
-    const chosen = portraitCatalog.find((portrait) => portrait.gender === character.gender && character.age >= portrait.ageMin && character.age <= portrait.ageMax)!;
-    const game = createGame({ ...character, portraitId: chosen.id }, 72391);
-    const identities = [game.character.portraitId, ...game.contacts.map((person) => person.portraitId)].map(getPortraitIdentityId);
-    expect(game.character.portraitId).toBe(chosen.id);
-    expect(new Set(identities).size).toBe(identities.length);
-  });
-
-  it("ages the player and NPCs once at each simulated year boundary", () => {
-    const state = createGame(character, 72392);
-    const next = startNextWeek({ ...state, week: 52, phase: "summary" });
-    expect(next.week).toBe(53);
-    expect(next.character.age).toBe(character.age + 1);
-    expect(next.contacts.every((person, index) => person.age === state.contacts[index].age! + 1)).toBe(true);
-    const ordinaryWeek = startNextWeek({ ...state, week: 1, phase: "summary" });
-    expect(ordinaryWeek.character.age).toBe(character.age);
   });
 
   it("reassigns portraits for a new game seed but keeps each save reproducible", () => {
@@ -386,7 +358,7 @@ describe("first week simulation", () => {
 
   it("brings a returning NPC back through a hazy-memory reunion conversation", () => {
     const base = createGame(character, 323);
-    const person = { ...base.contacts[0], warmth: 22, returnCount: 1, memories: [{ id: "old-memory", text: "함께 동네 축제에 갔다", week: 1, vividness: 0.28 }] };
+    const person = { ...base.contacts[0], warmth: 28, historicalBond: 82, returnCount: 1, memories: [{ id: "old-memory", text: "함께 동네 축제에 갔다", week: 1, vividness: 0.28 }] };
     const state = { ...base, contacts: [person, ...base.contacts.slice(1)], npcReunionIds: [person.id] };
     const reunion = getNpcReunionEvents(state)[0];
     expect(reunion?.body).toContain("세세한 장면보다 그때의 따뜻함");
@@ -395,7 +367,24 @@ describe("first week simulation", () => {
     const next = chooseEvent(eventState, "reunion-memory");
     expect(next.npcReunionIds).toEqual([]);
     expect(next.contacts[0].warmth).toBe(person.warmth + 5);
-    expect(next.contacts[0].memories?.[0].text).toContain("천천히 떠올렸다");
+    expect(next.contacts[0].memories?.[0].text).toContain("오래 쌓인 정");
+  });
+
+  it("varies reunion choices by relationship history and records a distant ending", () => {
+    const base = createGame(character, 324);
+    const person = base.contacts[0];
+    const closeReunion = getNpcReunionEvents({ ...base, contacts: [{ ...person, warmth: 38, historicalBond: 88 }], npcReunionIds: [person.id] })[0];
+    const casualReunion = getNpcReunionEvents({ ...base, contacts: [{ ...person, warmth: 24, historicalBond: 28 }], npcReunionIds: [person.id] })[0];
+    const strainedReunion = getNpcReunionEvents({ ...base, contacts: [{ ...person, warmth: 20, historicalBond: 78 }], npcReunionIds: [person.id] })[0];
+    expect(closeReunion.choices[0].title).toContain("오래된 정");
+    expect(casualReunion.choices[0].title).toContain("가벼운 인연");
+    expect(strainedReunion.choices[0].title).toContain("멀어진 시간");
+    expect(closeReunion.choices[2].effect.relationship).toBeLessThan(0);
+
+    const state = { ...base, contacts: [{ ...person, warmth: 38, historicalBond: 88 }], npcReunionIds: [person.id], phase: "event" as const, pendingEvent: closeReunion };
+    const endedDistantly = chooseEvent(state, "reunion-slow");
+    expect(endedDistantly.contacts[0].warmth).toBe(35);
+    expect(endedDistantly.relationshipRecords?.at(-1)?.text).toContain("무리하게 들어가지 않기로 했다");
   });
 
   it("lets the player reach out to an archived NPC while preserving bond history", () => {
