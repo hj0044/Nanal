@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 20074)
+Total output lines: 1106
+
 export type Background = "student" | "jobseeker" | "worker";
 export type Palette = "clean" | "warm" | "dark";
 export type SensitiveTopic = "affair" | "illness" | "pregnancy";
@@ -65,7 +68,12 @@ export interface PlayerGoal {
   createdWeek: number;
   completedWeek?: number;
   lastProgressWeek?: number;
+  weeklyProgress?: number;
+  reviewDue?: boolean;
+  cycleNumber?: number;
 }
+export const PLAYER_GOAL_CYCLE_WEEKS = 4;
+export const PLAYER_GOAL_WEEKLY_TARGET = 2;
 export const playerGoalTemplates: Array<Pick<PlayerGoal, "id" | "title" | "category" | "target">> = [
   { id: "career-direction", title: "내게 맞는 진로 방향 찾기", category: "career", target: 8 },
   { id: "career-step", title: "일에서 다음 단계로 나아가기", category: "career", target: 8 },
@@ -566,11 +574,7 @@ export function getNpcRelationshipEvents(state: GameState): LifeEvent[] {
         : link.warmth >= 76 && !link.romanceStatus ? "bond" : undefined;
     if (!kind) return [];
     const id = `npc-pair-${kind}-${link.id}`;
-    if ((state.eventLastSeenWeek?.[id] ?? -100) > state.week - 3) return [];
-    return [{ link, a, b, kind, id }];
-  }).sort((left, right) => {
-    const priority = (kind: string) => kind === "conflict" ? 0 : kind === "reconciliation" ? 1 : 2;
-    return priority(left.kind) - priority(right.kind) || left.link.warmth - right.link.warmth || left.link.id.localeCompare(right.link.id);
+    if ((state.eventLastSeenWeek?.[id] ?? -100) > state.week -…74 tokens truncated…localeCompare(right.link.id);
   });
   const selected = candidates[0];
   if (!selected) return [];
@@ -892,7 +896,7 @@ export function addPlayerGoal(state: GameState, templateId: string): GameState {
   if (!template || (state.playerGoals ?? []).some((goal) => goal.id === template.id)) return state;
   const activeGoals = (state.playerGoals ?? []).filter((goal) => goal.status === "active");
   if (activeGoals.length >= 3 || activeGoals.some((goal) => goal.category === template.category)) return state;
-  const goal: PlayerGoal = { ...template, progress: 0, status: "active", createdWeek: state.week };
+  const goal: PlayerGoal = { ...template, progress: 0, status: "active", createdWeek: state.week, weeklyProgress: 0, cycleNumber: 1 };
   return { ...state, playerGoals: [...(state.playerGoals ?? []), goal], log: [`새 목표를 정했다: ${goal.title}`, ...state.log] };
 }
 
@@ -901,7 +905,12 @@ export function setPlayerGoalStatus(state: GameState, goalId: string, status: "a
   const target = goals.find((goal) => goal.id === goalId);
   if (!target || target.status === "completed") return state;
   if (status === "active" && goals.filter((goal) => goal.status === "active" && goal.id !== goalId).length >= 3) return state;
-  return { ...state, playerGoals: goals.map((goal) => goal.id === goalId ? { ...goal, status } : goal) };
+  return { ...state, playerGoals: goals.map((goal) => {
+    if (goal.id !== goalId) return goal;
+    return status === "active" && goal.reviewDue
+      ? { ...goal, status, createdWeek: state.week, weeklyProgress: 0, reviewDue: false, cycleNumber: (goal.cycleNumber ?? 1) + 1 }
+      : { ...goal, status };
+  }) };
 }
 
 function progressPlayerGoals(state: GameState, category: GoalCategory, points: number): GameState {
@@ -914,9 +923,9 @@ function progressPlayerGoals(state: GameState, category: GoalCategory, points: n
     const progress = Math.min(goal.target, goal.progress + points);
     if (progress >= goal.target) {
       completedTitle = goal.title;
-      return { ...goal, progress, status: "completed" as const, completedWeek: state.week, lastProgressWeek: state.week };
+      return { ...goal, progress, status: "completed" as const, completedWeek: state.week, lastProgressWeek: state.week, weeklyProgress: Math.min(PLAYER_GOAL_WEEKLY_TARGET, (goal.weeklyProgress ?? 0) + points) };
     }
-    return { ...goal, progress, lastProgressWeek: state.week };
+    return { ...goal, progress, weeklyProgress: Math.min(PLAYER_GOAL_WEEKLY_TARGET, (goal.weeklyProgress ?? 0) + points), lastProgressWeek: state.week };
   });
   return {
     ...state,
@@ -1062,6 +1071,9 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
 export function startNextWeek(state: GameState): GameState {
   if (state.phase !== "summary") return state;
   const week = state.week + 1;
+  const playerGoals = (state.playerGoals ?? []).map((goal) => goal.status === "active" && state.week - goal.createdWeek >= PLAYER_GOAL_CYCLE_WEEKS - 1
+    ? { ...goal, status: "paused" as const, reviewDue: true, weeklyProgress: 0 }
+    : { ...goal, weeklyProgress: 0 });
   const yearTurn = week > 1 && (week - 1) % 52 === 0;
   const agePerson = <T extends { age?: number; portraitId?: string; portraitAgeBand?: string; appearanceHistory?: AppearanceSnapshot[]; warmth?: number; name?: string }>(person: T): T => {
     if (!yearTurn || person.age === undefined) return person;
@@ -1081,6 +1093,7 @@ export function startNextWeek(state: GameState): GameState {
   ].filter(Boolean) : [];
   return {
     ...state, character: agedCharacter, contacts: agedContacts, archivedContacts: agedArchived, week, day: 1, phase: "playing",
+    playerGoals,
     evaluatedDays: [], actionDays: [], weeklyActions: {}, weeklyMeetingMomentum: 0, weeklyMeetingContext: undefined, seenEvents: [], lastChoice: undefined,
     stats: { ...state.stats, energy: clamp(state.stats.energy + 12), stress: clamp(state.stats.stress - 7) },
     log: [...notableAgeChanges, `${week}주차가 시작됐다. 지난주의 경험이 생활에 남아 있다.`, ...state.log],
