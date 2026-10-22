@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   addPlayerGoal, advanceDays, backgroundLabels, chooseEvent, contactArchivedNpc, createGame, createInitialNPCRelationships, createSeed, generateBodyMetrics, generateContacts, generateName, getContactAffiliation, getPlayerAffiliation, getWeeklyCashflowPlan, normalizeContactName, playerGoalTemplates, setPlayerGoalStatus, startNextWeek, takeDailyAction,
@@ -7,6 +7,7 @@ import {
 } from "./game";
 import "./style.css";
 import { choosePortraitId, getPortrait, getPortraitIdentityId } from "./portrait-catalog";
+import { rewriteNarrative } from "./narrative-rewrite";
 
 const SAVE_KEY = "nanal-save-v1";
 const backgroundChoices: Background[] = ["student", "jobseeker", "worker"];
@@ -91,6 +92,35 @@ function App() {
   const [showCreator, setShowCreator] = useState(!readSave());
   const [importMessage, setImportMessage] = useState("");
   const [nightNow, setNightNow] = useState(false);
+  const [narrativeAvailable, setNarrativeAvailable] = useState(false);
+  const narrativeRequests = useRef(new Set<string>());
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/narrative-status", { credentials: "same-origin", signal: controller.signal })
+      .then((response) => response.ok ? response.json() : { available: false })
+      .then((status: { available?: unknown }) => setNarrativeAvailable(status.available === true))
+      .catch(() => setNarrativeAvailable(false));
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const event = game?.phase === "event" ? game.pendingEvent : undefined;
+    if (!game || !event || !narrativeAvailable || event.narrativeCopyGenerated) return;
+    const requestKey = `${game.week}:${game.day}:${event.id}`;
+    if (narrativeRequests.current.has(requestKey)) return;
+    narrativeRequests.current.add(requestKey);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 18_000);
+    rewriteNarrative(event, game, controller.signal).then((rewritten) => {
+      if (!rewritten) return;
+      setGame((current) => current?.phase === "event" && current.pendingEvent?.id === event.id
+        ? { ...current, pendingEvent: rewritten }
+        : current);
+    }).catch(() => { /* Curated text stays playable when the narrative service is unavailable. */ })
+      .finally(() => window.clearTimeout(timeout));
+    return () => { window.clearTimeout(timeout); controller.abort(); };
+  }, [game?.phase, game?.pendingEvent?.id, game?.week, game?.day, narrativeAvailable]);
 
   useEffect(() => {
     if (!game) { document.documentElement.dataset.palette = "clean"; return; }
