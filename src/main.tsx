@@ -345,7 +345,7 @@ function WorkView({ game }: { game: GameState }) {
 function GoalsView({ game, onAdd, onStatus }: { game: GameState; onAdd: (id: string) => void; onStatus: (id: string, status: "active" | "paused") => void }) {
   const goals = game.playerGoals ?? [];
   const active = goals.filter((goal) => goal.status === "active");
-  const available = playerGoalTemplates.filter((template) => !active.some((goal) => goal.id === template.id));
+  const available = playerGoalTemplates.filter((template) => !goals.some((goal) => goal.id === template.id) && !active.some((goal) => goal.category === template.category));
   const [selectedTemplate, setSelectedTemplate] = useState(available[0]?.id ?? "");
   useEffect(() => { if (!available.some((goal) => goal.id === selectedTemplate)) setSelectedTemplate(available[0]?.id ?? ""); }, [available, selectedTemplate]);
   const categoryLabel: Record<string, string> = { career: "일·진로", learning: "학습", relationship: "관계", health: "건강", finance: "경제", personal: "생활" };
