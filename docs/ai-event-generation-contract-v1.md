@@ -10,7 +10,7 @@ When the endpoint is missing, unavailable, slow, or returns invalid output, the 
 
 ## Request contract
 
-The browser sends a schema version, the selected event's sanitized copy, and a small context object. The request excludes:
+The browser sends a schema version, the selected event's sanitized copy, and a small context object. Choice IDs are replaced with positional aliases (`choice-0`, `choice-1`, and `choice-2`) so dynamic NPC link IDs are not exposed. The request excludes:
 
 - player and NPC names, stable NPC IDs, and portrait identifiers
 - free-text memories and goals
