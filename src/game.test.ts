@@ -87,9 +87,30 @@ describe("first week simulation", () => {
     expect(full.playerGoals).toHaveLength(3);
     const advanced = takeDailyAction(state, "focus");
     expect(advanced.playerGoals?.find((goal) => goal.id === "learning-skill")?.progress).toBe(1);
+    expect(advanced.playerGoals?.find((goal) => goal.id === "learning-skill")?.weeklyProgress).toBe(1);
     expect(advanced.playerGoals?.find((goal) => goal.id === "career-direction")?.progress).toBe(0);
     const paused = setPlayerGoalStatus(advanced, "learning-skill", "paused");
     expect(addPlayerGoal(paused, "health-rhythm").playerGoals?.some((goal) => goal.id === "health-rhythm" && goal.status === "active")).toBe(true);
+  });
+
+  it("tracks a four-week goal cycle and pauses unfinished goals for review", () => {
+    let state = addPlayerGoal(createGame(character, 71003), "learning-skill");
+    const goal = state.playerGoals![0];
+    state = { ...state, week: 4, phase: "summary", playerGoals: [{ ...goal, progress: 5, weeklyProgress: 2 }] };
+    const weekFive = startNextWeek(state);
+    expect(weekFive.playerGoals?.[0]).toMatchObject({ status: "paused", reviewDue: true, weeklyProgress: 0, progress: 5 });
+    const continued = setPlayerGoalStatus(weekFive, goal.id, "active");
+    expect(continued.playerGoals?.[0]).toMatchObject({ status: "active", reviewDue: false, createdWeek: 5, cycleNumber: 2, progress: 5, weeklyProgress: 0 });
+  });
+
+  it("resets weekly goal progress while preserving compatible older goal saves", () => {
+    const state = addPlayerGoal(createGame(character, 71004), "health-rhythm");
+    const oldGoal = { ...state.playerGoals![0] };
+    delete oldGoal.weeklyProgress;
+    delete oldGoal.cycleNumber;
+    const next = startNextWeek({ ...state, phase: "summary", playerGoals: [oldGoal] });
+    expect(next.playerGoals?.[0]).toMatchObject({ weeklyProgress: 0, progress: 0 });
+    expect(next.playerGoals?.[0].cycleNumber).toBeUndefined();
   });
 
   it("lets a related event choice move one goal and records completion", () => {
