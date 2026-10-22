@@ -34,7 +34,13 @@ The client also re-sanitizes returned prose to prevent names or NPC goal text fr
 3. Abort a slow client request and use the curated text on timeout, endpoint failure, invalid content, or quota exhaustion.
 4. Apply a response only if the same event is still open; never advance a day twice.
 5. Keep sensitive-topic policy and relationship mechanics in the game engine.
-6. Preserve the host's server routes when packaging a new frontend build. The current Nanal Site owns the Gemini route and its secret; this repository owns the maintainable game source.
+6. Preserve the host's server routes when packaging a new frontend build. `src/narrative-api.ts` now contains the portable source handler for both routes. A host Worker must call `handleNarrativeApi(request, env)` and return its response when non-undefined; other paths continue through the host's existing handler. Keep `NANAL_GEMINI_API_KEY` as a server-side secret. `NANAL_GEMINI_MODEL` is optional and defaults to `gemini-3.8-flash`.
+
+## Server handler integration
+
+The source handler owns `/api/narrative-status` and `/api/narrative-event`. It checks same-origin requests, caps request bodies at 18,000 characters, validates enum values and text lengths, times out provider calls after 30 seconds, and checks Gemini output against the original choice IDs and text limits. It returns `undefined` for paths it does not own so a host can retain unrelated routes. The handler does not add CORS headers.
+
+The GitHub source can now maintain the handler, but the deployed Site Worker still needs to import and dispatch to this module when a new source build is packaged. Do not remove the existing host route until that integration is included and verified.
 
 ## Acceptance checks
 
