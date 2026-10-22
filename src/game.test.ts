@@ -3,6 +3,7 @@ import { addPlayerGoal, advanceDay, advanceDays, chooseEvent, contactArchivedNpc
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
 import { applyNarrativeRewrite, buildNarrativeRewriteRequest } from "./narrative-rewrite";
+import { getEventThreadEvents } from "./event-threads";
 import { getPortrait, getPortraitCandidates, getPortraitIdentityId, portraitCatalog } from "./portrait-catalog";
 
 const character: Character = {
@@ -527,7 +528,7 @@ describe("first week simulation", () => {
         if (previousWeek !== undefined) expect(state.week - previousWeek).toBeGreaterThanOrEqual(8);
         const family = getEventFamily(state.pendingEvent);
         const lastFamilyWeek = familyLastSeen.get(family);
-        if (lastFamilyWeek !== undefined) expect(state.week - lastFamilyWeek).toBeGreaterThanOrEqual(2);
+        if (!(state.pendingEvent.thread && state.pendingEvent.thread.stage > 0) && lastFamilyWeek !== undefined) expect(state.week - lastFamilyWeek).toBeGreaterThanOrEqual(2);
         familyLastSeen.set(family, state.week);
         state = chooseEvent(state, state.pendingEvent.choices[0].id);
         choicesMade += 1;
@@ -606,7 +607,7 @@ describe("first week simulation", () => {
 
   it("settles each background's weekly cashflow once and records any shortfall", () => {
     const studentPlan = getWeeklyCashflowPlan({ ...character, housing: "자취" });
-    expect(studentPlan).toMatchObject({ income: 150_000, livingExpenses: 155_000, housingExpenses: 130_000, expenses: 285_000, net: -135_000 });
+    expect(studentPlan).toMatchObject({ income: 220_000, livingExpenses: 155_000, housingExpenses: 130_000, expenses: 285_000, net: -65_000 });
     const seekerPlan = getWeeklyCashflowPlan({ ...character, background: "jobseeker", housing: "자취" });
     const workerPlan = getWeeklyCashflowPlan({ ...character, background: "worker", housing: "가족과 동거" });
     expect(seekerPlan.net).toBeLessThan(0);
@@ -617,7 +618,7 @@ describe("first week simulation", () => {
     const summary = advanceDay(atWeekEnd);
     expect(summary.phase).toBe("summary");
     expect(summary.stats.money).toBe(300_000 + studentPlan.net);
-    expect(summary.weeklyCashflow).toMatchObject({ week: 1, income: 150_000, expenses: 285_000, endingBalance: 165_000 });
+    expect(summary.weeklyCashflow).toMatchObject({ week: 1, income: 220_000, expenses: 285_000, endingBalance: 235_000 });
     const nextWeek = startNextWeek(summary);
     expect(nextWeek.stats.money).toBe(summary.stats.money);
     expect(nextWeek.weeklyCashflow).toEqual(summary.weeklyCashflow);
@@ -627,6 +628,62 @@ describe("first week simulation", () => {
     expect(shortfall.stats.money).toBe(0);
     expect(shortfall.weeklyCashflow?.unpaidExpenses).toBe(seekerPlan.expenses - seekerPlan.income);
     expect(shortfall.stats.stress).toBe(25);
+  });
+
+  it("makes non-worker housing costs survivable through a visible paid daily action", () => {
+    const studentFamily = getWeeklyCashflowPlan({ ...character, housing: "가족과 동거" });
+    const studentSolo = getWeeklyCashflowPlan({ ...character, housing: "자취" });
+    const seekerFamily = getWeeklyCashflowPlan({ ...character, background: "jobseeker", housing: "가족과 동거" });
+    const seekerSolo = getWeeklyCashflowPlan({ ...character, background: "jobseeker", housing: "자취" });
+    expect(studentFamily.net).toBe(65_000);
+    expect(studentSolo.net).toBe(-65_000);
+    expect(seekerFamily.net).toBe(0);
+    expect(seekerSolo.net).toBe(-130_000);
+    expect(Math.ceil(-studentSolo.net / 40_000)).toBe(2);
+    expect(Math.ceil(-seekerSolo.net / 45_000)).toBe(3);
+
+    const base = { ...createGame({ ...character, housing: "자취" }, 991), evaluatedDays: [1, 2, 3, 4, 5, 6, 7] };
+    const earned = takeDailyAction(base, "earn");
+    expect(earned.stats.money).toBe(base.stats.money + 40_000);
+    expect(earned.stats.energy).toBe(base.stats.energy - 5);
+    expect(earned.log).toContain("단기 아르바이트를 했다");
+    const capped = takeDailyAction({ ...base, weeklyActions: { earn: 4 } }, "earn");
+    expect(capped.weeklyActions?.earn).toBe(4);
+    expect(capped.stats.money).toBe(base.stats.money);
+  });
+
+  it("keeps student and jobseeker cashflow solvent for a year with a reasonable work schedule", () => {
+    const runYear = (background: "student" | "jobseeker", housing: string, shifts: number, seed: number) => {
+      let state = createGame({ ...character, background, housing }, seed);
+      for (let week = 0; week < 52; week += 1) {
+        state = { ...state, evaluatedDays: [1, 2, 3, 4, 5, 6, 7] };
+        while (state.phase === "playing") state = state.day <= shifts ? takeDailyAction(state, "earn") : advanceDay(state);
+        expect(state.weeklyCashflow?.unpaidExpenses).toBe(0);
+        state = startNextWeek(state);
+      }
+      return state;
+    };
+    expect(runYear("student", "가족과 동거", 0, 301).stats.money).toBeGreaterThan(0);
+    expect(runYear("student", "자취", 2, 302).stats.money).toBeGreaterThan(0);
+    expect(runYear("jobseeker", "가족과 동거", 0, 303).stats.money).toBeGreaterThan(0);
+    expect(runYear("jobseeker", "자취", 3, 304).stats.money).toBeGreaterThan(0);
+  });
+
+  it("carries route choices through two scheduled follow-up events", () => {
+    let state = createGame(character, 992);
+    const root = commonEventLibrary.find((event) => event.id === "common-misunderstanding")!;
+    state = chooseEvent({ ...state, phase: "event", pendingEvent: root }, "misunderstanding-ignore");
+    expect(state.eventThreads?.["relationship-repair"]).toMatchObject({ route: "misunderstanding-ignore", stage: 1, nextWeek: 2 });
+    let followUp = getEventThreadEvents({ ...state, week: 2 })[0];
+    expect(followUp.title).toContain("다시 마주한 대화");
+    expect(followUp.body).toContain("어색함이 쉽게 풀리지 않았다");
+    state = chooseEvent({ ...state, week: 2, phase: "event", pendingEvent: followUp }, "repair-listen");
+    expect(state.eventThreads?.["relationship-repair"]).toMatchObject({ route: "misunderstanding-ignore|repair-listen", stage: 2, nextWeek: 3 });
+    followUp = getEventThreadEvents({ ...state, week: 3 })[0];
+    expect(followUp.thread).toEqual({ id: "relationship-repair", stage: 2 });
+    state = chooseEvent({ ...state, week: 3, phase: "event", pendingEvent: followUp }, "repair-close");
+    expect(state.eventThreads?.["relationship-repair"]).toBeUndefined();
+    expect(state.contacts[1].warmth).toBeGreaterThan(createGame(character, 992).contacts[1].warmth);
   });
 
   it("records social memories and fades them gradually at weekly boundaries", () => {
