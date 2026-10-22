@@ -34,6 +34,7 @@ export const commonEventLibrary: LifeEvent[] = [
   },
   {
     id: "common-misunderstanding",
+    thread: { id: "relationship-repair", stage: 0 },
     title: "가까운 사람의 말이 마음에 걸렸다",
     eyebrow: "관계 · 대화",
     body: "평소와 다른 말투가 계속 신경 쓰인다. 바로 물어볼 수도 있고, 생각을 정리한 뒤 대화할 수도 있다.",
@@ -56,6 +57,7 @@ export const commonEventLibrary: LifeEvent[] = [
   },
   {
     id: "common-unexpected-expense",
+    thread: { id: "unexpected-expense", stage: 0 },
     title: "예상하지 못한 지출이 생겼다",
     eyebrow: "생활 · 돈 관리",
     body: "휴대전화 수리나 갑작스러운 경조사처럼 미루기 어려운 비용이 생겼다. 당장 지출하거나 다른 항목을 조정할 수 있다.",
@@ -205,6 +207,7 @@ export const eventLibrary: Record<Background, LifeEvent[]> = {
   jobseeker: [
     {
       id: "job-posting",
+      thread: { id: "job-application", stage: 0 },
       title: "관심 있던 채용 공고를 발견했다",
       eyebrow: "구직 · 기회",
       body: "관심 분야의 공고가 올라왔다. 지원 기한은 아직 남아 있어 준비 정도와 생활 리듬을 고려해 대응할 수 있다.",
