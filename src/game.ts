@@ -1,11 +1,9 @@
-Warning: truncated output (original token count: 20074)
-Total output lines: 1106
-
 export type Background = "student" | "jobseeker" | "worker";
 export type Palette = "clean" | "warm" | "dark";
 export type SensitiveTopic = "affair" | "illness" | "pregnancy";
 export type Tab = "life" | "people" | "work" | "goals" | "record";
-export type DailyAction = "focus" | "rest" | "social" | "organize";
+export type DailyAction = "focus" | "rest" | "social" | "organize" | "earn";
+export const WEEKLY_EARN_ACTION_LIMIT = 4;
 
 export interface Character {
   name: string;
@@ -162,6 +160,8 @@ export interface LifeEvent {
   personalStory?: { contactId: string; stage: number };
   reunion?: { contactId: string };
   npcPair?: { linkId: string; kind: "bond" | "conflict" | "reconciliation" | "romance"; contactAId: string; contactBId: string; speakerId: string };
+  /** Optional multi-week authored thread marker; absent in older saves and events. */
+  thread?: { id: string; stage: number };
   npcDialogue?: { speakerName: string; line: string };
   /** Marks an event whose copy was rewritten by the server; optional for save compatibility. */
   narrativeCopyGenerated?: boolean;
@@ -177,6 +177,7 @@ export interface GameState {
   evaluatedDays: number[];
   actionDays?: string[];
   weeklyActions?: Partial<Record<DailyAction, number>>;
+  weeklyEarnedIncome?: number;
   weeklyMeetingMomentum?: number;
   weeklyMeetingContext?: string;
   npcReunionIds?: string[];
@@ -187,6 +188,8 @@ export interface GameState {
   npcStoryStages?: Record<string, number>;
   npcStoryLastWeek?: Record<string, number>;
   npcStoryChoices?: Record<string, string>;
+  /** Active multi-week event routes. */
+  eventThreads?: Record<string, { route: string; stage: number; nextWeek: number; contactId?: string }>;
   weeklyCashflow?: WeeklyCashflow;
   playerGoals?: PlayerGoal[];
   stats: Stats;
@@ -262,6 +265,7 @@ export function getContactAffiliation(role: string, background: Background): str
 
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { choosePortraitId, getPortrait, getPortraitAgeVariant } from "./portrait-catalog";
+import { getEventThreadEvents, updateEventThreads } from "./event-threads";
 
 // Keep generated names aligned with the character's selected gender. Korean names
 // can be unisex, so these pools favor names commonly associated with each gender.
@@ -406,8 +410,8 @@ export function createGame(character: Character, seed = createSeed(`${character.
 }
 function clamp(value: number, min = 0, max = 100): number { return Math.max(min, Math.min(max, value)); }
 const weeklyCashflowProfiles: Record<Background, { income: number; livingExpenses: number; incomeLabel: string; expenseLabel: string }> = {
-  student: { income: 150_000, livingExpenses: 155_000, incomeLabel: "용돈·아르바이트", expenseLabel: "식비·교통·학업" },
-  jobseeker: { income: 80_000, livingExpenses: 180_000, incomeLabel: "단기 일·가족 지원", expenseLabel: "식비·교통·구직 준비" },
+  student: { income: 220_000, livingExpenses: 155_000, incomeLabel: "용돈·장학·아르바이트", expenseLabel: "식비·교통·학업" },
+  jobseeker: { income: 180_000, livingExpenses: 180_000, incomeLabel: "가족 지원·단기 일", expenseLabel: "식비·교통·구직 준비" },
   worker: { income: 600_000, livingExpenses: 340_000, incomeLabel: "급여", expenseLabel: "식비·교통·생활" },
 };
 const weeklyHousingExpenses: Record<string, number> = {
@@ -429,7 +433,7 @@ function settleWeeklyCashflow(state: GameState): GameState {
   const unpaidExpenses = Math.max(0, plan.expenses - available);
   const endingBalance = Math.max(0, available - plan.expenses);
   const cashflow: WeeklyCashflow = {
-    week: state.week, income: plan.income, expenses: plan.expenses, unpaidExpenses, endingBalance,
+    week: state.week, income: plan.income + (state.weeklyEarnedIncome ?? 0), expenses: plan.expenses, unpaidExpenses, endingBalance,
   };
   const line = unpaidExpenses > 0
     ? `${state.week}주차 정산 · 수입 +${plan.income.toLocaleString("ko-KR")}원 / 지출 ${plan.expenses.toLocaleString("ko-KR")}원 · 미납 ${unpaidExpenses.toLocaleString("ko-KR")}원`
@@ -574,7 +578,11 @@ export function getNpcRelationshipEvents(state: GameState): LifeEvent[] {
         : link.warmth >= 76 && !link.romanceStatus ? "bond" : undefined;
     if (!kind) return [];
     const id = `npc-pair-${kind}-${link.id}`;
-    if ((state.eventLastSeenWeek?.[id] ?? -100) > state.week -…74 tokens truncated…localeCompare(right.link.id);
+    if ((state.eventLastSeenWeek?.[id] ?? -100) > state.week - 3) return [];
+    return [{ link, a, b, kind, id }];
+  }).sort((left, right) => {
+    const priority = (kind: string) => kind === "conflict" ? 0 : kind === "reconciliation" ? 1 : 2;
+    return priority(left.kind) - priority(right.kind) || left.link.warmth - right.link.warmth || left.link.id.localeCompare(right.link.id);
   });
   const selected = candidates[0];
   if (!selected) return [];
@@ -693,13 +701,13 @@ function nextEligibleEvent(state: GameState): [LifeEvent | undefined, number] {
   const recent = state.recentEventIds ?? [];
   const lastSeen = state.eventLastSeenWeek ?? {};
   const familyLastSeen = state.eventFamilyLastSeenWeek ?? {};
-  const eligible = [...eventLibrary[state.character.background], ...commonEventLibrary, ...getPersonalStoryEvents(state), ...getNpcReunionEvents(state), ...getNpcRelationshipEvents(state)]
+  const eligible = [...eventLibrary[state.character.background], ...commonEventLibrary, ...getPersonalStoryEvents(state), ...getNpcReunionEvents(state), ...getNpcRelationshipEvents(state), ...getEventThreadEvents(state)]
     .filter((event) => !state.seenEvents.includes(event.id) && (!event.topic || state.settings.topics[event.topic]))
     .map((event) => personalizeAuthoredEvent(event, state));
   const notRecentlyPlayed = eligible.filter((event) => !recent.includes(event.id));
   const options = notRecentlyPlayed.filter((event) =>
     state.week - (lastSeen[event.id] ?? -100) >= 8
-    && state.week - (familyLastSeen[getEventFamily(event)] ?? -100) >= 2);
+    && (Boolean(event.thread && event.thread.stage > 0) || state.week - (familyLastSeen[getEventFamily(event)] ?? -100) >= 2));
   const [afterRoll, roll] = nextRandom(state.seed);
   if (!options.length) return [undefined, afterRoll];
   const urgency = (state.stats.stress >= 70 ? 0.12 : state.stats.stress >= 55 ? 0.06 : 0)
@@ -771,12 +779,18 @@ export function takeDailyAction(state: GameState, action: DailyAction, targetCon
   if (state.phase !== "playing") return state;
   const actionDay = `${state.week}-${state.day}`;
   if ((state.actionDays ?? []).includes(actionDay)) return state;
+  if (action === "earn" && ((state.weeklyActions ?? {}).earn ?? 0) >= WEEKLY_EARN_ACTION_LIMIT) return state;
   const focusLabel = state.character.background === "worker" ? "업무에 집중했다" : state.character.background === "jobseeker" ? "구직 준비에 집중했다" : "공부에 집중했다";
   const actionEffects: Record<DailyAction, { log: string; effect: Effect; contactIndex?: number }> = {
     focus: { log: focusLabel, effect: { focus: 5, energy: -5, stress: 2 } },
     rest: { log: "일정을 비우고 제대로 쉬었다", effect: { energy: 10, stress: -5, mood: 2 } },
     social: { log: "가까운 사람과 시간을 보냈다", effect: { mood: 4, energy: -3, relationship: 3 }, contactIndex: 1 },
     organize: { log: "생활과 이번 주 계획을 정리했다", effect: { focus: 2, stress: -2, energy: -1 } },
+    earn: state.character.background === "student"
+      ? { log: "단기 아르바이트를 했다", effect: { money: 40_000, energy: -5, stress: 2, mood: 1 } }
+      : state.character.background === "jobseeker"
+        ? { log: "단기 근무를 하며 생활비를 보탰다", effect: { money: 45_000, energy: -4, stress: 2, focus: -1 } }
+        : { log: "추가 근무를 하고 수당을 받았다", effect: { money: 30_000, energy: -6, stress: 3 } },
   };
   const selected = actionEffects[action];
   const requestedContactIndex = action === "social" && targetContactId
@@ -795,6 +809,7 @@ export function takeDailyAction(state: GameState, action: DailyAction, targetCon
       : [],
     actionDays: [...(state.actionDays ?? []), actionDay],
     weeklyActions: { ...(state.weeklyActions ?? {}), [action]: ((state.weeklyActions ?? {})[action] ?? 0) + 1 },
+    weeklyEarnedIncome: (state.weeklyEarnedIncome ?? 0) + (action === "earn" ? selected.effect.money ?? 0 : 0),
     stats: {
       money: Math.max(0, state.stats.money + (selected.effect.money ?? 0)),
       energy: clamp(state.stats.energy + (selected.effect.energy ?? 0)),
@@ -856,6 +871,7 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
     npcStoryChoices: state.pendingEvent.personalStory ? {
       ...(state.npcStoryChoices ?? {}), [state.pendingEvent.personalStory.contactId]: choice.id,
     } : state.npcStoryChoices,
+    eventThreads: updateEventThreads(state, choice),
     npcRelationships,
     stats: {
       money: Math.max(0, state.stats.money + (effect.money ?? 0)),
@@ -1094,7 +1110,7 @@ export function startNextWeek(state: GameState): GameState {
   return {
     ...state, character: agedCharacter, contacts: agedContacts, archivedContacts: agedArchived, week, day: 1, phase: "playing",
     playerGoals,
-    evaluatedDays: [], actionDays: [], weeklyActions: {}, weeklyMeetingMomentum: 0, weeklyMeetingContext: undefined, seenEvents: [], lastChoice: undefined,
+    evaluatedDays: [], actionDays: [], weeklyActions: {}, weeklyEarnedIncome: 0, weeklyMeetingMomentum: 0, weeklyMeetingContext: undefined, seenEvents: [], lastChoice: undefined,
     stats: { ...state.stats, energy: clamp(state.stats.energy + 12), stress: clamp(state.stats.stress - 7) },
     log: [...notableAgeChanges, `${week}주차가 시작됐다. 지난주의 경험이 생활에 남아 있다.`, ...state.log],
   };

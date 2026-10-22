@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  addPlayerGoal, advanceDays, backgroundLabels, chooseEvent, contactArchivedNpc, createGame, createInitialNPCRelationships, createSeed, generateBodyMetrics, generateContacts, generateName, getContactAffiliation, getPlayerAffiliation, getWeeklyCashflowPlan, normalizeContactName, playerGoalTemplates, PLAYER_GOAL_CYCLE_WEEKS, PLAYER_GOAL_WEEKLY_TARGET, setPlayerGoalStatus, startNextWeek, takeDailyAction,
+  addPlayerGoal, advanceDays, backgroundLabels, chooseEvent, contactArchivedNpc, createGame, createInitialNPCRelationships, createSeed, generateBodyMetrics, generateContacts, generateName, getContactAffiliation, getPlayerAffiliation, getWeeklyCashflowPlan, normalizeContactName, playerGoalTemplates, PLAYER_GOAL_CYCLE_WEEKS, PLAYER_GOAL_WEEKLY_TARGET, setPlayerGoalStatus, startNextWeek, takeDailyAction, WEEKLY_EARN_ACTION_LIMIT,
   type Background, type Character, type CharacterDraft, type Contact, type DailyAction, type GameState, type Palette,
   type SensitiveTopic, type Tab,
 } from "./game";
@@ -302,6 +302,7 @@ function LifeView({ game, onAdvance, onAction, onChoice, onNextWeek, onSelectPer
   const energyLabel = game.stats.energy >= 70 ? "좋음" : game.stats.energy >= 40 ? "보통" : "피곤함";
   const scheduleLabel = game.phase === "event" ? "이벤트 선택" : game.phase === "summary" ? "주간 정산" : "일상 진행";
   const actionUsed = (game.actionDays ?? []).includes(`${game.week}-${game.day}`);
+  const earnLimitReached = ((game.weeklyActions ?? {}).earn ?? 0) >= WEEKLY_EARN_ACTION_LIMIT;
   const notableNpc = [...game.contacts].sort((a, b) => {
     const aSupported = a.lastAutonomousAction?.includes("네가 건넨 응원") ? 1 : 0;
     const bSupported = b.lastAutonomousAction?.includes("네가 건넨 응원") ? 1 : 0;
@@ -328,7 +329,8 @@ function LifeView({ game, onAdvance, onAction, onChoice, onNextWeek, onSelectPer
             ["rest", "충분히 쉬기", "에너지↑ · 스트레스↓"],
             ["social", "가까운 사람 만나기", "기분↑ · 관계 온도↑"],
             ["organize", "생활 정리하기", "집중도↑ · 부담↓"],
-          ] as [DailyAction, string, string][]).map(([action, title, detail]) => <div className="daily-action-wrap" key={action}><button className="daily-action" disabled={actionUsed} onClick={() => { setShowResult(false); onAction(action, action === "social" ? socialTargetId : undefined); }}><strong>{title}</strong><small>{actionUsed ? "오늘 행동을 이미 선택했어요" : detail}</small></button>{action === "social" && <label className="social-target-field"><span>함께 보낼 사람</span><select aria-label="함께 시간을 보낼 사람" value={socialTargetId} disabled={actionUsed} onChange={(event) => setSocialTargetId(event.target.value)}>{game.contacts.map((person) => <option key={person.id} value={person.id}>{person.name} · {person.role}</option>)}</select></label>}</div>)}</div><div className="advance-options"><span className="fast-forward-label">그냥 진행</span>{([1, 3, 7] as const).map((days) => <button className="advance-button secondary-advance" key={days} onClick={() => { setShowResult(false); onAdvance(days); }}><span>{days === 1 ? "하루" : `${days}일`}</span><span className="arrow">→</span></button>)}</div></div>
+            ["earn", game.character.background === "student" ? "단기 아르바이트" : game.character.background === "jobseeker" ? "단기 근무" : "추가 근무", game.character.background === "student" ? "수입 +40,000원 · 체력 소모" : game.character.background === "jobseeker" ? "수입 +45,000원 · 준비 시간 감소" : "수입 +30,000원 · 체력 소모"],
+          ] as [DailyAction, string, string][]).map(([action, title, detail]) => <div className="daily-action-wrap" key={action}><button className="daily-action" disabled={actionUsed || (action === "earn" && earnLimitReached)} onClick={() => { setShowResult(false); onAction(action, action === "social" ? socialTargetId : undefined); }}><strong>{title}</strong><small>{actionUsed ? "오늘 행동을 이미 선택했어요" : action === "earn" && earnLimitReached ? "이번 주 단기 근무 한도를 채웠어요" : detail}</small></button>{action === "social" && <label className="social-target-field"><span>함께 보낼 사람</span><select aria-label="함께 시간을 보낼 사람" value={socialTargetId} disabled={actionUsed} onChange={(event) => setSocialTargetId(event.target.value)}>{game.contacts.map((person) => <option key={person.id} value={person.id}>{person.name} · {person.role}</option>)}</select></label>}</div>)}</div><div className="advance-options"><span className="fast-forward-label">그냥 진행</span>{([1, 3, 7] as const).map((days) => <button className="advance-button secondary-advance" key={days} onClick={() => { setShowResult(false); onAdvance(days); }}><span>{days === 1 ? "하루" : `${days}일`}</span><span className="arrow">→</span></button>)}</div></div>
         </section>
       )}
       {showResult && game.lastChoice && <div className="toast-result"><span className="toast-check">✓</span><span>{game.lastChoice}</span><button onClick={() => setShowResult(false)} aria-label="닫기">×</button></div>}
