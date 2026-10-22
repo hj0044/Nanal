@@ -21,13 +21,14 @@ type SourceAsset = {
   gender: PersonGender;
   ageEstimate: { min: number; max: number };
   filename: string;
+  status?: string;
   runtimeEligible: boolean;
 };
 
 const ageBand = (min: number, max: number) => `${min}–${max}세`;
 // Keep portrait IDs as save metadata; no artwork is bundled or requested at runtime.
 const eligiblePortraits: PortraitRecord[] = (sourceManifest.assets as unknown as SourceAsset[])
-  .filter((asset) => asset.runtimeEligible)
+  .filter((asset) => asset.status === "approved" && asset.runtimeEligible === true)
   .map((asset) => ({
     id: asset.assetId,
     characterId: asset.characterId,
