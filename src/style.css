@@ -119,6 +119,11 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .summary-panel p { margin: 10px 0 15px; }
 .summary-chips { margin-bottom: 17px; display: flex; flex-wrap: wrap; gap: 7px; }
 .summary-chips span { padding: 7px 9px; border-radius: 8px; background: var(--surface-soft); font-size: 10px; }
+.weekly-goal-checkin { display: grid; gap: 8px; margin: 14px 0 17px; padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, var(--surface) 80%, var(--accent-soft)); }
+.weekly-goal-checkin > strong { font-size: 12px; }
+.weekly-goal-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 11px; }
+.weekly-goal-row small { display: block; margin-top: 4px; color: var(--muted); }
+.weekly-goal-row b { color: var(--accent); white-space: nowrap; }
 .primary-button, .secondary-button { min-height: 44px; padding: 0 16px; border: 0; border-radius: 11px; font-size: 12px; font-weight: 700; cursor: pointer; }
 .primary-button { background: var(--accent); color: white; }
 .primary-button:disabled { opacity: .42; cursor: not-allowed; }
