@@ -14,7 +14,6 @@ export interface Character {
   weightKg?: number;
   affiliation?: string;
   portraitId?: string;
-  appearanceHistory?: AppearanceSnapshot[];
   region: string;
   housing: string;
   education?: string;
@@ -90,7 +89,6 @@ export interface Contact {
   affiliation?: string;
   portraitId?: string;
   portraitAgeBand?: import("./portrait-catalog").PortraitAgeBand;
-  appearanceHistory?: AppearanceSnapshot[];
   occupation?: string;
   personality?: string;
   goal?: string;
@@ -108,7 +106,6 @@ export interface Contact {
   returnCount?: number;
   historicalBond?: number;
 }
-export interface AppearanceSnapshot { week: number; age: number; portraitId: string; reason: "manual" | "age-stage" }
 export interface NPCRelationship {
   id: string;
   contactAId: string;
@@ -210,8 +207,6 @@ export interface CharacterDraft {
   education: string;
   family: string;
   startingMoney: string;
-  /** Optional player-selected face; empty means assign automatically per save. */
-  portraitId?: string;
 }
 
 export const backgroundLabels: Record<Background, string> = {
@@ -249,7 +244,7 @@ export function getContactAffiliation(role: string, background: Background): str
 }
 
 import { commonEventLibrary, eventLibrary } from "./scenarios";
-import { choosePortraitId, getPortrait, getPortraitAgeVariant } from "./portrait-catalog";
+import { choosePortraitId, getPortrait } from "./portrait-catalog";
 
 // Keep generated names aligned with the character's selected gender. Korean names
 // can be unisex, so these pools favor names commonly associated with each gender.
@@ -485,6 +480,17 @@ export function getNpcReunionEvents(state: GameState): LifeEvent[] {
     const memoryLine = remembered
       ? `${contact.name}은 함께 웃었던 기분은 선명한데, 언제 무슨 이야기를 나눴는지는 잘 떠오르지 않는다고 했다. 세세한 장면보다 그때의 따뜻함이 남아 있었다.`
       : "예전에 함께 지낸 시간이 있었지만, 세세한 장면은 희미해져 있었다. 두 사람은 그동안 달라진 일상을 조심스럽게 물었다.";
+    const pastBond = contact.historicalBond ?? contact.warmth;
+    const oldCloseness = pastBond >= 65;
+    const unresolvedDistance = pastBond >= 50 && contact.warmth < 25;
+    const firstChoice = unresolvedDistance
+      ? { id: "reunion-memory", title: "멀어진 시간이 마음에 남았다고 솔직히 말한다", detail: "서운함을 숨기지 않고 서로의 이야기를 듣는다", result: `${contact.name}과 왜 멀어졌는지 조심스럽게 나눴다. 바로 예전으로 돌아가진 못해도, 서로의 마음을 처음으로 제대로 들었다.`, effect: { stress: 1, relationship: 3 }, contactIndex: index }
+      : oldCloseness
+        ? { id: "reunion-memory", title: "오래된 정을 인정하고 함께한 기억을 나눈다", detail: "세부 장면은 희미해도 서로에게 소중했던 시간을 확인한다", result: `${contact.name}과 예전에 서로에게 힘이 되어준 순간을 이야기했다. 정확한 장면은 흐려졌지만 오래 쌓인 정은 여전히 느껴졌다.`, effect: { mood: 3, relationship: 5 }, contactIndex: index }
+        : { id: "reunion-memory", title: "예전의 가벼운 인연을 반갑게 확인한다", detail: "부담을 주지 않고 반가웠던 마음을 전한다", result: `${contact.name}과 예전의 짧은 인연을 웃으며 나눴다. 더 가까워질지는 서두르지 않기로 했다.`, effect: { mood: 2, relationship: 2 }, contactIndex: index };
+    const closingChoice = oldCloseness
+      ? { id: "reunion-slow", title: "반갑지만 예전의 거리로 돌아가지는 않기로 한다", detail: "좋았던 마음은 간직하고 지금의 삶을 존중한다", result: `${contact.name}과 다시 가까워지려 애쓰기보다 반가운 인사로 만남을 마무리했다. 좋은 기억은 남기되 서로의 삶에 무리하게 들어가지 않기로 했다.`, effect: { stress: -1, relationship: -3 }, contactIndex: index }
+      : { id: "reunion-slow", title: "반갑게 인사하고 오늘의 대화를 마무리한다", detail: "다시 이어갈 약속은 하지 않고 편안히 헤어진다", result: `${contact.name}과 반가운 인사를 나누고 오늘의 대화를 마무리했다. 이 만남만으로 관계를 다시 이어가야 한다고 약속하진 않았다.`, effect: { mood: 1, relationship: -4 }, contactIndex: index };
     return [{
       id: `npc-reunion-${contact.id}-${contact.returnCount ?? 1}`,
       title: `${contact.name}과 다시 마주쳤다`,
@@ -492,9 +498,9 @@ export function getNpcReunionEvents(state: GameState): LifeEvent[] {
       body: `${contact.name}과(와) 다시 만나 반갑게 인사를 나눴다. ${memoryLine} 예전처럼 바로 가까워지기보다, 지금의 서로를 알아가는 시간이 필요해 보인다.`,
       reunion: { contactId },
       choices: [
-        { id: "reunion-memory", title: "희미한 기억을 같이 되짚어본다", detail: "기억이 완전하지 않아도 함께 웃었던 순간을 나눈다", result: `${contact.name}과 예전 일을 천천히 떠올렸다. 기억은 흐릿했지만 함께 웃으며 다시 대화를 이어갈 수 있었다.`, effect: { mood: 3, relationship: 5 }, contactIndex: index },
+        firstChoice,
         { id: "reunion-now", title: "지난 일보다 서로의 요즘을 묻는다", detail: "지금 달라진 생활과 관심사를 알아간다", result: `${contact.name}과 서로의 최근 생활을 나눴다. 예전 관계를 그대로 되돌리기보다 지금의 모습으로 새로 알아가기로 했다.`, effect: { stress: -1, relationship: 4 }, contactIndex: index },
-        { id: "reunion-slow", title: "반가움을 전하고 천천히 연락하자고 한다", detail: "서로의 속도를 존중하며 부담 없이 이어간다", result: `${contact.name}에게 다시 만나 반갑다고 전했다. 무리해서 예전처럼 지내려 하지 않고, 편한 때 안부를 나누기로 했다.`, effect: { relationship: 3 }, contactIndex: index },
+        closingChoice,
       ],
     }];
   });
@@ -836,6 +842,17 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
       ...(state.npcStoryChoices ?? {}), [state.pendingEvent.personalStory.contactId]: choice.id,
     } : state.npcStoryChoices,
     npcRelationships,
+    relationshipRecords: state.pendingEvent.reunion ? [
+      ...(state.relationshipRecords ?? []),
+      {
+        id: `reunion-choice-${state.pendingEvent.reunion.contactId}-${state.week}-${choice.id}`,
+        week: state.week,
+        kind: "reunion" as const,
+        contactId: state.pendingEvent.reunion.contactId,
+        contactName: state.contacts.find((contact) => contact.id === state.pendingEvent?.reunion?.contactId)?.name ?? "이전 인연",
+        text: choice.result,
+      },
+    ] : state.relationshipRecords,
     stats: {
       money: Math.max(0, state.stats.money + (effect.money ?? 0)),
       energy: clamp(state.stats.energy + (effect.energy ?? 0)),
@@ -1045,28 +1062,11 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
 export function startNextWeek(state: GameState): GameState {
   if (state.phase !== "summary") return state;
   const week = state.week + 1;
-  const yearTurn = week > 1 && (week - 1) % 52 === 0;
-  const agePerson = <T extends { age?: number; portraitId?: string; portraitAgeBand?: string; appearanceHistory?: AppearanceSnapshot[]; warmth?: number; name?: string }>(person: T): T => {
-    if (!yearTurn || person.age === undefined) return person;
-    const age = person.age + 1;
-    const portraitId = getPortraitAgeVariant(person.portraitId, age) ?? person.portraitId;
-    const appearanceHistory = portraitId && person.portraitId && portraitId !== person.portraitId
-      ? [...(person.appearanceHistory ?? []), { week, age: person.age, portraitId: person.portraitId, reason: "age-stage" as const }]
-      : person.appearanceHistory;
-    return { ...person, age, portraitId, portraitAgeBand: getPortrait(portraitId)?.ageBand ?? person.portraitAgeBand, appearanceHistory };
-  };
-  const agedCharacter = yearTurn ? agePerson(state.character) : state.character;
-  const agedContacts = yearTurn ? state.contacts.map(agePerson) : state.contacts;
-  const agedArchived = yearTurn ? (state.archivedContacts ?? []).map(agePerson) : state.archivedContacts;
-  const notableAgeChanges = yearTurn ? [
-    agedCharacter.portraitId !== state.character.portraitId ? `${state.character.name}의 모습이 세월에 따라 달라졌다.` : "",
-    ...agedContacts.filter((person, index) => person.portraitId !== state.contacts[index]?.portraitId && (person.warmth ?? 0) >= 70).map((person) => `${person.name}의 인상이 세월에 따라 달라졌다.`),
-  ].filter(Boolean) : [];
   return {
-    ...state, character: agedCharacter, contacts: agedContacts, archivedContacts: agedArchived, week, day: 1, phase: "playing",
+    ...state, week, day: 1, phase: "playing",
     evaluatedDays: [], actionDays: [], weeklyActions: {}, weeklyMeetingMomentum: 0, weeklyMeetingContext: undefined, seenEvents: [], lastChoice: undefined,
     stats: { ...state.stats, energy: clamp(state.stats.energy + 12), stress: clamp(state.stats.stress - 7) },
-    log: [...notableAgeChanges, `${week}주차가 시작됐다. 지난주의 경험이 생활에 남아 있다.`, ...state.log],
+    log: [`${week}주차가 시작됐다. 지난주의 경험이 생활에 남아 있다.`, ...state.log],
   };
 }
 export function setPalette(state: GameState, palette: Palette): GameState {
