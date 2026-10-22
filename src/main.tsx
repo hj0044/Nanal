@@ -80,7 +80,7 @@ function normalizeSave(parsed: GameState): GameState {
         weightKg: person.weightKg ?? body.weightKg,
         appearance: ensureAppearance(
           person.appearance, createSeed(`${parsed.seed}:${person.id}:appearance`),
-          gender, age, body.heightCm, person.weightKg ?? body.weightKg,
+          gender, person.age ?? parsed.character.age, body.heightCm, person.weightKg ?? body.weightKg,
         ),
         affiliation: person.affiliation ?? getContactAffiliation(person.role, parsed.character.background) };
     }),
