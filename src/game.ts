@@ -32,6 +32,9 @@ export interface NPCMemory {
   text: string;
   week: number;
   vividness: number;
+  /** Emotional residue fades more slowly than exact scene details. */
+  emotionalTrace?: number;
+  significance?: "ordinary" | "meaningful";
 }
 export interface WeeklyCashflow {
   week: number;
@@ -101,6 +104,7 @@ export interface Contact {
   lastInteractionWeek?: number;
   archivedWeek?: number;
   returnCount?: number;
+  historicalBond?: number;
 }
 export interface NPCRelationship {
   id: string;
@@ -472,9 +476,9 @@ export function getNpcReunionEvents(state: GameState): LifeEvent[] {
     const contact = state.contacts.find((item) => item.id === contactId);
     if (!contact) return [];
     const index = state.contacts.findIndex((item) => item.id === contactId);
-    const remembered = (contact.memories ?? []).find((memory) => memory.vividness <= 0.45)?.text;
+    const remembered = (contact.memories ?? []).find((memory) => memory.vividness <= 0.45 && (memory.emotionalTrace ?? memory.vividness) >= 0.2);
     const memoryLine = remembered
-      ? `예전 함께 보낸 날의 한 장면이 어렴풋이 떠올랐다. “우리 그때 ${remembered} 얘기도 했었지?” ${contact.name}도 정확히는 기억나지 않는 듯 웃었다.`
+      ? `${contact.name}은 함께 웃었던 기분은 선명한데, 언제 무슨 이야기를 나눴는지는 잘 떠오르지 않는다고 했다. 세세한 장면보다 그때의 따뜻함이 남아 있었다.`
       : "예전에 함께 지낸 시간이 있었지만, 세세한 장면은 희미해져 있었다. 두 사람은 그동안 달라진 일상을 조심스럽게 물었다.";
     return [{
       id: `npc-reunion-${contact.id}-${contact.returnCount ?? 1}`,
@@ -489,6 +493,39 @@ export function getNpcReunionEvents(state: GameState): LifeEvent[] {
       ],
     }];
   });
+}
+
+/** Player-initiated contact preserves the archived person and history, then opens the same reunion choice scene. */
+export function contactArchivedNpc(state: GameState, contactId: string): GameState {
+  const archived = state.archivedContacts ?? [];
+  const person = archived.find((contact) => contact.id === contactId);
+  if (!person || state.phase === "event") return state;
+  const weeksAway = Math.max(0, state.week - (person.archivedWeek ?? state.week));
+  const bond = person.historicalBond ?? person.warmth;
+  const returned: Contact = {
+    ...person,
+    archivedWeek: undefined,
+    warmth: clamp(Math.round(16 + bond * 0.3 - Math.min(8, weeksAway * 0.1)), 15, 42),
+    goalSupport: 0,
+    memories: (person.memories ?? []).map((memory) => ({ ...memory, vividness: Math.min(memory.vividness, 0.28), emotionalTrace: Math.max(memory.emotionalTrace ?? 0.35, 0.4) })),
+    lastInteractionWeek: state.week,
+    returnCount: (person.returnCount ?? 0) + 1,
+    note: "먼저 안부를 건네 다시 연락이 닿았다. 예전의 정은 남아 있지만, 지금의 서로를 다시 알아갈 시간이 필요하다.",
+  };
+  const next: GameState = {
+    ...state,
+    phase: "event",
+    contacts: [...state.contacts, returned],
+    archivedContacts: archived.filter((contact) => contact.id !== contactId),
+    npcReunionIds: [...(state.npcReunionIds ?? []), contactId],
+    relationshipRecords: [...(state.relationshipRecords ?? []), {
+      id: `reunion-player-${contactId}-${state.week}-${returned.returnCount}`,
+      week: state.week, kind: "reunion", contactId, contactName: person.name,
+      text: `${person.name}에게 먼저 안부를 건네 다시 연락이 닿았다. 오래된 인연의 기록은 그대로 남아 있다.`,
+    }],
+    log: [`${person.name}에게 먼저 안부를 건네 다시 연락이 닿았다.`, ...state.log],
+  };
+  return { ...next, pendingEvent: getNpcReunionEvents(next)[0] };
 }
 function dialogueFor(contact: Contact, kind: "bond" | "conflict" | "reconciliation" | "romance"): string {
   const name = contact.name;
@@ -750,7 +787,7 @@ export function takeDailyAction(state: GameState, action: DailyAction, targetCon
       focus: clamp(state.stats.focus + (selected.effect.focus ?? 0)),
     },
     contacts: state.contacts.map((contact, index) => index === selectedContactIndex
-      ? { ...contact, warmth: clamp(contact.warmth + (selected.effect.relationship ?? 0)), lastInteractionWeek: state.week, goalSupport: clamp((contact.goalSupport ?? 0) + 1, 0, 3), note: actionLog, memories: addNpcMemory(contact, actionLog, state.week) }
+      ? { ...contact, warmth: clamp(contact.warmth + (selected.effect.relationship ?? 0)), historicalBond: Math.max(contact.historicalBond ?? 0, clamp(contact.warmth + (selected.effect.relationship ?? 0))), lastInteractionWeek: state.week, goalSupport: clamp((contact.goalSupport ?? 0) + 1, 0, 3), note: actionLog, memories: addNpcMemory(contact, actionLog, state.week) }
       : contact),
     log: [actionLog, ...state.log],
   };
@@ -809,6 +846,7 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
       return {
         ...contact,
         warmth: clamp(contact.warmth + (effect.relationship ?? 0)),
+        historicalBond: Math.max(contact.historicalBond ?? 0, clamp(contact.warmth + (effect.relationship ?? 0))),
         lastInteractionWeek: state.week,
         goalSupport: clamp((contact.goalSupport ?? 0) + (effect.goalSupport ?? 0), 0, 3),
         note: choice.result,
@@ -867,7 +905,7 @@ function progressPlayerGoals(state: GameState, category: GoalCategory, points: n
 function addNpcMemory(contact: Contact, text: string, week: number): NPCMemory[] {
   const previous = contact.memories ?? [];
   return [
-    { id: `${contact.id}-memory-${week}-${previous.length}`, text, week, vividness: 1 },
+    { id: `${contact.id}-memory-${week}-${previous.length}`, text, week, vividness: 1, emotionalTrace: 1, significance: (/처음|약속|사과|축하|힘들|응원|갈등|화해|이별|다시 만났/.test(text) ? "meaningful" : "ordinary") as NPCMemory["significance"] },
     ...previous,
   ].slice(0, 8);
 }
@@ -902,7 +940,7 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
     const [, departureRoll] = nextRandom(state.seed ^ createSeed(`distance:${contact.id}:${state.week}`));
     const departureChance = timeFactor * warmthFactor * relationship.departureMultiplier;
     if (departureChance > 0 && departureRoll < departureChance) {
-      const departed = { ...contact, archivedWeek: state.week, note: "서로의 생활이 달라져 한동안 연락이 뜸해졌다." };
+    const departed = { ...contact, archivedWeek: state.week, historicalBond: contact.historicalBond ?? contact.warmth, note: "서로의 생활이 달라져 한동안 연락이 뜸해졌다." };
       archived.push(departed);
       const text = `${contact.name}과(와) 연락이 뜸해져 각자의 생활을 이어가게 됐다. 함께한 기억은 생애기록에 남아 있다.`;
       logs.push(text);
@@ -919,8 +957,8 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
     const chance = clamp(55 + (warmth - 50) * 0.45 + playerSupport * 9, 30, 90) / 100;
     const oldGoal = contact.goal ?? "자기만의 방향을 찾는 일";
     const memories = (contact.memories ?? [])
-      .map((memory) => ({ ...memory, vividness: memory.vividness * 0.94 }))
-      .filter((memory) => memory.vividness >= 0.2);
+      .map((memory) => ({ ...memory, vividness: memory.vividness * (memory.significance === "meaningful" ? 0.985 : 0.94), emotionalTrace: (memory.emotionalTrace ?? memory.vividness) * 0.995 }))
+      .filter((memory) => memory.vividness >= 0.2 || (memory.emotionalTrace ?? 0) >= 0.2);
     const currentProgress = contact.goalProgress ?? 0;
     const advanced = roll < chance || playerSupport >= 3;
     let goal = oldGoal;
@@ -959,7 +997,9 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
     const reunionChance = Math.min(0.16, 0.025 + weeksAway * 0.0025) * (/가족|부모|사촌|친척|친구/.test(old.role) ? 1.25 : 1);
     if (reunionRoll >= reunionChance) continue;
     archived.splice(index, 1);
-    const returned = { ...old, archivedWeek: undefined, warmth: Math.min(35, Math.max(18, old.warmth - 12)), goalSupport: 0, memories: (old.memories ?? []).map((memory) => ({ ...memory, vividness: Math.min(memory.vividness, 0.28) })), lastInteractionWeek: state.week, returnCount: (old.returnCount ?? 0) + 1, note: "우연히 다시 만나 어색하지만 반갑게 안부를 나눴다." };
+    const oldBond = old.historicalBond ?? old.warmth;
+    const reunionWarmth = clamp(Math.round(16 + oldBond * 0.3 - Math.min(8, weeksAway * 0.1)), 15, 42);
+    const returned = { ...old, archivedWeek: undefined, warmth: reunionWarmth, goalSupport: 0, memories: (old.memories ?? []).map((memory) => ({ ...memory, vividness: Math.min(memory.vividness, 0.28), emotionalTrace: Math.max(memory.emotionalTrace ?? 0.35, 0.4) })), lastInteractionWeek: state.week, returnCount: (old.returnCount ?? 0) + 1, note: "우연히 다시 만나 어색하지만 반가웠다. 예전의 정은 남아 있지만, 지금의 서로를 다시 알아갈 시간이 필요하다." };
     contacts.push(returned);
     reunionIds.push(returned.id);
     const text = `${old.name}과(와) 우연히 다시 만났다. 예전만큼 가깝지는 않지만, 서로의 근황을 나누며 새롭게 관계를 이어가기 시작했다.`;
@@ -1010,3 +1050,4 @@ export function startNextWeek(state: GameState): GameState {
 export function setPalette(state: GameState, palette: Palette): GameState {
   return { ...state, settings: { ...state.settings, palette } };
 }
+
