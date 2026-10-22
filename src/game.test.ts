@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advanceDay, advanceDays, chooseEvent, createGame, createInitialNPCRelationships, generateBodyMetrics, generateContacts, getContactAffiliation, getEventFamily, getNpcRelationshipEvents, getNpcReunionEvents, getPersonalStoryEvents, getPlayerAffiliation, getRelationshipProfile, getWeeklyCashflowPlan, normalizeContactName, personalizeAuthoredEvent, startNextWeek, takeDailyAction, type Character } from "./game";
+import { addPlayerGoal, advanceDay, advanceDays, chooseEvent, createGame, createInitialNPCRelationships, generateBodyMetrics, generateContacts, getContactAffiliation, getEventFamily, getNpcRelationshipEvents, getNpcReunionEvents, getPersonalStoryEvents, getPlayerAffiliation, getRelationshipProfile, getWeeklyCashflowPlan, normalizeContactName, personalizeAuthoredEvent, setPlayerGoalStatus, startNextWeek, takeDailyAction, type Character } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
 import { getImageKitPortraitUrl, getPortrait, portraitCatalog } from "./portrait-catalog";
@@ -14,6 +14,32 @@ function finishWeek(state: ReturnType<typeof createGame>) {
 }
 
 describe("first week simulation", () => {
+  it("connects daily actions to save-local player goals and caps concurrent goals at three", () => {
+    let state = createGame(character, 71001);
+    state = addPlayerGoal(state, "learning-skill");
+    state = addPlayerGoal(state, "career-direction");
+    state = addPlayerGoal(state, "relationship-close");
+    const full = addPlayerGoal(state, "health-rhythm");
+    expect(full.playerGoals).toHaveLength(3);
+    const advanced = takeDailyAction(state, "focus");
+    expect(advanced.playerGoals?.find((goal) => goal.id === "learning-skill")?.progress).toBe(1);
+    expect(advanced.playerGoals?.find((goal) => goal.id === "career-direction")?.progress).toBe(0);
+    const paused = setPlayerGoalStatus(advanced, "learning-skill", "paused");
+    expect(addPlayerGoal(paused, "health-rhythm").playerGoals?.some((goal) => goal.id === "health-rhythm" && goal.status === "active")).toBe(true);
+  });
+
+  it("lets a related event choice move one goal and records completion", () => {
+    let state = addPlayerGoal(createGame(character, 71002), "career-direction");
+    state = { ...state, playerGoals: state.playerGoals?.map((goal) => ({ ...goal, progress: 7 })), phase: "event", pendingEvent: {
+      id: "goal-career-check", title: "진로 면접 기회가 찾아오다", eyebrow: "CAREER", body: "기회가 찾아왔다.", choices: [
+        { id: "take-step", title: "준비를 시작한다", detail: "", result: "첫 준비를 시작했다.", effect: { goalProgress: 1 } },
+      ],
+    } };
+    const next = chooseEvent(state, "take-step");
+    expect(next.playerGoals?.[0]).toMatchObject({ status: "completed", progress: 8, completedWeek: 1 });
+    expect(next.log[0]).toContain("목표를 이루었다");
+  });
+
   it("constructs ImageKit CDN links safely without changing existing portrait IDs", () => {
     expect(getImageKitPortraitUrl("https://ik.imagekit.io/demo/", "face-01.webp")).toBe("https://ik.imagekit.io/demo/nanal/portraits/face-01.webp");
     expect(getImageKitPortraitUrl("https://ik.imagekit.io/demo", "npc-portrait-atlas-v1.webp", "/nanal/portraits/")).toBe("https://ik.imagekit.io/demo/nanal/portraits/npc-portrait-atlas-v1.webp");
