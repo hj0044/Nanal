@@ -23,7 +23,7 @@ describe("first week simulation", () => {
       body: `${character.name}에게 ${target.name}이 “${target.goal}”에 대해 말했다.`,
       personalStory: { contactId: target.id, stage: 0 },
       npcDialogue: { speakerName: target.name, line: "원래 문장" },
-      choices: [{ id: "story-listen", title: "이야기를 듣는다", detail: "천천히 듣는다", result: `${target.name}의 이야기를 들었다.`, effect: { relationship: 4, money: -2_000 }, contactId: target.id }],
+      choices: [{ id: `story-listen-${target.id}`, title: "이야기를 듣는다", detail: "천천히 듣는다", result: `${target.name}의 이야기를 들었다.`, effect: { relationship: 4, money: -2_000 }, contactId: target.id }],
     };
     const request = buildNarrativeRewriteRequest(event, state);
     const serialized = JSON.stringify(request);
@@ -31,18 +31,20 @@ describe("first week simulation", () => {
     expect(serialized).not.toContain(target.name);
     expect(serialized).not.toContain(target.goal);
     expect(serialized).not.toContain(target.id);
+    expect(serialized).not.toContain(event.choices[0].id);
+    expect(request.event.choices[0].id).toBe("choice-0");
     expect(serialized).not.toContain("effect");
     expect(request.context.people).toHaveLength(1);
 
     const rewritten = applyNarrativeRewrite(event, {
       title: `${target.name}의 고민`, eyebrow: "개인 이야기", body: `${character.name}과 대화를 나눴다.`, npcDialogueLine: "마음을 나눴다.",
-      choices: [{ id: "story-listen", title: "조용히 듣는다", detail: "이야기를 재촉하지 않는다", result: `${target.name}의 말을 끝까지 들었다.` }],
+      choices: [{ id: "choice-0", title: "조용히 듣는다", detail: "이야기를 재촉하지 않는다", result: `${target.name}의 말을 끝까지 들었다.` }],
     }, state);
     expect(rewritten?.narrativeCopyGenerated).toBe(true);
     expect(rewritten?.title).not.toContain(target.name);
     expect(rewritten?.npcDialogue?.speakerName).toBe(target.name);
     expect(rewritten?.personalStory).toEqual(event.personalStory);
-    expect(rewritten?.choices[0]).toMatchObject({ id: "story-listen", contactId: target.id, effect: { relationship: 4, money: -2_000 } });
+    expect(rewritten?.choices[0]).toMatchObject({ id: event.choices[0].id, contactId: target.id, effect: { relationship: 4, money: -2_000 } });
   });
 
   it("rejects Gemini copy that changes or drops an authored choice id", () => {
@@ -54,7 +56,7 @@ describe("first week simulation", () => {
     expect(applyNarrativeRewrite(event, {
       title: "수정 사건", eyebrow: "일상", body: "수정 문장",
       choices: [
-        { id: "choice-a", title: "A", detail: "A 설명", result: "A 결과" },
+        { id: "choice-0", title: "A", detail: "A 설명", result: "A 결과" },
         { id: "invented-choice", title: "B", detail: "B 설명", result: "B 결과" },
       ],
     }, state)).toBeUndefined();
