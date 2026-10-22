@@ -358,6 +358,28 @@ describe("first week simulation", () => {
     }
   });
 
+  it("does not bypass the eight-week cooldown when no eligible event remains", () => {
+    const started = createGame(character, 662911);
+    const eventIds = [...commonEventLibrary, ...Object.values(eventLibrary).flat()].map((event) => event.id);
+    const state = {
+      ...started,
+      week: 2,
+      day: 1,
+      seenEvents: [],
+      eventLastSeenWeek: Object.fromEntries(eventIds.map((id) => [id, 1])),
+      eventFamilyLastSeenWeek: {},
+      npcStoryStages: Object.fromEntries(started.contacts.map((contact) => [contact.id, 3])),
+      npcStoryLastWeek: {},
+      npcStoryChoices: {},
+      npcReunionIds: [],
+      npcRelationships: [],
+    };
+    const next = advanceDay(state);
+    expect(next.phase).toBe("playing");
+    expect(next.pendingEvent).toBeUndefined();
+    expect(next.day).toBe(2);
+  });
+
   it("avoids repeating authored events inside the eight-week cooldown and rotates story families", () => {
     let state = createGame(character, 662910);
     let choicesMade = 0;
@@ -365,13 +387,11 @@ describe("first week simulation", () => {
     for (let guard = 0; guard < 140 && state.week <= 12; guard += 1) {
       if (state.phase === "event" && state.pendingEvent) {
         const previousWeek = state.eventLastSeenWeek?.[state.pendingEvent.id];
-        if (previousWeek !== undefined && !state.pendingEvent.personalStory && !state.pendingEvent.reunion && !state.pendingEvent.npcPair) expect(state.week - previousWeek).toBeGreaterThanOrEqual(8);
-        if (!state.pendingEvent.personalStory && !state.pendingEvent.reunion && !state.pendingEvent.npcPair) {
-          const family = getEventFamily(state.pendingEvent);
-          const lastFamilyWeek = familyLastSeen.get(family);
-          if (lastFamilyWeek !== undefined) expect(state.week - lastFamilyWeek).toBeGreaterThanOrEqual(2);
-          familyLastSeen.set(family, state.week);
-        }
+        if (previousWeek !== undefined) expect(state.week - previousWeek).toBeGreaterThanOrEqual(8);
+        const family = getEventFamily(state.pendingEvent);
+        const lastFamilyWeek = familyLastSeen.get(family);
+        if (lastFamilyWeek !== undefined) expect(state.week - lastFamilyWeek).toBeGreaterThanOrEqual(2);
+        familyLastSeen.set(family, state.week);
         state = chooseEvent(state, state.pendingEvent.choices[0].id);
         choicesMade += 1;
       } else if (state.phase === "summary") {
