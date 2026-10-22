@@ -1,10 +1,1 @@
-import { defineConfig } from "vitest/config";
-import react from "@vitejs/plugin-react";
-
-export default defineConfig({
-  plugins: [react()],
-  base: "./",
-  server: { allowedHosts: ["terminal.local"] },
-  test: { environment: "node" },
-});
-
+import { defineConfig } from "vitest/config";\nimport react from "@vitejs/plugin-react";\n\nexport default defineConfig({\n  plugins: [react()],\n  base: "./",\n  server: { allowedHosts: ["terminal.local"] },\n  test: { environment: "node" },\n});\n\n
