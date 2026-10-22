@@ -820,18 +820,18 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
   const eventFamily = getEventFamily(state.pendingEvent);
   const goalCategory: GoalCategory | undefined = eventFamily === "career" || eventFamily === "work" ? "career"
     : eventFamily === "study" ? "learning"
-    : eventFamily === "romance" || eventFamily === "family" || eventFamily === "friendship" ? "relationship"
+    : eventFamily === "romance" || eventFamily === "family" || eventFamily === "friendship" || eventFamily === "npc-story" ? "relationship"
     : eventFamily === "health" ? "health"
     : eventFamily === "money" || eventFamily === "housing" ? "finance"
-    : eventFamily === "social" ? "personal" : undefined;
+    : eventFamily === "social" || eventFamily === "daily" ? "personal" : undefined;
   return goalCategory ? progressPlayerGoals(next, goalCategory, effect.goalProgress ?? 1) : next;
 }
 
 export function addPlayerGoal(state: GameState, templateId: string): GameState {
   const template = playerGoalTemplates.find((item) => item.id === templateId);
-  if (!template || (state.playerGoals ?? []).some((goal) => goal.id === template.id && goal.status === "active")) return state;
+  if (!template || (state.playerGoals ?? []).some((goal) => goal.id === template.id)) return state;
   const activeGoals = (state.playerGoals ?? []).filter((goal) => goal.status === "active");
-  if (activeGoals.length >= 3) return state;
+  if (activeGoals.length >= 3 || activeGoals.some((goal) => goal.category === template.category)) return state;
   const goal: PlayerGoal = { ...template, progress: 0, status: "active", createdWeek: state.week };
   return { ...state, playerGoals: [...(state.playerGoals ?? []), goal], log: [`새 목표를 정했다: ${goal.title}`, ...state.log] };
 }
