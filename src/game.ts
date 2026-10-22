@@ -510,7 +510,7 @@ export function getNpcReunionEvents(state: GameState): LifeEvent[] {
 export function contactArchivedNpc(state: GameState, contactId: string): GameState {
   const archived = state.archivedContacts ?? [];
   const person = archived.find((contact) => contact.id === contactId);
-  if (!person || state.phase === "event") return state;
+  if (!person || state.phase !== "playing") return state;
   const weeksAway = Math.max(0, state.week - (person.archivedWeek ?? state.week));
   const bond = person.historicalBond ?? person.warmth;
   const returned: Contact = {
