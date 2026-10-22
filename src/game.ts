@@ -49,6 +49,31 @@ export interface WeeklyCashflowPlan {
   incomeLabel: string;
   expenseLabel: string;
 }
+export type GoalCategory = "career" | "learning" | "relationship" | "health" | "finance" | "personal";
+export type PlayerGoalStatus = "active" | "completed" | "paused";
+export interface PlayerGoal {
+  id: string;
+  title: string;
+  category: GoalCategory;
+  progress: number;
+  target: number;
+  status: PlayerGoalStatus;
+  createdWeek: number;
+  completedWeek?: number;
+  lastProgressWeek?: number;
+}
+export const playerGoalTemplates: Array<Pick<PlayerGoal, "id" | "title" | "category" | "target">> = [
+  { id: "career-direction", title: "내게 맞는 진로 방향 찾기", category: "career", target: 8 },
+  { id: "career-step", title: "일에서 다음 단계로 나아가기", category: "career", target: 8 },
+  { id: "learning-skill", title: "꾸준히 실력을 쌓기", category: "learning", target: 8 },
+  { id: "learning-credential", title: "미뤄둔 공부나 자격 과정 마치기", category: "learning", target: 8 },
+  { id: "relationship-close", title: "오래 갈 관계를 만들어가기", category: "relationship", target: 8 },
+  { id: "relationship-family", title: "가족과 보내는 시간 늘리기", category: "relationship", target: 8 },
+  { id: "health-rhythm", title: "건강한 생활 리듬 되찾기", category: "health", target: 8 },
+  { id: "finance-buffer", title: "생활비 부담을 줄이고 여유 자금 만들기", category: "finance", target: 8 },
+  { id: "personal-balance", title: "일과 휴식의 균형 맞추기", category: "personal", target: 8 },
+  { id: "personal-new", title: "새로운 경험과 기회 넓히기", category: "personal", target: 8 },
+];
 
 export interface Contact {
   id: string;
@@ -99,6 +124,8 @@ export interface Effect {
   npcRelationship?: number;
   /** Adds a chance to meet someone through the selected event. */
   newContactOpportunity?: number;
+  /** Progress credited to a matching player goal when this event is chosen. */
+  goalProgress?: number;
 }
 export interface EventChoice {
   id: string;
@@ -144,6 +171,7 @@ export interface GameState {
   npcStoryLastWeek?: Record<string, number>;
   npcStoryChoices?: Record<string, string>;
   weeklyCashflow?: WeeklyCashflow;
+  playerGoals?: PlayerGoal[];
   stats: Stats;
   contacts: Contact[];
   archivedContacts?: Contact[];
@@ -348,6 +376,7 @@ export function createGame(character: Character, seed = createSeed(`${character.
   return {
     version: 1, character: player, week: 1, day: 1, phase: "playing", seed,
     evaluatedDays: [], seenEvents: [], npcStoryStages: {}, npcStoryLastWeek: {}, npcStoryChoices: {},
+    playerGoals: [],
     stats: { money, energy: 72, stress: 24, mood: 61, focus: 52 },
     contacts, archivedContacts: [], relationshipRecords: [], npcRelationships: createInitialNPCRelationships(contacts, seed), nextContactNumber: 13,
     log: [`${character.year}년, ${character.name}의 새로운 생활이 시작됐다.`],
@@ -725,7 +754,9 @@ export function takeDailyAction(state: GameState, action: DailyAction, targetCon
       : contact),
     log: [actionLog, ...state.log],
   };
-  return advanceDay(next);
+  const goalCategory: GoalCategory = action === "focus" ? (state.character.background === "student" ? "learning" : "career")
+    : action === "rest" ? "health" : action === "social" ? "relationship" : "finance";
+  return advanceDay(progressPlayerGoals(next, goalCategory, 1));
 }
 export function chooseEvent(state: GameState, choiceId: string): GameState {
   if (state.phase !== "event" || !state.pendingEvent) return state;
@@ -786,7 +817,52 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
     }),
     log: [choice.result, ...state.log],
   };
-  return next;
+  const eventFamily = getEventFamily(state.pendingEvent);
+  const goalCategory: GoalCategory | undefined = eventFamily === "career" || eventFamily === "work" ? "career"
+    : eventFamily === "study" ? "learning"
+    : eventFamily === "romance" || eventFamily === "family" || eventFamily === "friendship" ? "relationship"
+    : eventFamily === "health" ? "health"
+    : eventFamily === "money" || eventFamily === "housing" ? "finance"
+    : eventFamily === "social" ? "personal" : undefined;
+  return goalCategory ? progressPlayerGoals(next, goalCategory, effect.goalProgress ?? 1) : next;
+}
+
+export function addPlayerGoal(state: GameState, templateId: string): GameState {
+  const template = playerGoalTemplates.find((item) => item.id === templateId);
+  if (!template || (state.playerGoals ?? []).some((goal) => goal.id === template.id && goal.status === "active")) return state;
+  const activeGoals = (state.playerGoals ?? []).filter((goal) => goal.status === "active");
+  if (activeGoals.length >= 3) return state;
+  const goal: PlayerGoal = { ...template, progress: 0, status: "active", createdWeek: state.week };
+  return { ...state, playerGoals: [...(state.playerGoals ?? []), goal], log: [`새 목표를 정했다: ${goal.title}`, ...state.log] };
+}
+
+export function setPlayerGoalStatus(state: GameState, goalId: string, status: "active" | "paused"): GameState {
+  const goals = state.playerGoals ?? [];
+  const target = goals.find((goal) => goal.id === goalId);
+  if (!target || target.status === "completed") return state;
+  if (status === "active" && goals.filter((goal) => goal.status === "active" && goal.id !== goalId).length >= 3) return state;
+  return { ...state, playerGoals: goals.map((goal) => goal.id === goalId ? { ...goal, status } : goal) };
+}
+
+function progressPlayerGoals(state: GameState, category: GoalCategory, points: number): GameState {
+  const target = (state.playerGoals ?? []).filter((goal) => goal.status === "active" && goal.category === category)
+    .sort((a, b) => a.createdWeek - b.createdWeek || a.progress - b.progress)[0];
+  if (points <= 0 || !target) return state;
+  let completedTitle: string | undefined;
+  const playerGoals = (state.playerGoals ?? []).map((goal) => {
+    if (goal.id !== target.id) return goal;
+    const progress = Math.min(goal.target, goal.progress + points);
+    if (progress >= goal.target) {
+      completedTitle = goal.title;
+      return { ...goal, progress, status: "completed" as const, completedWeek: state.week, lastProgressWeek: state.week };
+    }
+    return { ...goal, progress, lastProgressWeek: state.week };
+  });
+  return {
+    ...state,
+    playerGoals,
+    ...(completedTitle ? { log: [`목표를 이루었다: ${completedTitle}`, ...state.log] } : {}),
+  };
 }
 function addNpcMemory(contact: Contact, text: string, week: number): NPCMemory[] {
   const previous = contact.memories ?? [];
