@@ -387,7 +387,16 @@ describe("first week simulation", () => {
     expect(next.relationshipRecords?.at(-1)?.text).toContain("먼저 안부");
   });
 
-  it("does not let archived-NPC contact skip an event or weekly review", () => {\n    const base = createGame(character, 1924);\n    const person = { ...base.contacts[0], archivedWeek: base.week - 12 };\n    for (const phase of ["event", "summary"] as const) {\n      const state = { ...base, phase, archivedContacts: [person], contacts: base.contacts.slice(1) };\n      expect(contactArchivedNpc(state, person.id)).toBe(state);\n    }\n  });\n\n  it("keeps a recent-event cooldown across week boundaries", () => {
+  it("does not let archived-NPC contact skip an event or weekly review", () => {
+    const base = createGame(character, 1924);
+    const person = { ...base.contacts[0], archivedWeek: base.week - 12 };
+    for (const phase of ["event", "summary"] as const) {
+      const state = { ...base, phase, archivedContacts: [person], contacts: base.contacts.slice(1) };
+      expect(contactArchivedNpc(state, person.id)).toBe(state);
+    }
+  });
+
+  it("keeps a recent-event cooldown across week boundaries", () => {
     let state = createGame(character, 54321);
     for (let guard = 0; guard < 30 && state.phase !== "summary"; guard += 1) {
       state = state.phase === "event" && state.pendingEvent
