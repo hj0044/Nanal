@@ -1,45 +1,46 @@
-# Optional AI event generation contract v1
+# Narrative generation contract v1
 
 ## Current behavior
 
-The current game uses 60 curated event definitions and makes no model/API calls. AI is used during development to draft content; the event library is reviewed, checked in, and available offline. This keeps player-side API cost at zero and game behavior deterministic.
+The game engine selects and resolves curated events. When the host exposes `GET /api/narrative-status` and reports `available: true`, the client may ask `POST /api/narrative-event` to rewrite the wording of the already-selected event. This is a text-only pass: event IDs, choice IDs, NPC targets, choice effects, time progression, and save data remain controlled by the game engine.
 
-## Extension boundary
+When the endpoint is missing, unavailable, slow, or returns invalid output, the authored event remains playable without interruption. Local Vite development therefore uses curated copy unless a compatible server route is provided.
 
-`src/event-generation.ts` defines the future provider interface and validates untrusted model output. A later server adapter may implement `EventGenerationProvider`; the game loop should continue to select curated events first and request a generated event only when the player has opted in and the curated pool is exhausted or a requested narrative mode needs one.
-
-The browser must never contain provider credentials. Any provider call belongs behind a server endpoint, for example `POST /api/events/generate`. The endpoint and live model integration do not exist yet.
+`src/event-generation.ts` retains a validator for a separate future experiment that would generate complete events. It is not used by this live narrative-rewrite path; generated mechanics must not be added to the current endpoint contract.
 
 ## Request contract
 
-Send only the minimum context needed to write a relevant scene:
+The browser sends a schema version, the selected event's sanitized copy, and a small context object. The request excludes:
 
-- `background`: student, jobseeker, or worker
-- `year`, `ageBand`, `week`, and `day`
-- recent event IDs for repetition avoidance
-- enabled sensitive-topic flags
-- broad relationship signals such as `close-friend` or `coworker`
+- player and NPC names, stable NPC IDs, and portrait identifiers
+- free-text memories and goals
+- exact balances, full saves, or unrelated profile data
+- gameplay effects and internal contact indices
 
-Do not send player names, NPC names, free-text memories, contact details, exact balances, save files, or unrelated personal data. The current client type intentionally has no fields for those values.
+Context contains broad categories only: background, decade, month/season, region type, housing category, a pressure band, up to three relationship/character signal summaries, and recently used event families. Memory text is classified locally into a small fixed set of signals before transmission.
+
+The server must keep provider credentials outside the browser and validate all inputs. The model receives the authored choices' IDs and words but never their effects.
 
 ## Response contract
 
-Return one JSON object shaped like `LifeEvent`: `id`, `title`, `eyebrow`, `body`, optional `topic`, and two or three `choices`. Each choice contains `id`, `title`, `detail`, `result`, and a bounded `effect`. Do not return HTML, executable code, URLs, or instructions to the player.
+The endpoint returns `title`, `eyebrow`, `body`, the same two or three choice IDs with rewritten `title`, `detail`, and `result`, and `npcDialogueLine` when a speaker is present. The client rejects missing, duplicate, or changed choice IDs and malformed or overlong text. It then merges only those strings into the authored event.
 
-`validateGeneratedEvent()` rejects malformed JSON, unknown topics, disabled sensitive topics, duplicate/invalid IDs, overlong text, unknown effect keys, and excessive numeric effects. Rejected output falls back to the curated pool; it must never block time progression or corrupt a save.
+The client also re-sanitizes returned prose to prevent names or NPC goal text from being reintroduced. It preserves the NPC speaker name locally and never accepts a model-provided effect or event structure.
 
-## Operational rules for a future live mode
+## Operational rules
 
-1. Keep live generation off by default and let the player explicitly enable it.
-2. Show a clear cost/availability notice before enabling any provider that may charge.
-3. Set a short timeout, strict output-token cap, per-player rate limit, and cache key based on non-identifying context.
-4. Validate output on the server and client; never execute model-provided code or trust model-selected effects.
-5. On timeout, provider error, invalid content, or exhausted quota, use the curated event library and preserve deterministic game progress.
-6. Add provider-specific code only behind the interface. Do not tie game logic to one model vendor.
+1. Never place provider credentials in browser assets, local storage, or exported saves.
+2. Keep curated text visible and choices usable while rewriting is pending.
+3. Abort a slow client request and use the curated text on timeout, endpoint failure, invalid content, or quota exhaustion.
+4. Apply a response only if the same event is still open; never advance a day twice.
+5. Keep sensitive-topic policy and relationship mechanics in the game engine.
+6. Preserve the host's server routes when packaging a new frontend build. The current Nanal Site owns the Gemini route and its secret; this repository owns the maintainable game source.
 
 ## Acceptance checks
 
-- No provider request is made while live generation is disabled.
-- API keys are absent from browser bundles and saves.
-- Valid output passes the validator; invalid, extreme, duplicate-ID, and disabled-topic output is rejected.
-- Failure falls back to curated events without duplicating the same event or advancing a day twice.
+- No API request occurs when the status endpoint is unavailable or reports `available: false`.
+- Request construction does not include names, stable NPC IDs, free-text memories/goals, or effects.
+- Valid response text can change while choice IDs, targets, effects, and event metadata stay unchanged.
+- Invalid response, network failure, and abort leave the authored event playable.
+- A stale response cannot replace a later event.
+- Existing version 1 saves remain loadable.
