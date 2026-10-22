@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addPlayerGoal, advanceDay, advanceDays, chooseEvent, createGame, createInitialNPCRelationships, generateBodyMetrics, generateContacts, getContactAffiliation, getEventFamily, getNpcRelationshipEvents, getNpcReunionEvents, getPersonalStoryEvents, getPlayerAffiliation, getRelationshipProfile, getWeeklyCashflowPlan, normalizeContactName, personalizeAuthoredEvent, setPlayerGoalStatus, startNextWeek, takeDailyAction, type Character } from "./game";
+import { addPlayerGoal, advanceDay, advanceDays, chooseEvent, contactArchivedNpc, createGame, createInitialNPCRelationships, generateBodyMetrics, generateContacts, getContactAffiliation, getEventFamily, getNpcRelationshipEvents, getNpcReunionEvents, getPersonalStoryEvents, getPlayerAffiliation, getRelationshipProfile, getWeeklyCashflowPlan, normalizeContactName, personalizeAuthoredEvent, setPlayerGoalStatus, startNextWeek, takeDailyAction, type Character } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
 import { getImageKitPortraitUrl, getPortrait, portraitCatalog } from "./portrait-catalog";
@@ -361,13 +361,25 @@ describe("first week simulation", () => {
     const person = { ...base.contacts[0], warmth: 22, returnCount: 1, memories: [{ id: "old-memory", text: "함께 동네 축제에 갔다", week: 1, vividness: 0.28 }] };
     const state = { ...base, contacts: [person, ...base.contacts.slice(1)], npcReunionIds: [person.id] };
     const reunion = getNpcReunionEvents(state)[0];
-    expect(reunion?.body).toContain("어렴풋이 떠올랐다");
-    expect(reunion?.body).toContain("함께 동네 축제에 갔다");
+    expect(reunion?.body).toContain("세세한 장면보다 그때의 따뜻함");
+    expect(reunion?.body).not.toContain("함께 동네 축제에 갔다");
     const eventState = { ...state, phase: "event" as const, pendingEvent: reunion };
     const next = chooseEvent(eventState, "reunion-memory");
     expect(next.npcReunionIds).toEqual([]);
     expect(next.contacts[0].warmth).toBe(person.warmth + 5);
     expect(next.contacts[0].memories?.[0].text).toContain("천천히 떠올렸다");
+  });
+
+  it("lets the player reach out to an archived NPC while preserving bond history", () => {
+    const base = createGame(character, 1923);
+    const person = { ...base.contacts[0], warmth: 25, historicalBond: 82, archivedWeek: base.week - 20, memories: [{ id: "old-memory", text: "함께 야시장에 갔다", week: 1, vividness: 0.9, emotionalTrace: 0.9, significance: "meaningful" as const }] };
+    const state = { ...base, archivedContacts: [person], contacts: base.contacts.slice(1) };
+    const next = contactArchivedNpc(state, person.id);
+    expect(next.phase).toBe("event");
+    expect(next.pendingEvent?.reunion?.contactId).toBe(person.id);
+    expect(next.archivedContacts).toEqual([]);
+    expect(next.contacts.find((item) => item.id === person.id)?.warmth).toBeGreaterThan(30);
+    expect(next.relationshipRecords?.at(-1)?.text).toContain("먼저 안부");
   });
 
   it("keeps a recent-event cooldown across week boundaries", () => {
@@ -549,3 +561,4 @@ describe("first week simulation", () => {
     expect(following.log.filter((entry) => entry === line)).toHaveLength(1);
   });
 });
+
