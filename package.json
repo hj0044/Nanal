@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.app.json && vite build",
+    "build:site": "npm run build && node scripts/build-site-worker.mjs",
+    "verify:site": "npm run build:site && node scripts/verify-site-worker.mjs",
     "test": "vitest run"
   },
   "dependencies": {
@@ -16,6 +18,7 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^4.6.0",
+    "esbuild": "^0.25.5",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
     "vitest": "^3.2.4"
