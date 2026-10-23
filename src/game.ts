@@ -562,6 +562,14 @@ function dialogueFor(contact: Contact, kind: "bond" | "conflict" | "reconciliati
   if (/즉흥|유쾌|호기심/.test(trait)) return kind === "conflict" ? `잠깐, 내가 너무 앞서갔지? 다음엔 먼저 물어볼게.` : `다음엔 우리 둘 다 좋아하는 걸 해보자. 얘기하다 보니 생각보다 잘 맞네.`;
   return kind === "conflict" ? `조금 어색해졌지만 그냥 넘기고 싶지는 않아. 차분히 얘기해보자.` : `“${goal}” 얘기도 나누고 싶었어. 너랑 있으면 편하게 말할 수 있어.`;
 }
+function withKoreanParticle(name: string, kind: "and" | "subject" | "topic"): string {
+  const code = name.charCodeAt(name.length - 1);
+  const hasFinal = code >= 0xac00 && code <= 0xd7a3 && (code - 0xac00) % 28 !== 0;
+  const particle = kind === "and" ? (hasFinal ? "과" : "와")
+    : kind === "subject" ? (hasFinal ? "이" : "가")
+      : hasFinal ? "은" : "는";
+  return name + particle;
+}
 export function getNpcRelationshipEvents(state: GameState): LifeEvent[] {
   const active = new Map(state.contacts.map((contact) => [contact.id, contact]));
   const candidates = (state.npcRelationships ?? []).flatMap((link) => {
@@ -592,30 +600,30 @@ export function getNpcRelationshipEvents(state: GameState): LifeEvent[] {
   const closeness = kind === "bond";
   const conflict = kind === "conflict";
   const romance = kind === "romance";
-  const title = romance ? `${a.name}과 ${b.name}이 서로 마음을 확인했다` : conflict ? `${a.name}과 ${b.name} 사이에 오해가 생겼다` : closeness ? `${a.name}과 ${b.name}이 가까워지고 있다` : `${a.name}과 ${b.name}이 다시 대화를 시작했다`;
+  const title = romance ? `${withKoreanParticle(a.name, "and")} ${withKoreanParticle(b.name, "subject")} 서로 마음을 확인했다` : conflict ? `${withKoreanParticle(a.name, "and")} ${b.name} 사이에 오해가 생겼다` : closeness ? `${withKoreanParticle(a.name, "and")} ${withKoreanParticle(b.name, "subject")} 가까워지고 있다` : `${withKoreanParticle(a.name, "and")} ${withKoreanParticle(b.name, "subject")} 다시 대화를 시작했다`;
   const body = romance
-    ? `${a.name}과 ${b.name}은 서로 호감이 있다는 걸 직접 확인했다. 두 사람은 만나보기로 했고, 주변의 응원보다 서로의 동의와 속도를 우선하기로 했다.`
+    ? `${withKoreanParticle(a.name, "and")} ${withKoreanParticle(b.name, "topic")} 서로 호감이 있다는 걸 직접 확인했다. 두 사람은 만나보기로 했고, 주변의 응원보다 서로의 동의와 속도를 우선하기로 했다.`
     : conflict
     ? `${relation}인 두 사람이 약속과 말의 뜻을 다르게 받아들여 서먹해졌다. 둘 다 관계를 끊고 싶은 것은 아닌 듯하지만, 먼저 손을 내밀기 어렵다.`
     : closeness
-      ? `${a.name}과 ${b.name}은 서로의 근황을 자주 나누며 가까워졌다. 우정이 깊어지는 중일 수도 있고, 서로 호감이 있다면 천천히 확인해볼 수도 있다. 어느 쪽이든 당사자의 마음과 속도를 존중해야 한다.`
-      : `${a.name}과 ${b.name}은 지난번 불편했던 일을 다시 꺼내 보기로 했다. 한쪽의 사과만으로 덮기보다 서로의 경계와 바라는 점을 확인할 수 있다.`;
+      ? `${withKoreanParticle(a.name, "and")} ${withKoreanParticle(b.name, "topic")} 서로의 근황을 자주 나누며 가까워졌다. 우정이 깊어지는 중일 수도 있고, 서로 호감이 있다면 천천히 확인해볼 수도 있다. 어느 쪽이든 당사자의 마음과 속도를 존중해야 한다.`
+      : `${withKoreanParticle(a.name, "and")} ${withKoreanParticle(b.name, "topic")} 지난번 불편했던 일을 다시 꺼내 보기로 했다. 한쪽의 사과만으로 덮기보다 서로의 경계와 바라는 점을 확인할 수 있다.`;
   const choices: EventChoice[] = romance ? [
-    { id: `${id}-encourage`, title: "두 사람의 결정을 응원한다", detail: "서로 편한 속도로 알아가도록 지지한다", result: `${a.name}과 ${b.name}이 서로의 마음과 경계를 확인한 결정을 응원했다. 두 사람은 만나보며 관계를 천천히 쌓아가기로 했다.`, effect: { mood: 2, npcRelationship: 5 } },
-    { id: `${id}-privacy`, title: "축하하고 사적인 이야기는 묻지 않는다", detail: "당사자가 먼저 나눌 때까지 기다린다", result: `${a.name}과 ${b.name}에게 축하를 전하고 사적인 이야기는 먼저 묻지 않았다. 필요할 때 편하게 말하라고 전했다.`, effect: { npcRelationship: 3 } },
-    { id: `${id}-neutral`, title: "평소처럼 대하며 지켜본다", detail: "관계의 변화를 두 사람이 직접 만들어가게 둔다", result: `${a.name}과 ${b.name}의 관계를 대신 규정하지 않고 평소처럼 대했다. 두 사람은 자신의 속도로 만남을 이어간다.`, effect: { npcRelationship: 1 } },
+    { id: `${id}-encourage`, title: "두 사람의 결정을 응원한다", detail: "서로 편한 속도로 알아가도록 지지한다", result: `${withKoreanParticle(a.name, "and")} ${withKoreanParticle(b.name, "subject")} 서로의 마음과 경계를 확인한 결정을 응원했다. 두 사람은 만나보며 관계를 천천히 쌓아가기로 했다.`, effect: { mood: 2, npcRelationship: 5 } },
+    { id: `${id}-privacy`, title: "축하하고 사적인 이야기는 묻지 않는다", detail: "당사자가 먼저 나눌 때까지 기다린다", result: `${withKoreanParticle(a.name, "and")} ${b.name}에게 축하를 전하고 사적인 이야기는 먼저 묻지 않았다. 필요할 때 편하게 말하라고 전했다.`, effect: { npcRelationship: 3 } },
+    { id: `${id}-neutral`, title: "평소처럼 대하며 지켜본다", detail: "관계의 변화를 두 사람이 직접 만들어가게 둔다", result: `${withKoreanParticle(a.name, "and")} ${b.name}의 관계를 대신 규정하지 않고 평소처럼 대했다. 두 사람은 자신의 속도로 만남을 이어간다.`, effect: { npcRelationship: 1 } },
   ] : conflict ? [
-    { id: `${id}-listen`, title: "두 사람 말을 따로 충분히 들어본다", detail: "누구 편도 들지 않고 각자 원하는 점을 확인한다", result: `${a.name}과 ${b.name}의 이야기를 각각 들었다. 서로 오해한 지점을 확인하고 직접 대화할 시간을 정했다.`, effect: { mood: 1, npcRelationship: 10 } },
-    { id: `${id}-mediate`, title: "함께 이야기할 자리를 제안한다", detail: "대화 규칙을 정하고 해결할 한 가지를 고른다", result: `${a.name}과 ${b.name}이 차례로 말할 수 있도록 도왔다. 당장 다 풀리진 않았지만 서로의 입장을 알게 됐다.`, effect: { stress: -1, npcRelationship: 6 } },
-    { id: `${id}-space`, title: "감정이 가라앉을 때까지 기다린다", detail: "화해를 강요하지 않고 각자의 공간을 존중한다", result: `${a.name}과 ${b.name}에게 먼저 진정할 시간을 줬다. 서둘러 결론 내리지 않기로 했다.`, effect: { stress: -1, npcRelationship: 1 } },
+    { id: `${id}-listen`, title: "두 사람 말을 따로 충분히 들어본다", detail: "누구 편도 들지 않고 각자 원하는 점을 확인한다", result: `${withKoreanParticle(a.name, "and")} ${b.name}의 이야기를 각각 들었다. 서로 오해한 지점을 확인하고 직접 대화할 시간을 정했다.`, effect: { mood: 1, npcRelationship: 10 } },
+    { id: `${id}-mediate`, title: "함께 이야기할 자리를 제안한다", detail: "대화 규칙을 정하고 해결할 한 가지를 고른다", result: `${withKoreanParticle(a.name, "and")} ${withKoreanParticle(b.name, "subject")} 차례로 말할 수 있도록 도왔다. 당장 다 풀리진 않았지만 서로의 입장을 알게 됐다.`, effect: { stress: -1, npcRelationship: 6 } },
+    { id: `${id}-space`, title: "감정이 가라앉을 때까지 기다린다", detail: "화해를 강요하지 않고 각자의 공간을 존중한다", result: `${withKoreanParticle(a.name, "and")} ${b.name}에게 먼저 진정할 시간을 줬다. 서둘러 결론 내리지 않기로 했다.`, effect: { stress: -1, npcRelationship: 1 } },
   ] : closeness ? [
-    { id: `${id}-encourage`, title: "서로 직접 마음을 확인해보라고 응원한다", detail: "관계의 이름을 대신 정하지 않고 솔직한 대화를 권한다", result: `${a.name}과 ${b.name}에게 서로의 마음을 직접 확인하되 어떤 답이든 존중하라고 전했다. 두 사람은 편한 속도로 이야기해보기로 했다.`, effect: { mood: 2, npcRelationship: 5 } },
-    { id: `${id}-group`, title: "다 함께 만날 자리를 만든다", detail: "부담 없이 관계를 이어갈 기회를 마련한다", result: `${a.name}과 ${b.name}이 부담 없이 만날 수 있도록 여러 사람이 함께하는 자리를 잡았다.`, effect: { energy: -1, npcRelationship: 3 } },
-    { id: `${id}-respect`, title: "두 사람에게 맡기고 지켜본다", detail: "사적인 관계에 끼어들지 않는다", result: `${a.name}과 ${b.name}이 스스로 관계의 속도와 방향을 정하도록 맡겼다.`, effect: { focus: 1, npcRelationship: 1 } },
+    { id: `${id}-encourage`, title: "서로 직접 마음을 확인해보라고 응원한다", detail: "관계의 이름을 대신 정하지 않고 솔직한 대화를 권한다", result: `${withKoreanParticle(a.name, "and")} ${b.name}에게 서로의 마음을 직접 확인하되 어떤 답이든 존중하라고 전했다. 두 사람은 편한 속도로 이야기해보기로 했다.`, effect: { mood: 2, npcRelationship: 5 } },
+    { id: `${id}-group`, title: "다 함께 만날 자리를 만든다", detail: "부담 없이 관계를 이어갈 기회를 마련한다", result: `${withKoreanParticle(a.name, "and")} ${withKoreanParticle(b.name, "subject")} 부담 없이 만날 수 있도록 여러 사람이 함께하는 자리를 잡았다.`, effect: { energy: -1, npcRelationship: 3 } },
+    { id: `${id}-respect`, title: "두 사람에게 맡기고 지켜본다", detail: "사적인 관계에 끼어들지 않는다", result: `${withKoreanParticle(a.name, "and")} ${withKoreanParticle(b.name, "subject")} 스스로 관계의 속도와 방향을 정하도록 맡겼다.`, effect: { focus: 1, npcRelationship: 1 } },
   ] : [
-    { id: `${id}-apology`, title: "서로 상처 준 부분을 구체적으로 사과한다", detail: "잘못을 인정하고 다시 지킬 경계를 합의한다", result: `${a.name}과 ${b.name}이 각자 상처 준 부분을 짚어 사과했다. 다음에는 어떻게 할지 함께 정했다.`, effect: { mood: 2, stress: -2, npcRelationship: 12 } },
-    { id: `${id}-smallstep`, title: "작은 약속부터 다시 시작한다", detail: "완전한 화해를 서두르지 않는다", result: `${a.name}과 ${b.name}은 당장 예전처럼 지내려 하지 않고 작은 약속부터 지켜보기로 했다.`, effect: { stress: -1, npcRelationship: 7 } },
-    { id: `${id}-boundary`, title: "당분간 필요한 거리를 존중한다", detail: "화해보다 안전하고 편한 거리를 우선한다", result: `${a.name}과 ${b.name}이 원하는 거리를 서로 확인했다. 용서나 화해를 강요하지 않기로 했다.`, effect: { npcRelationship: 2 } },
+    { id: `${id}-apology`, title: "서로 상처 준 부분을 구체적으로 사과한다", detail: "잘못을 인정하고 다시 지킬 경계를 합의한다", result: `${withKoreanParticle(a.name, "and")} ${withKoreanParticle(b.name, "subject")} 각자 상처 준 부분을 짚어 사과했다. 다음에는 어떻게 할지 함께 정했다.`, effect: { mood: 2, stress: -2, npcRelationship: 12 } },
+    { id: `${id}-smallstep`, title: "작은 약속부터 다시 시작한다", detail: "완전한 화해를 서두르지 않는다", result: `${withKoreanParticle(a.name, "and")} ${withKoreanParticle(b.name, "topic")} 당장 예전처럼 지내려 하지 않고 작은 약속부터 지켜보기로 했다.`, effect: { stress: -1, npcRelationship: 7 } },
+    { id: `${id}-boundary`, title: "당분간 필요한 거리를 존중한다", detail: "화해보다 안전하고 편한 거리를 우선한다", result: `${withKoreanParticle(a.name, "and")} ${withKoreanParticle(b.name, "subject")} 원하는 거리를 서로 확인했다. 용서나 화해를 강요하지 않기로 했다.`, effect: { npcRelationship: 2 } },
   ];
   return [{ id, title, eyebrow: `${relation} 관계 · ${romance ? "연애" : conflict ? "갈등" : closeness ? "관계의 변화" : "화해"}`, body,
     npcPair: { linkId: link.id, kind, contactAId: a.id, contactBId: b.id, speakerId: speaker.id },
