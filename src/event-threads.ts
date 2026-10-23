@@ -71,6 +71,51 @@ function stageOne(id: string, route: string, name: string, contactId?: string): 
       choice("repair-space", "조금 더 시간을 두고 안부만 나눈다", "무리한 화해를 서두르지 않는다", `${name}과 당장 결론을 내리지 않고 가볍게 안부를 주고받았다. 관계를 이어갈 여지는 남겼다.`, { relationship: 1, stress: -1 }, contactId),
     ] };
   }
+  if (id === "shared-project") return {
+    id: `thread-${id}-stage-1-${route}`, thread: { id, stage: 1 }, title: `${name}이 먼저 보낸 “우리 그거 해볼까?”`,
+    eyebrow: "친구 · 같이 시작한 일", body: `${name}과 가볍게 꺼냈던 계획이 다시 대화에 올랐다. 이번에는 말로만 끝내지 않고 작게 시작해볼 수 있다.`,
+    choices: [
+      choice("project-pick-date", "이번 주에 만날 날짜부터 잡는다", "작은 약속을 실제 일정으로 옮긴다", `${name}과 만날 날짜를 정했다. 장소와 준비물은 천천히 정하기로 했다.`, { relationship: 3, focus: 2 }, contactId),
+      choice("project-define-small", "첫 단계만 정하고 부담을 줄인다", "완성보다 시작을 먼저 챙긴다", `${name}과 이번 주에 할 수 있는 첫 단계만 정했다. 부담이 줄어들자 계획이 조금 현실적으로 느껴졌다.`, { relationship: 2, stress: -1, focus: 2 }, contactId),
+      choice("project-check-interest", "서로 아직 하고 싶은지 솔직히 확인한다", "예전 계획에 억지로 매이지 않는다", `${name}과 계획을 다시 꺼낸 이유와 지금의 마음을 나눴다. 계속할지 함께 결정하기로 했다.`, { relationship: 2, mood: 1 }, contactId),
+    ],
+  };
+  if (id === "old-friend") return {
+    id: `thread-${id}-stage-1-${route}`, thread: { id, stage: 1 }, title: `${name}에게서 “요즘 잘 지내?”가 왔다`,
+    eyebrow: "오래된 인연 · 다시 연락", body: `한동안 뜸했던 ${name}이 먼저 안부를 물었다. 반가움과 어색함이 같이 들지만, 대답은 지금의 마음에 맞춰도 된다.`,
+    choices: [
+      choice("friend-reply-honest", "요즘 내 얘기도 조금 솔직하게 전한다", "잘 지낸다는 말로 덮지 않는다", `${name}에게 요즘 있었던 일을 솔직하게 전했다. ${name}도 자신의 근황을 들려주며 대화가 이어졌다.`, { relationship: 3, mood: 2 }, contactId),
+      choice("friend-call", "짧게 통화하자고 먼저 제안한다", "메시지보다 목소리로 안부를 나눈다", `${name}과 통화로 근황을 나눴다. 어색함은 조금 남았지만 다시 연락할 이유가 생겼다.`, { relationship: 3, stress: -1 }, contactId),
+      choice("friend-slow", "반갑다고 답하고 천천히 이야기를 잇는다", "급하게 예전처럼 돌아가려 하지 않는다", `${name}에게 반갑다고 답했다. 무리해서 긴 대화를 만들지 않고 서로 편한 속도로 연락하기로 했다.`, { relationship: 2, stress: -1 }, contactId),
+    ],
+  };
+  if (id === "family-plan") return {
+    id: `thread-${id}-stage-1-${route}`, thread: { id, stage: 1 }, title: `${name}과 통화하다가 남은 이야기`,
+    eyebrow: "가족 · 안부와 거리", body: `${name}과 안부를 나누다 보니 평소엔 미뤄둔 이야기도 나왔다. 가족이라는 이유만으로 넘기지 말고, 필요한 만큼 서로의 생각을 들을 수 있다.`,
+    choices: [
+      choice("family-plan-visit", "이번 달에 함께할 날짜를 정한다", "막연한 안부를 실제 만남으로 잇는다", `${name}과 이번 달에 만날 날을 정했다. 그때 하고 싶었던 이야기도 천천히 나누기로 했다.`, { relationship: 3, mood: 2 }, contactId),
+      choice("family-plan-boundary", "내가 가능한 범위부터 솔직히 말한다", "도움과 부담의 선을 함께 정한다", `${name}에게 지금 가능한 일과 어려운 일을 차분히 설명했다. 서로의 기대를 다시 맞췄다.`, { relationship: 2, stress: -2 }, contactId),
+      choice("family-plan-call", "주말마다 짧게 통화하기로 한다", "큰 약속보다 꾸준한 안부를 택한다", `${name}과 주말에 짧게 통화하기로 했다. 부담은 적고 서로의 생활을 놓치지 않을 방법이 생겼다.`, { relationship: 2, focus: 1 }, contactId),
+    ],
+  };
+  if (id === "hobby-project") return {
+    id: `thread-${id}-stage-1-${route}`, thread: { id, stage: 1 }, title: `${name}이 같이 해보자던 취미를 다시 꺼냈다`,
+    eyebrow: "취미 · 새로운 일상", body: `${name}이 예전에 이야기했던 취미를 다시 제안했다. 비용과 시간을 따져보면서도, 함께 웃을 일을 만들 수 있다.`,
+    choices: [
+      choice("hobby-try", "이번 주에 체험부터 해본다", "큰 결제 없이 서로 맞는지 살핀다", `${name}과 체험 수업을 알아봤다. 잘 맞으면 계속하고 아니면 좋은 하루로 남기기로 했다.`, { relationship: 3, mood: 3, money: -8_000 }, contactId),
+      choice("hobby-home", "돈 적게 드는 방식으로 먼저 해본다", "장비나 수강권보다 같이 해보는 데 집중한다", `${name}과 집 근처에서 가볍게 시작해보기로 했다. 필요한 건 해본 다음에 사기로 했다.`, { relationship: 2, focus: 1 }, contactId),
+      choice("hobby-calendar", "바쁜 일정이 지나면 다시 날짜를 잡는다", "관심은 남기되 이번 주 부담을 줄인다", `${name}에게 이번 주 일정은 어렵다고 말하고 가능한 시기를 함께 찾았다. 계획을 접지는 않았다.`, { relationship: 1, stress: -1 }, contactId),
+    ],
+  };
+  if (id === "career-mentor") return {
+    id: `thread-${id}-stage-1-${route}`, thread: { id, stage: 1 }, title: `${name}이 건넨 뜻밖의 연락처`,
+    eyebrow: "기회 · 사람을 통한 연결", body: `${name}이 네가 고민하던 분야를 아는 사람을 소개해줄 수 있다고 했다. 당장 결과를 기대하기보다 어떤 이야기를 나누고 싶은지 정할 수 있다.`,
+    choices: [
+      choice("mentor-intro-accept", "소개를 부탁하고 궁금한 점을 정리한다", "먼저 대화할 주제를 준비한다", `${name}에게 소개를 부탁했다. 궁금한 점을 정리해 첫 연락에서 편하게 물어보기로 했다.`, { relationship: 2, focus: 3 }, contactId),
+      choice("mentor-intro-ask", "그 사람이 어떤 일을 하는지 먼저 듣는다", "소개 전에 나와 맞는 자리인지 살핀다", `${name}에게 상대의 경험과 현재 하는 일을 먼저 들었다. 필요한 도움인지 생각한 뒤 연락하기로 했다.`, { relationship: 2, focus: 2 }, contactId),
+      choice("mentor-intro-later", "지금은 준비를 조금 더 한 뒤 부탁한다", "연결을 소중하게 쓰도록 시간을 둔다", `${name}에게 고맙다고 전하고, 준비를 마친 뒤 소개를 부탁하기로 했다.`, { relationship: 1, stress: -1, focus: 1 }, contactId),
+    ],
+  };
   const start = route === "apply" ? "지원서를 제출한 뒤 결과를 기다리고 있다."
     : route === "prepare" ? "지원 자료를 다듬었지만 공고 마감이 가까워졌다."
     : "현직자에게 들은 정보를 바탕으로 지원 방향을 정리했다.";
@@ -91,6 +136,34 @@ function stageTwo(id: string, route: string, name: string, contactId?: string): 
     choice("repair-close", "다음에 함께할 시간을 정한다", "작은 약속으로 신뢰를 이어간다", `${name}과 다음에 만날 시간을 정했다. 완벽한 화해보다 지킬 수 있는 약속을 이어가기로 했다.`, { relationship: 3, mood: 2 }, contactId),
     choice("repair-open", "부담 없이 안부를 나누며 지켜본다", "관계의 속도를 서로에게 맞춘다", `${name}과 무리하지 않고 안부를 주고받기로 했다. 필요한 이야기는 편한 때 다시 꺼낼 수 있다.`, { relationship: 2, stress: -1 }, contactId),
   ] };
+  const continuing = (title: string, body: string, choices: EventChoice[]): LifeEvent => ({
+    id: `thread-${id}-stage-2-${route}`, thread: { id, stage: 2 }, title, eyebrow: "이어지는 이야기 · 두 번째 장", body, choices,
+  });
+  if (id === "shared-project") return continuing(`${name}과 처음 같이 해본 날`, `생각보다 손이 많이 갔지만 ${name}과 역할을 나누니 조금씩 모양이 잡혔다. 계속 키워갈지, 작게 남길지 정할 수 있다.`, [
+    choice("project-share", "중간 결과를 다른 사람에게 보여준다", "반응을 듣고 다음 방향을 찾는다", `${name}과 중간 결과를 공유했다. 예상 못 한 의견이 다음 아이디어로 이어졌다.`, { relationship: 2, focus: 2 }, contactId),
+    choice("project-scope", "처음 생각보다 범위를 줄인다", "완성할 수 있는 크기로 다시 맞춘다", `${name}과 욕심냈던 부분을 덜어냈다. 이번 주에 끝낼 수 있는 만큼으로 바꾸자 다시 움직일 수 있었다.`, { relationship: 2, stress: -1, focus: 2 }, contactId),
+    choice("project-roles", "각자 맡을 일을 다시 나눈다", "한 사람에게 부담이 쏠리지 않게 한다", `${name}과 시간이 얼마나 드는지 확인하고 역할을 나눴다. 서로 기대하는 바도 분명해졌다.`, { relationship: 3, focus: 1 }, contactId),
+  ]);
+  if (id === "old-friend") return continuing(`${name}과 밀린 이야기를 나눈 저녁`, `처음엔 근황만 묻다가 예전엔 몰랐던 서로의 시간을 알게 됐다. 다시 가까워지는 방식은 둘이 새로 정하면 된다.`, [
+    choice("friend-memory", "예전에 같이 가던 곳을 다시 찾아간다", "익숙한 장소에서 새로운 근황을 나눈다", `${name}과 예전에 자주 가던 곳에 들렀다. 달라진 점도 그대로인 점도 편하게 이야기했다.`, { relationship: 3, mood: 2 }, contactId),
+    choice("friend-new-memory", "이번엔 새로운 장소에서 만나자고 한다", "과거에만 기대지 않고 지금을 알아간다", `${name}과 처음 가보는 곳에서 만났다. 예전 추억에 지금의 이야기가 더해졌다.`, { relationship: 3, focus: 1 }, contactId),
+    choice("friend-rhythm", "다음 연락은 누가 먼저든 편하게 하자고 한다", "연락 빈도를 약속으로 묶지 않는다", `${name}과 연락 횟수를 정해두지 않기로 했다. 생각나면 먼저 안부를 묻기로 했다.`, { relationship: 2, stress: -1 }, contactId),
+  ]);
+  if (id === "family-plan") return continuing(`${name}과 정한 약속을 앞두고`, `만날 날짜가 가까워지자 서로 궁금했던 일과 조심스러운 이야기가 떠올랐다. 어디까지 나눌지 미리 정할 수 있다.`, [
+    choice("family-talk-open", "미뤄둔 이야기를 만나서 나눈다", "서로의 입장을 차분히 듣는다", `${name}과 미뤄둔 이야기를 나눴다. 바로 해결되지는 않았지만 서로 무엇을 걱정하는지는 알게 됐다.`, { relationship: 3, stress: -2 }, contactId),
+    choice("family-time-light", "이번 만남은 가볍게 근황만 나눈다", "한 번에 모든 문제를 다루지 않는다", `${name}과 식사하며 편한 이야기부터 나눴다. 어려운 주제는 둘 다 준비가 됐을 때 꺼내기로 했다.`, { relationship: 2, mood: 2 }, contactId),
+    choice("family-ask", "내가 필요한 도움이나 바라는 점을 구체적으로 말한다", "기대만 쌓이지 않게 요청을 분명히 한다", `${name}에게 필요한 것을 구체적으로 부탁했다. 어렵다면 어렵다고 말해달라고도 전했다.`, { relationship: 2, focus: 1 }, contactId),
+  ]);
+  if (id === "hobby-project") return continuing(`${name}과 두 번째로 취미를 해본 날`, `처음보다 어색함은 줄었지만 시간과 비용을 계속 쓸 수 있을지는 고민된다. 생활에 무리 없는 방법을 고를 수 있다.`, [
+    choice("hobby-regular", "한 달에 한 번만 같이 하기로 한다", "꾸준히 할 수 있는 빈도를 찾는다", `${name}과 한 달에 한 번 만나는 날을 정했다. 다른 일정과 예산을 해치지 않게 이어가기로 했다.`, { relationship: 3, mood: 2 }, contactId),
+    choice("hobby-solo", "각자 연습하고 다음에 결과를 나눈다", "함께하지 않는 시간에도 관심을 이어간다", `${name}과 각자 해볼 것을 정했다. 다음에 만날 때 서로의 변화를 보여주기로 했다.`, { relationship: 2, focus: 2 }, contactId),
+    choice("hobby-pause", "당분간 쉬되 다시 시작할 때를 정한다", "흥미가 사라지기 전에 부담부터 조절한다", `${name}과 잠시 쉬는 데 동의했다. 다시 해보고 싶은 시기를 정해 아예 흐지부지되지 않게 했다.`, { relationship: 2, stress: -1 }, contactId),
+  ]);
+  if (id === "career-mentor") return continuing(`${name}의 소개로 첫 대화를 앞두고`, `상대가 시간을 내주기로 했다. 잘 보이려 애쓰기보다 궁금한 점과 내 상황을 솔직하게 나눌 준비를 할 수 있다.`, [
+    choice("mentor-meet", "내가 해온 일을 짧게 정리해 만난다", "도움을 구체적으로 요청한다", `${name}의 소개로 만난 사람에게 지금까지 해온 일과 고민을 설명했다. 당장 답을 얻기보다 다음에 준비할 방향을 들었다.`, { focus: 3, relationship: 2 }, contactId),
+    choice("mentor-question", "현업의 하루와 어려운 점부터 묻는다", "나와 맞는 일인지 현실을 확인한다", `${name}이 연결해준 사람에게 실제 업무 이야기를 들었다. 막연한 동경과 현실을 함께 살펴볼 수 있었다.`, { focus: 4, stress: -1 }, contactId),
+    choice("mentor-thank", "소개해준 사람에게 고마움을 전한다", "관계의 도움을 당연하게 여기지 않는다", `${name}에게 고맙다고 전했다. 소개를 받은 뒤에도 진행 상황을 알려주기로 했다.`, { relationship: 3, mood: 1 }, contactId),
+  ]);
   return { id: `thread-${id}-stage-2-${route}`, thread: { id, stage: 2 }, title: "다음 지원을 위한 정리", eyebrow: "구직 · 한 단계 마무리", body: "지원 과정에서 얻은 경험을 다음 계획으로 옮길 차례다. 구직을 계속하되 준비와 회복의 균형을 정할 수 있다.", choices: [
     choice("job-close-plan", "다음 주 지원 목표를 구체적으로 정한다", "실행할 수 있는 수와 시간을 정한다", "다음 주 지원할 곳과 준비 시간을 정했다. 막연한 걱정이 작은 일정으로 바뀌었다.", { focus: 3, stress: -1, goalProgress: 1 }),
     choice("job-close-support", "도움을 받을 사람에게 진행 상황을 나눈다", "혼자 준비하지 않도록 연결을 유지한다", "믿을 만한 사람에게 준비 상황을 나눴다. 조언을 받을 통로를 이어가기로 했다.", { mood: 2, stress: -2, relationship: 1 }),
