@@ -23,13 +23,14 @@ export const commonEventLibrary: LifeEvent[] = [
   },
   {
     id: "common-date-plan",
-    title: "서로 호감 있는 사람과 약속을 잡았다",
-    eyebrow: "연애 · 관계",
-    body: "최근 연락을 주고받던 사람이 주말에 만나자고 한다. 무엇을 할지와 어느 정도 마음을 표현할지 생각해볼 수 있다.",
+    thread: { id: "romance-route", stage: 0 },
+    title: "이번 주말, 그 사람과 만나기로 했다",
+    eyebrow: "연애 · 첫 만남",
+    body: "최근 연락을 주고받던 사람이 주말에 만나자고 했다. 어디서 만날지, 서로 얼마나 솔직해질지 지금 마음에 맞춰 정할 수 있다.",
     choices: [
-      { id: "date-active", title: "관심 있던 장소를 골라 약속을 정한다", detail: "마음을 표현하고 만남을 기대한다", result: "함께 가고 싶었던 곳으로 약속을 잡았다. 서로에 대해 더 알아갈 시간이 생겼다.", effect: { money: -25000, mood: 8, energy: -3, relationship: 5 }, contactIndex: 1 },
-      { id: "date-simple", title: "부담 없는 식사나 산책을 제안한다", detail: "편안한 분위기에서 대화한다", result: "가볍게 식사하며 이야기하기로 했다. 부담 없이 서로의 생각을 나눌 수 있을 것 같다.", effect: { money: -12000, mood: 5, stress: -2, relationship: 4 }, contactIndex: 1 },
-      { id: "date-check", title: "일정을 확인한 뒤 가능한 시간을 답한다", detail: "기대와 현실적인 일정을 함께 맞춘다", result: "서로 가능한 시간을 확인해 약속을 조율했다. 급하게 정하지 않아 마음이 편해졌다.", effect: { mood: 2, stress: -1, relationship: 2 }, contactIndex: 1 },
+      { id: "date-active", title: "가보고 싶던 곳을 골라 제안한다", detail: "기대하는 마음을 숨기지 않고 전한다", result: "함께 가고 싶었던 곳으로 약속을 잡았다. 서로에 대해 더 알아갈 시간이 생겼다.", effect: { money: -25000, mood: 8, energy: -3, relationship: 5 }, contactIndex: 1 },
+      { id: "date-simple", title: "밥 먹고 동네를 걸으며 얘기하자고 한다", detail: "편한 자리에서 서로의 요즘을 알아간다", result: "가볍게 식사하며 이야기하기로 했다. 부담 없이 서로의 생각을 나눌 수 있을 것 같다.", effect: { money: -12000, mood: 5, stress: -2, relationship: 4 }, contactIndex: 1 },
+      { id: "date-check", title: "가능한 날을 먼저 맞춰본다", detail: "서로 부담 없는 시간부터 찾는다", result: "서로 가능한 시간을 확인해 약속을 조율했다. 급하게 정하지 않아 마음이 편해졌다.", effect: { mood: 2, stress: -1, relationship: 2 }, contactIndex: 1 },
     ],
   },
   {
@@ -100,7 +101,6 @@ export const commonEventLibrary: LifeEvent[] = [
       { id: "message-shift", title: "휴대전화를 내려놓고 다른 일을 한다", detail: "신경 쓰이는 시간을 줄인다", result: "메신저를 잠시 닫고 하던 일로 돌아갔다. 답을 기다리는 동안의 불편함이 줄었다.", effect: { mood: 2, focus: 3, stress: -3 } },
     ],
   },
-  ,
   {
     id: "common-shared-project",
     thread: { id: "shared-project", stage: 0 },
