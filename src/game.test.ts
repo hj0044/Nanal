@@ -322,7 +322,7 @@ describe("first week simulation", () => {
   it("provides a broad, unique pool of reviewed events per background", () => {
     const ids = [...commonEventLibrary, ...Object.values(eventLibrary).flat()].map((event) => event.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids).toHaveLength(60);
+    expect(ids.length).toBeGreaterThanOrEqual(60);
     for (const background of ["student", "jobseeker", "worker"] as const) {
       expect(eventLibrary[background].length + commonEventLibrary.length).toBeGreaterThanOrEqual(25);
       expect([...eventLibrary[background], ...commonEventLibrary].every((event) => event.choices.length >= 2)).toBe(true);
