@@ -4,6 +4,14 @@ const choice = (id: string, title: string, detail: string, result: string, effec
   id, title, detail, result, effect, ...(contactId ? { contactId } : {}),
 });
 
+function withKoreanParticle(name: string, kind: "and" | "subject" | "topic"): string {
+  const code = name.charCodeAt(name.length - 1);
+  const hasFinal = code >= 0xac00 && code <= 0xd7a3 && (code - 0xac00) % 28 !== 0;
+  return name + (kind === "and" ? (hasFinal ? "과" : "와")
+    : kind === "subject" ? (hasFinal ? "이" : "가")
+      : hasFinal ? "은" : "는");
+}
+
 /** Returns due authored follow-ups from saved route state; no random rolls or external calls. */
 export function getEventThreadEvents(state: GameState): LifeEvent[] {
   return Object.entries(state.eventThreads ?? {}).flatMap(([id, thread]) => {
@@ -61,55 +69,67 @@ function stageOne(id: string, route: string, name: string, contactId?: string): 
       choice("expense-follow-talk", "납부 일정이나 도움을 받을 방법을 문의한다", "혼자 감당하지 않고 현실적인 일정을 확인한다", `${name}에게 상황을 설명하고 가능한 도움과 납부 일정을 함께 확인했다. 부담을 나눌 방법이 생겼다.`, { stress: -3, relationship: 2 }, contactId),
     ] };
   }
+  if (id === "romance-route") {
+    const start = route === "date-active" ? "관심 있던 장소에서 만나 생각보다 오래 이야기했다."
+      : route === "date-simple" ? "부담 없는 식사를 하며 서로의 요즘을 나눴다."
+        : "서로 가능한 시간을 맞춰 첫 만남 날짜를 정했다.";
+    return { id: `thread-${id}-stage-1-${route}`, thread: { id, stage: 1 },
+      title: route === "date-active" ? "집에 돌아와도 남은 첫 만남" : route === "date-simple" ? "편안해서 더 궁금해진 사람" : "첫 약속을 기다리는 동안",
+      eyebrow: "연애 · 첫 만남 뒤", body: `${start} 기분 좋은 설렘만 좇기보다 서로 편한 방식으로 알아갈 수 있다.`, choices: [
+        choice("romance-second-date", "다음에 같이 해보고 싶은 일을 제안한다", "첫 만남에서 나온 얘기를 실제 약속으로 잇는다", `${withKoreanParticle(name, "and")} 다음 만남에서 해볼 일을 정했다. 이번에는 서로 좋아하는 걸 하나씩 가져오기로 했다.`, { relationship: 3, mood: 2, money: -8_000 }, contactId),
+        choice("romance-expectations", "연락과 만남에 대한 기대를 나눈다", "속도와 표현 방식이 서로 다른지 확인한다", `${withKoreanParticle(name, "and")} 연락 빈도나 만남의 속도에 대해 이야기했다. 서로에게 편한 기준을 찾을 수 있었다.`, { relationship: 2, focus: 2, stress: -1 }, contactId),
+        choice("romance-slow", "당장 결론 내리지 않고 조금 더 만나본다", "호감은 전하되 답을 서두르지 않는다", `${name}에게 호감은 전하되 지금 당장 관계를 정하진 말자고 했다. 부담 없이 다음 만남을 이어가기로 했다.`, { relationship: 2, stress: -1 }, contactId),
+      ] };
+  }
   if (id === "relationship-repair") {
-    const start = route === "misunderstanding-ask" ? `${name}과 그날의 말을 다시 확인한 뒤 서로의 의도를 조금 알게 됐다.`
+    const start = route === "misunderstanding-ask" ? `${withKoreanParticle(name, "and")} 그날의 말을 다시 확인한 뒤 서로의 의도를 조금 알게 됐다.`
       : route === "misunderstanding-wait" ? `생각을 정리한 뒤 ${name}에게 먼저 대화를 제안했다.`
-      : `${name}과 잠시 거리를 둔 사이, 어색함이 쉽게 풀리지 않았다.`;
+      : `${withKoreanParticle(name, "and")} 잠시 거리를 둔 사이, 어색함이 쉽게 풀리지 않았다.`;
     return { id: `thread-${id}-stage-1-${route}`, thread: { id, stage: 1 }, title: `${name}에게서 먼저 연락이 왔다`, eyebrow: "관계 · 이어진 이야기", body: `${start} 이번에는 관계를 어떻게 이어갈지 작은 행동으로 정할 수 있다.`, choices: [
       choice("repair-listen", "상대가 느낀 점을 끝까지 듣는다", "먼저 이해하고 대화를 이어간다", `${name}의 이야기를 충분히 들었다. 서로 다르게 받아들인 부분을 인정하며 다시 편하게 연락하기로 했다.`, { relationship: 4, stress: -2 }, contactId),
-      choice("repair-boundary", "다음부터 지킬 대화 방식을 제안한다", "서로 편안한 기준을 정한다", `${name}과 불편했던 상황을 줄일 방법을 정했다. 모든 생각이 같지는 않아도 서로의 경계를 존중하기로 했다.`, { relationship: 2, focus: 2 }, contactId),
-      choice("repair-space", "조금 더 시간을 두고 안부만 나눈다", "무리한 화해를 서두르지 않는다", `${name}과 당장 결론을 내리지 않고 가볍게 안부를 주고받았다. 관계를 이어갈 여지는 남겼다.`, { relationship: 1, stress: -1 }, contactId),
+      choice("repair-boundary", "다음부터 지킬 대화 방식을 제안한다", "서로 편안한 기준을 정한다", `${withKoreanParticle(name, "and")} 불편했던 상황을 줄일 방법을 정했다. 모든 생각이 같지는 않아도 서로의 경계를 존중하기로 했다.`, { relationship: 2, focus: 2 }, contactId),
+      choice("repair-space", "조금 더 시간을 두고 안부만 나눈다", "무리한 화해를 서두르지 않는다", `${withKoreanParticle(name, "and")} 당장 결론을 내리지 않고 가볍게 안부를 주고받았다. 관계를 이어갈 여지는 남겼다.`, { relationship: 1, stress: -1 }, contactId),
     ] };
   }
   if (id === "shared-project") return {
-    id: `thread-${id}-stage-1-${route}`, thread: { id, stage: 1 }, title: `${name}이 먼저 보낸 “우리 그거 해볼까?”`,
-    eyebrow: "친구 · 같이 시작한 일", body: `${name}과 가볍게 꺼냈던 계획이 다시 대화에 올랐다. 이번에는 말로만 끝내지 않고 작게 시작해볼 수 있다.`,
+    id: `thread-${id}-stage-1-${route}`, thread: { id, stage: 1 }, title: `${withKoreanParticle(name, "subject")} 먼저 보낸 “우리 그거 해볼까?”`,
+    eyebrow: "친구 · 같이 시작한 일", body: `${withKoreanParticle(name, "and")} 가볍게 꺼냈던 계획이 다시 대화에 올랐다. 이번에는 말로만 끝내지 않고 작게 시작해볼 수 있다.`,
     choices: [
-      choice("project-pick-date", "이번 주에 만날 날짜부터 잡는다", "작은 약속을 실제 일정으로 옮긴다", `${name}과 만날 날짜를 정했다. 장소와 준비물은 천천히 정하기로 했다.`, { relationship: 3, focus: 2 }, contactId),
-      choice("project-define-small", "첫 단계만 정하고 부담을 줄인다", "완성보다 시작을 먼저 챙긴다", `${name}과 이번 주에 할 수 있는 첫 단계만 정했다. 부담이 줄어들자 계획이 조금 현실적으로 느껴졌다.`, { relationship: 2, stress: -1, focus: 2 }, contactId),
-      choice("project-check-interest", "서로 아직 하고 싶은지 솔직히 확인한다", "예전 계획에 억지로 매이지 않는다", `${name}과 계획을 다시 꺼낸 이유와 지금의 마음을 나눴다. 계속할지 함께 결정하기로 했다.`, { relationship: 2, mood: 1 }, contactId),
+      choice("project-pick-date", "이번 주에 만날 날짜부터 잡는다", "작은 약속을 실제 일정으로 옮긴다", `${withKoreanParticle(name, "and")} 만날 날짜를 정했다. 장소와 준비물은 천천히 정하기로 했다.`, { relationship: 3, focus: 2 }, contactId),
+      choice("project-define-small", "첫 단계만 정하고 부담을 줄인다", "완성보다 시작을 먼저 챙긴다", `${withKoreanParticle(name, "and")} 이번 주에 할 수 있는 첫 단계만 정했다. 부담이 줄어들자 계획이 조금 현실적으로 느껴졌다.`, { relationship: 2, stress: -1, focus: 2 }, contactId),
+      choice("project-check-interest", "서로 아직 하고 싶은지 솔직히 확인한다", "예전 계획에 억지로 매이지 않는다", `${withKoreanParticle(name, "and")} 계획을 다시 꺼낸 이유와 지금의 마음을 나눴다. 계속할지 함께 결정하기로 했다.`, { relationship: 2, mood: 1 }, contactId),
     ],
   };
   if (id === "old-friend") return {
     id: `thread-${id}-stage-1-${route}`, thread: { id, stage: 1 }, title: `${name}에게서 “요즘 잘 지내?”가 왔다`,
-    eyebrow: "오래된 인연 · 다시 연락", body: `한동안 뜸했던 ${name}이 먼저 안부를 물었다. 반가움과 어색함이 같이 들지만, 대답은 지금의 마음에 맞춰도 된다.`,
+    eyebrow: "오래된 인연 · 다시 연락", body: `한동안 뜸했던 ${withKoreanParticle(name, "subject")} 먼저 안부를 물었다. 반가움과 어색함이 같이 들지만, 대답은 지금의 마음에 맞춰도 된다.`,
     choices: [
       choice("friend-reply-honest", "요즘 내 얘기도 조금 솔직하게 전한다", "잘 지낸다는 말로 덮지 않는다", `${name}에게 요즘 있었던 일을 솔직하게 전했다. ${name}도 자신의 근황을 들려주며 대화가 이어졌다.`, { relationship: 3, mood: 2 }, contactId),
-      choice("friend-call", "짧게 통화하자고 먼저 제안한다", "메시지보다 목소리로 안부를 나눈다", `${name}과 통화로 근황을 나눴다. 어색함은 조금 남았지만 다시 연락할 이유가 생겼다.`, { relationship: 3, stress: -1 }, contactId),
+      choice("friend-call", "짧게 통화하자고 먼저 제안한다", "메시지보다 목소리로 안부를 나눈다", `${withKoreanParticle(name, "and")} 통화로 근황을 나눴다. 어색함은 조금 남았지만 다시 연락할 이유가 생겼다.`, { relationship: 3, stress: -1 }, contactId),
       choice("friend-slow", "반갑다고 답하고 천천히 이야기를 잇는다", "급하게 예전처럼 돌아가려 하지 않는다", `${name}에게 반갑다고 답했다. 무리해서 긴 대화를 만들지 않고 서로 편한 속도로 연락하기로 했다.`, { relationship: 2, stress: -1 }, contactId),
     ],
   };
   if (id === "family-plan") return {
-    id: `thread-${id}-stage-1-${route}`, thread: { id, stage: 1 }, title: `${name}과 통화하다가 남은 이야기`,
-    eyebrow: "가족 · 안부와 거리", body: `${name}과 안부를 나누다 보니 평소엔 미뤄둔 이야기도 나왔다. 가족이라는 이유만으로 넘기지 말고, 필요한 만큼 서로의 생각을 들을 수 있다.`,
+    id: `thread-${id}-stage-1-${route}`, thread: { id, stage: 1 }, title: `${withKoreanParticle(name, "and")} 통화하다가 남은 이야기`,
+    eyebrow: "가족 · 안부와 거리", body: `${withKoreanParticle(name, "and")} 안부를 나누다 보니 평소엔 미뤄둔 이야기도 나왔다. 가족이라는 이유만으로 넘기지 말고, 필요한 만큼 서로의 생각을 들을 수 있다.`,
     choices: [
-      choice("family-plan-visit", "이번 달에 함께할 날짜를 정한다", "막연한 안부를 실제 만남으로 잇는다", `${name}과 이번 달에 만날 날을 정했다. 그때 하고 싶었던 이야기도 천천히 나누기로 했다.`, { relationship: 3, mood: 2 }, contactId),
+      choice("family-plan-visit", "이번 달에 함께할 날짜를 정한다", "막연한 안부를 실제 만남으로 잇는다", `${withKoreanParticle(name, "and")} 이번 달에 만날 날을 정했다. 그때 하고 싶었던 이야기도 천천히 나누기로 했다.`, { relationship: 3, mood: 2 }, contactId),
       choice("family-plan-boundary", "내가 가능한 범위부터 솔직히 말한다", "도움과 부담의 선을 함께 정한다", `${name}에게 지금 가능한 일과 어려운 일을 차분히 설명했다. 서로의 기대를 다시 맞췄다.`, { relationship: 2, stress: -2 }, contactId),
-      choice("family-plan-call", "주말마다 짧게 통화하기로 한다", "큰 약속보다 꾸준한 안부를 택한다", `${name}과 주말에 짧게 통화하기로 했다. 부담은 적고 서로의 생활을 놓치지 않을 방법이 생겼다.`, { relationship: 2, focus: 1 }, contactId),
+      choice("family-plan-call", "주말마다 짧게 통화하기로 한다", "큰 약속보다 꾸준한 안부를 택한다", `${withKoreanParticle(name, "and")} 주말에 짧게 통화하기로 했다. 부담은 적고 서로의 생활을 놓치지 않을 방법이 생겼다.`, { relationship: 2, focus: 1 }, contactId),
     ],
   };
   if (id === "hobby-project") return {
-    id: `thread-${id}-stage-1-${route}`, thread: { id, stage: 1 }, title: `${name}이 같이 해보자던 취미를 다시 꺼냈다`,
-    eyebrow: "취미 · 새로운 일상", body: `${name}이 예전에 이야기했던 취미를 다시 제안했다. 비용과 시간을 따져보면서도, 함께 웃을 일을 만들 수 있다.`,
+    id: `thread-${id}-stage-1-${route}`, thread: { id, stage: 1 }, title: `${withKoreanParticle(name, "subject")} 같이 해보자던 취미를 다시 꺼냈다`,
+    eyebrow: "취미 · 새로운 일상", body: `${withKoreanParticle(name, "subject")} 예전에 이야기했던 취미를 다시 제안했다. 비용과 시간을 따져보면서도, 함께 웃을 일을 만들 수 있다.`,
     choices: [
-      choice("hobby-try", "이번 주에 체험부터 해본다", "큰 결제 없이 서로 맞는지 살핀다", `${name}과 체험 수업을 알아봤다. 잘 맞으면 계속하고 아니면 좋은 하루로 남기기로 했다.`, { relationship: 3, mood: 3, money: -8_000 }, contactId),
-      choice("hobby-home", "돈 적게 드는 방식으로 먼저 해본다", "장비나 수강권보다 같이 해보는 데 집중한다", `${name}과 집 근처에서 가볍게 시작해보기로 했다. 필요한 건 해본 다음에 사기로 했다.`, { relationship: 2, focus: 1 }, contactId),
+      choice("hobby-try", "이번 주에 체험부터 해본다", "큰 결제 없이 서로 맞는지 살핀다", `${withKoreanParticle(name, "and")} 체험 수업을 알아봤다. 잘 맞으면 계속하고 아니면 좋은 하루로 남기기로 했다.`, { relationship: 3, mood: 3, money: -8_000 }, contactId),
+      choice("hobby-home", "돈 적게 드는 방식으로 먼저 해본다", "장비나 수강권보다 같이 해보는 데 집중한다", `${withKoreanParticle(name, "and")} 집 근처에서 가볍게 시작해보기로 했다. 필요한 건 해본 다음에 사기로 했다.`, { relationship: 2, focus: 1 }, contactId),
       choice("hobby-calendar", "바쁜 일정이 지나면 다시 날짜를 잡는다", "관심은 남기되 이번 주 부담을 줄인다", `${name}에게 이번 주 일정은 어렵다고 말하고 가능한 시기를 함께 찾았다. 계획을 접지는 않았다.`, { relationship: 1, stress: -1 }, contactId),
     ],
   };
   if (id === "career-mentor") return {
-    id: `thread-${id}-stage-1-${route}`, thread: { id, stage: 1 }, title: `${name}이 건넨 뜻밖의 연락처`,
-    eyebrow: "기회 · 사람을 통한 연결", body: `${name}이 네가 고민하던 분야를 아는 사람을 소개해줄 수 있다고 했다. 당장 결과를 기대하기보다 어떤 이야기를 나누고 싶은지 정할 수 있다.`,
+    id: `thread-${id}-stage-1-${route}`, thread: { id, stage: 1 }, title: `${withKoreanParticle(name, "subject")} 건넨 뜻밖의 연락처`,
+    eyebrow: "기회 · 사람을 통한 연결", body: `${withKoreanParticle(name, "subject")} 네가 고민하던 분야를 아는 사람을 소개해줄 수 있다고 했다. 당장 결과를 기대하기보다 어떤 이야기를 나누고 싶은지 정할 수 있다.`,
     choices: [
       choice("mentor-intro-accept", "소개를 부탁하고 궁금한 점을 정리한다", "먼저 대화할 주제를 준비한다", `${name}에게 소개를 부탁했다. 궁금한 점을 정리해 첫 연락에서 편하게 물어보기로 했다.`, { relationship: 2, focus: 3 }, contactId),
       choice("mentor-intro-ask", "그 사람이 어떤 일을 하는지 먼저 듣는다", "소개 전에 나와 맞는 자리인지 살핀다", `${name}에게 상대의 경험과 현재 하는 일을 먼저 들었다. 필요한 도움인지 생각한 뒤 연락하기로 했다.`, { relationship: 2, focus: 2 }, contactId),
@@ -132,36 +152,43 @@ function stageTwo(id: string, route: string, name: string, contactId?: string): 
     choice("expense-close-buffer", "작은 비상 여유금을 먼저 만든다", "다음 돌발 지출에 대비한다", "이번 일을 계기로 매주 감당 가능한 금액부터 따로 남기기로 했다. 생활비 계획에 작은 안전 여유가 생겼다.", { focus: 3, goalProgress: 1 }),
     choice("expense-close-flex", "상황에 따라 조정할 항목을 정해둔다", "고정비와 선택 지출을 구분한다", "필수 비용과 조정 가능한 지출을 나눠 적었다. 다음에는 급한 상황에서도 선택지를 비교할 수 있다.", { stress: -2, focus: 2 }),
   ] };
-  if (id === "relationship-repair") return { id: `thread-${id}-stage-2-${route}`, thread: { id, stage: 2 }, title: `${name}과 다음에 나눌 이야기`, eyebrow: "관계 · 이어지는 이야기", body: `${name}과의 어색함은 조금씩 옅어졌다. 앞으로 관계를 이어갈 속도는 두 사람의 선택에 달려 있다.`, choices: [
-    choice("repair-close", "다음에 함께할 시간을 정한다", "작은 약속으로 신뢰를 이어간다", `${name}과 다음에 만날 시간을 정했다. 완벽한 화해보다 지킬 수 있는 약속을 이어가기로 했다.`, { relationship: 3, mood: 2 }, contactId),
-    choice("repair-open", "부담 없이 안부를 나누며 지켜본다", "관계의 속도를 서로에게 맞춘다", `${name}과 무리하지 않고 안부를 주고받기로 했다. 필요한 이야기는 편한 때 다시 꺼낼 수 있다.`, { relationship: 2, stress: -1 }, contactId),
+  if (id === "romance-route") return { id: `thread-${id}-stage-2-${route}`, thread: { id, stage: 2 },
+    title: "두 번째 만남, 서로의 생활이 보이기 시작했다", eyebrow: "연애 · 알아가는 중",
+    body: "좋아하는 마음만으로는 모르는 생활 습관과 바쁜 시기가 보이기 시작했다. 맞춰갈 부분과 지키고 싶은 선을 함께 정할 수 있다.", choices: [
+      choice("romance-talk-rhythm", "연락이 뜸해질 때 어떻게 느끼는지 말한다", "추측하기보다 각자의 생활 리듬을 확인한다", `${withKoreanParticle(name, "and")} 연락이 뜸할 때 각자 어떤 생각을 하는지 나눴다. 답장 속도를 마음의 크기로 재지 않기로 했다.`, { relationship: 3, stress: -2, focus: 1 }, contactId),
+      choice("romance-talk-boundary", "좋아해도 양보하기 어려운 점을 나눈다", "서로의 경계를 초반부터 존중한다", `${withKoreanParticle(name, "and")} 각자 꼭 지키고 싶은 시간과 경계를 이야기했다. 같은 답을 내지 않아도 존중할 수 있는지 확인했다.`, { relationship: 2, focus: 2 }, contactId),
+      choice("romance-talk-fun", "걱정은 잠시 접고 즐거운 약속을 잡는다", "관계를 점검하는 대화만 반복하지 않는다", `${withKoreanParticle(name, "and")} 이번에는 가볍게 즐길 약속을 정했다. 함께 웃는 시간도 관계를 알아가는 일부가 됐다.`, { relationship: 3, mood: 3, money: -10_000 }, contactId),
+    ] };
+  if (id === "relationship-repair") return { id: `thread-${id}-stage-2-${route}`, thread: { id, stage: 2 }, title: `${withKoreanParticle(name, "and")} 다음에 나눌 이야기`, eyebrow: "관계 · 이어지는 이야기", body: `${withKoreanParticle(name, "and")}의 어색함은 조금씩 옅어졌다. 앞으로 관계를 이어갈 속도는 두 사람의 선택에 달려 있다.`, choices: [
+    choice("repair-close", "다음에 함께할 시간을 정한다", "작은 약속으로 신뢰를 이어간다", `${withKoreanParticle(name, "and")} 다음에 만날 시간을 정했다. 완벽한 화해보다 지킬 수 있는 약속을 이어가기로 했다.`, { relationship: 3, mood: 2 }, contactId),
+    choice("repair-open", "부담 없이 안부를 나누며 지켜본다", "관계의 속도를 서로에게 맞춘다", `${withKoreanParticle(name, "and")} 무리하지 않고 안부를 주고받기로 했다. 필요한 이야기는 편한 때 다시 꺼낼 수 있다.`, { relationship: 2, stress: -1 }, contactId),
   ] };
   const continuing = (title: string, body: string, choices: EventChoice[]): LifeEvent => ({
     id: `thread-${id}-stage-2-${route}`, thread: { id, stage: 2 }, title, eyebrow: "이어지는 이야기 · 두 번째 장", body, choices,
   });
-  if (id === "shared-project") return continuing(`${name}과 처음 같이 해본 날`, `생각보다 손이 많이 갔지만 ${name}과 역할을 나누니 조금씩 모양이 잡혔다. 계속 키워갈지, 작게 남길지 정할 수 있다.`, [
-    choice("project-share", "중간 결과를 다른 사람에게 보여준다", "반응을 듣고 다음 방향을 찾는다", `${name}과 중간 결과를 공유했다. 예상 못 한 의견이 다음 아이디어로 이어졌다.`, { relationship: 2, focus: 2 }, contactId),
-    choice("project-scope", "처음 생각보다 범위를 줄인다", "완성할 수 있는 크기로 다시 맞춘다", `${name}과 욕심냈던 부분을 덜어냈다. 이번 주에 끝낼 수 있는 만큼으로 바꾸자 다시 움직일 수 있었다.`, { relationship: 2, stress: -1, focus: 2 }, contactId),
-    choice("project-roles", "각자 맡을 일을 다시 나눈다", "한 사람에게 부담이 쏠리지 않게 한다", `${name}과 시간이 얼마나 드는지 확인하고 역할을 나눴다. 서로 기대하는 바도 분명해졌다.`, { relationship: 3, focus: 1 }, contactId),
+  if (id === "shared-project") return continuing(`${withKoreanParticle(name, "and")} 처음 같이 해본 날`, `생각보다 손이 많이 갔지만 ${withKoreanParticle(name, "and")} 역할을 나누니 조금씩 모양이 잡혔다. 계속 키워갈지, 작게 남길지 정할 수 있다.`, [
+    choice("project-share", "중간 결과를 다른 사람에게 보여준다", "반응을 듣고 다음 방향을 찾는다", `${withKoreanParticle(name, "and")} 중간 결과를 공유했다. 예상 못 한 의견이 다음 아이디어로 이어졌다.`, { relationship: 2, focus: 2 }, contactId),
+    choice("project-scope", "처음 생각보다 범위를 줄인다", "완성할 수 있는 크기로 다시 맞춘다", `${withKoreanParticle(name, "and")} 욕심냈던 부분을 덜어냈다. 이번 주에 끝낼 수 있는 만큼으로 바꾸자 다시 움직일 수 있었다.`, { relationship: 2, stress: -1, focus: 2 }, contactId),
+    choice("project-roles", "각자 맡을 일을 다시 나눈다", "한 사람에게 부담이 쏠리지 않게 한다", `${withKoreanParticle(name, "and")} 시간이 얼마나 드는지 확인하고 역할을 나눴다. 서로 기대하는 바도 분명해졌다.`, { relationship: 3, focus: 1 }, contactId),
   ]);
-  if (id === "old-friend") return continuing(`${name}과 밀린 이야기를 나눈 저녁`, `처음엔 근황만 묻다가 예전엔 몰랐던 서로의 시간을 알게 됐다. 다시 가까워지는 방식은 둘이 새로 정하면 된다.`, [
-    choice("friend-memory", "예전에 같이 가던 곳을 다시 찾아간다", "익숙한 장소에서 새로운 근황을 나눈다", `${name}과 예전에 자주 가던 곳에 들렀다. 달라진 점도 그대로인 점도 편하게 이야기했다.`, { relationship: 3, mood: 2 }, contactId),
-    choice("friend-new-memory", "이번엔 새로운 장소에서 만나자고 한다", "과거에만 기대지 않고 지금을 알아간다", `${name}과 처음 가보는 곳에서 만났다. 예전 추억에 지금의 이야기가 더해졌다.`, { relationship: 3, focus: 1 }, contactId),
-    choice("friend-rhythm", "다음 연락은 누가 먼저든 편하게 하자고 한다", "연락 빈도를 약속으로 묶지 않는다", `${name}과 연락 횟수를 정해두지 않기로 했다. 생각나면 먼저 안부를 묻기로 했다.`, { relationship: 2, stress: -1 }, contactId),
+  if (id === "old-friend") return continuing(`${withKoreanParticle(name, "and")} 밀린 이야기를 나눈 저녁`, `처음엔 근황만 묻다가 예전엔 몰랐던 서로의 시간을 알게 됐다. 다시 가까워지는 방식은 둘이 새로 정하면 된다.`, [
+    choice("friend-memory", "예전에 같이 가던 곳을 다시 찾아간다", "익숙한 장소에서 새로운 근황을 나눈다", `${withKoreanParticle(name, "and")} 예전에 자주 가던 곳에 들렀다. 달라진 점도 그대로인 점도 편하게 이야기했다.`, { relationship: 3, mood: 2 }, contactId),
+    choice("friend-new-memory", "이번엔 새로운 장소에서 만나자고 한다", "과거에만 기대지 않고 지금을 알아간다", `${withKoreanParticle(name, "and")} 처음 가보는 곳에서 만났다. 예전 추억에 지금의 이야기가 더해졌다.`, { relationship: 3, focus: 1 }, contactId),
+    choice("friend-rhythm", "다음 연락은 누가 먼저든 편하게 하자고 한다", "연락 빈도를 약속으로 묶지 않는다", `${withKoreanParticle(name, "and")} 연락 횟수를 정해두지 않기로 했다. 생각나면 먼저 안부를 묻기로 했다.`, { relationship: 2, stress: -1 }, contactId),
   ]);
-  if (id === "family-plan") return continuing(`${name}과 정한 약속을 앞두고`, `만날 날짜가 가까워지자 서로 궁금했던 일과 조심스러운 이야기가 떠올랐다. 어디까지 나눌지 미리 정할 수 있다.`, [
-    choice("family-talk-open", "미뤄둔 이야기를 만나서 나눈다", "서로의 입장을 차분히 듣는다", `${name}과 미뤄둔 이야기를 나눴다. 바로 해결되지는 않았지만 서로 무엇을 걱정하는지는 알게 됐다.`, { relationship: 3, stress: -2 }, contactId),
-    choice("family-time-light", "이번 만남은 가볍게 근황만 나눈다", "한 번에 모든 문제를 다루지 않는다", `${name}과 식사하며 편한 이야기부터 나눴다. 어려운 주제는 둘 다 준비가 됐을 때 꺼내기로 했다.`, { relationship: 2, mood: 2 }, contactId),
+  if (id === "family-plan") return continuing(`${withKoreanParticle(name, "and")} 정한 약속을 앞두고`, `만날 날짜가 가까워지자 서로 궁금했던 일과 조심스러운 이야기가 떠올랐다. 어디까지 나눌지 미리 정할 수 있다.`, [
+    choice("family-talk-open", "미뤄둔 이야기를 만나서 나눈다", "서로의 입장을 차분히 듣는다", `${withKoreanParticle(name, "and")} 미뤄둔 이야기를 나눴다. 바로 해결되지는 않았지만 서로 무엇을 걱정하는지는 알게 됐다.`, { relationship: 3, stress: -2 }, contactId),
+    choice("family-time-light", "이번 만남은 가볍게 근황만 나눈다", "한 번에 모든 문제를 다루지 않는다", `${withKoreanParticle(name, "and")} 식사하며 편한 이야기부터 나눴다. 어려운 주제는 둘 다 준비가 됐을 때 꺼내기로 했다.`, { relationship: 2, mood: 2 }, contactId),
     choice("family-ask", "내가 필요한 도움이나 바라는 점을 구체적으로 말한다", "기대만 쌓이지 않게 요청을 분명히 한다", `${name}에게 필요한 것을 구체적으로 부탁했다. 어렵다면 어렵다고 말해달라고도 전했다.`, { relationship: 2, focus: 1 }, contactId),
   ]);
-  if (id === "hobby-project") return continuing(`${name}과 두 번째로 취미를 해본 날`, `처음보다 어색함은 줄었지만 시간과 비용을 계속 쓸 수 있을지는 고민된다. 생활에 무리 없는 방법을 고를 수 있다.`, [
-    choice("hobby-regular", "한 달에 한 번만 같이 하기로 한다", "꾸준히 할 수 있는 빈도를 찾는다", `${name}과 한 달에 한 번 만나는 날을 정했다. 다른 일정과 예산을 해치지 않게 이어가기로 했다.`, { relationship: 3, mood: 2 }, contactId),
-    choice("hobby-solo", "각자 연습하고 다음에 결과를 나눈다", "함께하지 않는 시간에도 관심을 이어간다", `${name}과 각자 해볼 것을 정했다. 다음에 만날 때 서로의 변화를 보여주기로 했다.`, { relationship: 2, focus: 2 }, contactId),
-    choice("hobby-pause", "당분간 쉬되 다시 시작할 때를 정한다", "흥미가 사라지기 전에 부담부터 조절한다", `${name}과 잠시 쉬는 데 동의했다. 다시 해보고 싶은 시기를 정해 아예 흐지부지되지 않게 했다.`, { relationship: 2, stress: -1 }, contactId),
+  if (id === "hobby-project") return continuing(`${withKoreanParticle(name, "and")} 두 번째로 취미를 해본 날`, `처음보다 어색함은 줄었지만 시간과 비용을 계속 쓸 수 있을지는 고민된다. 생활에 무리 없는 방법을 고를 수 있다.`, [
+    choice("hobby-regular", "한 달에 한 번만 같이 하기로 한다", "꾸준히 할 수 있는 빈도를 찾는다", `${withKoreanParticle(name, "and")} 한 달에 한 번 만나는 날을 정했다. 다른 일정과 예산을 해치지 않게 이어가기로 했다.`, { relationship: 3, mood: 2 }, contactId),
+    choice("hobby-solo", "각자 연습하고 다음에 결과를 나눈다", "함께하지 않는 시간에도 관심을 이어간다", `${withKoreanParticle(name, "and")} 각자 해볼 것을 정했다. 다음에 만날 때 서로의 변화를 보여주기로 했다.`, { relationship: 2, focus: 2 }, contactId),
+    choice("hobby-pause", "당분간 쉬되 다시 시작할 때를 정한다", "흥미가 사라지기 전에 부담부터 조절한다", `${withKoreanParticle(name, "and")} 잠시 쉬는 데 동의했다. 다시 해보고 싶은 시기를 정해 아예 흐지부지되지 않게 했다.`, { relationship: 2, stress: -1 }, contactId),
   ]);
   if (id === "career-mentor") return continuing(`${name}의 소개로 첫 대화를 앞두고`, `상대가 시간을 내주기로 했다. 잘 보이려 애쓰기보다 궁금한 점과 내 상황을 솔직하게 나눌 준비를 할 수 있다.`, [
     choice("mentor-meet", "내가 해온 일을 짧게 정리해 만난다", "도움을 구체적으로 요청한다", `${name}의 소개로 만난 사람에게 지금까지 해온 일과 고민을 설명했다. 당장 답을 얻기보다 다음에 준비할 방향을 들었다.`, { focus: 3, relationship: 2 }, contactId),
-    choice("mentor-question", "현업의 하루와 어려운 점부터 묻는다", "나와 맞는 일인지 현실을 확인한다", `${name}이 연결해준 사람에게 실제 업무 이야기를 들었다. 막연한 동경과 현실을 함께 살펴볼 수 있었다.`, { focus: 4, stress: -1 }, contactId),
+    choice("mentor-question", "현업의 하루와 어려운 점부터 묻는다", "나와 맞는 일인지 현실을 확인한다", `${withKoreanParticle(name, "subject")} 연결해준 사람에게 실제 업무 이야기를 들었다. 막연한 동경과 현실을 함께 살펴볼 수 있었다.`, { focus: 4, stress: -1 }, contactId),
     choice("mentor-thank", "소개해준 사람에게 고마움을 전한다", "관계의 도움을 당연하게 여기지 않는다", `${name}에게 고맙다고 전했다. 소개를 받은 뒤에도 진행 상황을 알려주기로 했다.`, { relationship: 3, mood: 1 }, contactId),
   ]);
   return { id: `thread-${id}-stage-2-${route}`, thread: { id, stage: 2 }, title: "이번 주엔 어디까지 가볼까?", eyebrow: "구직 · 이어지는 이야기", body: "지원 과정에서 얻은 경험을 다음 계획으로 옮길 차례다. 구직을 계속하되 준비와 회복의 균형을 정할 수 있다.", choices: [
@@ -179,6 +206,32 @@ function hashText(value: string): number {
 }
 
 type StoryBeat = { title: string; scene: string; dialogue: string };
+const friendshipBeats: StoryBeat[] = [
+  { title: "답장보다 먼저 떠오른 얼굴", scene: "대화창에 이름이 뜨자 한동안 잊고 지낸 장면들이 한꺼번에 생각났다.", dialogue: "이상하지? 연락하기까지 오래 걸렸는데, 막상 네 이름 보니까 바로 그때 생각났어." },
+  { title: "예전처럼 웃다가 잠깐 멈춘 순간", scene: "익숙한 농담은 그대로였지만 서로의 생활은 꽤 달라져 있었다.", dialogue: "이 농담 아직 기억하네. 근데 우리 진짜 많이 달라졌다." },
+  { title: "서로 몰랐던 몇 해", scene: "그동안 있었던 일을 다 말하진 못해도, 지금부터 물어볼 수는 있었다.", dialogue: "그때 네가 어떻게 지냈는지 이제야 묻게 됐네. 괜찮으면 얘기해줄래?" },
+  { title: "먼저 연락하는 쪽이 늘 같았을 때", scene: "반가운 마음 뒤에 쌓여 있던 서운함도 조심스럽게 모습을 드러냈다.", dialogue: "네가 싫어진 건 아니야. 나만 계속 찾는 것 같아서 지쳤던 거야." },
+  { title: "친구의 새 친구를 만난 날", scene: "서로의 생활에 새로 들어온 사람을 소개하며 관계의 바깥도 조금씩 알게 됐다.", dialogue: "너 요즘 이런 사람들과 지내는구나. 다음엔 다 같이 보자." },
+  { title: "힘든 일을 뒤늦게 알게 됐다", scene: "말하지 않은 이유도, 혼자 버티려 한 마음도 한 번에 이해되진 않았다.", dialogue: "몰랐다고 네가 덜 서운했던 건 아니겠지. 다음엔 내가 먼저 물어볼게." },
+  { title: "약속을 미룬 진짜 이유", scene: "바빴다는 말 뒤에 체력도 마음도 남지 않았다는 고백이 따라왔다.", dialogue: "널 피한 건 아니야. 누구를 만날 힘도 없었어." },
+  { title: "친구로 지내는 방식도 달라졌다", scene: "예전처럼 자주 만나지 않아도 서로를 챙길 방법을 새로 찾았다.", dialogue: "매주 볼 필요는 없잖아. 대신 생각날 때 편하게 연락하자." },
+  { title: "말하지 않아도 알 거란 착각", scene: "오래된 사이일수록 묻지 않아도 안다고 여겼던 마음을 다시 확인했다.", dialogue: "오래 봤다고 네 마음까지 다 아는 건 아니더라." },
+  { title: "다음 약속은 날짜까지 정했다", scene: "언젠가 보자는 말 대신 달력에 실제로 만날 날을 적었다.", dialogue: "이번엔 진짜 보자. 나 그날 비워둘게." },
+];
+const romanceBeats: StoryBeat[] = [
+  { title: "집에 도착했냐는 한 줄", scene: "짧은 안부 뒤에 오늘 나눈 이야기와 헤어질 때의 표정이 다시 떠올랐다.", dialogue: "잘 들어갔어? 오늘 네가 말한 그 얘기, 집에 와서도 생각났어." },
+  { title: "두 번째 약속을 잡는 데 걸린 시간", scene: "누가 먼저 말할지 눈치 보다가, 둘 다 같은 생각이었다는 걸 알게 됐다.", dialogue: "나만 또 보고 싶어 하는 줄 알았네. 다음 주에도 만날래?" },
+  { title: "답장 속도가 마음의 크기는 아니었다", scene: "연락을 주고받는 속도가 달라 괜한 상상을 했지만, 서로의 하루를 알고 나니 조금 놓였다.", dialogue: "답이 늦을 때 마음이 식은 건가 했어. 그런 뜻은 아니었다고 말해주고 싶었어." },
+  { title: "친구에게 네 얘길 꺼냈다", scene: "관계를 숨기지도 과장하지도 않고, 소중한 사람에게 지금 마음을 나눴다.", dialogue: "내 친구한테 네 얘기했어. 자랑하려던 건 아니고, 내가 요즘 좋다는 말을 하고 싶었어." },
+  { title: "돈 얘기를 처음 나눈 저녁", scene: "데이트 비용부터 각자의 형편까지, 피하고 싶던 현실을 조심스럽게 꺼냈다.", dialogue: "좋아하는 마음이랑 별개로 돈 문제도 편하게 얘기할 수 있으면 좋겠어." },
+  { title: "서운함을 농담으로 덮지 않은 날", scene: "웃고 넘기면 편할 일을 이번에는 그대로 말해보기로 했다.", dialogue: "아까는 웃었는데 사실 조금 속상했어. 네 탓을 하려는 건 아니야." },
+  { title: "우리 사이에 이름을 붙인 날", scene: "확답을 재촉하기보다 각자 원하는 관계와 속도를 먼저 나눴다.", dialogue: "나는 너랑 계속 만나보고 싶어. 너는 어떤 마음인지 듣고 싶어." },
+  { title: "각자의 생활을 지킨 주말", scene: "함께하지 않는 시간을 보내고도 불안하지 않은 관계가 어떤 건지 알아갔다.", dialogue: "이번 주는 각자 할 일 하자. 다음에 만나면 더 반가울 것 같아." },
+  { title: "못 지킨 약속 다음 날", scene: "변명보다 사정과 미안한 마음을 먼저 설명하고, 다시 믿을 방법을 의논했다.", dialogue: "어제 약속 못 지켜서 미안해. 다음엔 늦어질 것 같으면 먼저 연락할게." },
+  { title: "대답을 기다리기로 한 밤", scene: "마음이 급해도 상대가 생각할 시간을 갖도록 한 걸음 물러섰다.", dialogue: "오늘 다 정하지 않아도 돼. 네가 편해졌을 때 다시 얘기하자." },
+  { title: "같이 있어도 혼자였던 순간", scene: "같은 자리에 있어도 마음이 닿지 않는 날이 있다는 걸 인정했다.", dialogue: "요즘 네 옆에 있어도 혼자인 기분이 들어. 우리 둘 다 뭐가 필요한지 얘기해볼까?" },
+  { title: "다음 계절을 같이 상상해봤다", scene: "거창한 약속 대신 서로의 일정과 바람을 놓고 가능한 내일을 그려봤다.", dialogue: "몇 달 뒤에도 이렇게 만나고 있을까? 나는 그랬으면 좋겠어." },
+];
 const relationshipBeats: StoryBeat[] = [
   { title: "늦은 밤에 온 “잠깐 통화돼?”", scene: "별일 아닌 얘기부터 꺼냈지만, 통화는 생각보다 오래 이어졌다.", dialogue: "별일은 아닌데… 네 목소리 들으면 좀 정리될 것 같아서." },
   { title: "끝내 보내지 못한 메시지", scene: "대화창에 쓰다 지운 문장이 몇 번이나 있었다는 걸 알게 됐다.", dialogue: "괜히 무겁게 만들까 봐 지웠는데, 사실은 물어보고 싶었어." },
@@ -225,33 +278,39 @@ const sharedBeats: StoryBeat[] = [
 ];
 
 function ongoingChapter(state: GameState, id: string, thread: NonNullable<GameState["eventThreads"]>[string], name: string, person?: Contact): LifeEvent {
-  const lane = id === "relationship-repair" ? "relationship"
-    : id === "job-application" || id === "career-mentor" ? "career"
-      : id === "unexpected-expense" ? "money"
-        : /project|hobby|creative/.test(id) ? "shared" : "relationship";
-  const beats = lane === "relationship" ? relationshipBeats : lane === "career" ? careerBeats : lane === "money" ? moneyBeats : sharedBeats;
+  const lane = id === "romance-route" ? "romance"
+    : id === "old-friend" ? "friendship"
+      : id === "relationship-repair" ? "relationship"
+        : id === "job-application" || id === "career-mentor" ? "career"
+          : id === "unexpected-expense" ? "money"
+            : /project|hobby|creative/.test(id) ? "shared" : "relationship";
+  const beats = lane === "romance" ? romanceBeats : lane === "friendship" ? friendshipBeats
+    : lane === "relationship" ? relationshipBeats : lane === "career" ? careerBeats
+      : lane === "money" ? moneyBeats : sharedBeats;
   const routeKey = thread.route + (thread.history ?? []).slice(-3).join("|") + (thread.lastChoiceTitle ?? "") + (person?.mood ?? "");
   const beat = beats[(hashText(routeKey + ":" + thread.stage + ":" + state.week) % beats.length)];
   const linkedName = person?.name;
-  const continuity = thread.lastChoiceTitle ? "지난번에 \"" + thread.lastChoiceTitle + "\"를 고른 뒤의 이야기다. " : "";
-  const goalLine = person?.goal ? linkedName + "은 요즘 \"" + person.goal + "\"도 마음에 두고 있다. " : "";
-  const actionLine = person?.lastAutonomousAction ? "한편 " + linkedName + "은 최근 \"" + person.lastAutonomousAction + "\"이라고 했다. " : "";
-  const relationshipLine = person ? (person.warmth >= 65 ? linkedName + "은 너와 있으면 편하다고 했다. " : person.warmth <= 30 ? linkedName + "은 아직 조심스럽게 거리를 두고 있다. " : "") : "";
+  const continuity = thread.lastOutcome
+    ? "지난 장면에서는 " + thread.lastOutcome.replace(/[.!?。]+$/, "") + ". 그 뒤에 "
+    : thread.lastChoiceTitle ? "지난번 선택이 마음에 남아 다시 이야기를 꺼냈다. " : "";
+  const goalLine = person?.goal ? withKoreanParticle(linkedName!, "topic") + " 요즘 \"" + person.goal + "\"도 마음에 두고 있다. " : "";
+  const actionLine = person?.lastAutonomousAction ? "한편 " + withKoreanParticle(linkedName!, "topic") + " 최근 \"" + person.lastAutonomousAction + "\"이라고 했다. " : "";
+  const relationshipLine = person ? (person.warmth >= 65 ? withKoreanParticle(linkedName!, "topic") + " 너와 있으면 편하다고 했다. " : person.warmth <= 30 ? withKoreanParticle(linkedName!, "topic") + " 아직 조심스럽게 거리를 두고 있다. " : "") : "";
   const body = continuity + beat.scene + (person ? " " + relationshipLine + actionLine + goalLine : "");
   const chapter = thread.stage - 2;
   const chapterLabel = chapter + "번째 장";
   const episodeId = "thread-" + id + "-chapter-" + thread.stage + "-" + hashText(routeKey);
   const continueChoices = [
     choice("thread-step-" + id + "-" + thread.stage + "-talk",
-      lane === "money" ? "이번엔 지출 얘기를 피하지 않는다" : lane === "career" ? "내가 원하는 조건부터 솔직히 말한다" : "이번엔 내 마음도 솔직히 꺼낸다",
+      lane === "money" ? "이번엔 지출 얘기를 피하지 않는다" : lane === "career" ? "내가 원하는 조건부터 솔직히 말한다" : lane === "romance" ? "서로 기대하는 속도와 마음을 나눈다" : lane === "friendship" ? "서운했던 점도 숨기지 않고 말한다" : "이번엔 내 마음도 솔직히 꺼낸다",
       "상대의 생각도 듣고, 내 입장도 숨기지 않는다",
-      person ? linkedName + "에게 솔직하게 이야기했다. " + beat.dialogue + " 대화를 나눈 뒤에도 다음에 이어갈 이야기가 남았다."
+      person ? (lane === "romance" ? withKoreanParticle(linkedName!, "and") + " 서로 기대하는 속도와 마음을 나눴다. " : lane === "friendship" ? withKoreanParticle(linkedName!, "and") + " 지나온 시간과 지금의 서운함을 함께 이야기했다. " : linkedName + "에게 솔직하게 이야기했다. ") + beat.dialogue + " 대화를 나눈 뒤에도 다음에 이어갈 이야기가 남았다."
         : beat.scene + " 걱정만 되풀이하지 않고 내가 바꿀 수 있는 것부터 적었다.",
       { relationship: person ? 2 : 0, stress: -1, focus: 1 }, thread.contactId),
     choice("thread-step-" + id + "-" + thread.stage + "-act",
-      lane === "career" ? "작은 기회부터 같이 움직여본다" : lane === "money" ? "다음 주에 지킬 수 있는 기준을 정한다" : "말을 행동으로 옮길 작은 약속을 잡는다",
+      lane === "career" ? "작은 기회부터 같이 움직여본다" : lane === "money" ? "다음 주에 지킬 수 있는 기준을 정한다" : lane === "romance" ? "다음 만남을 함께 정한다" : lane === "friendship" ? "다음에 이어갈 약속을 하나 잡는다" : "말을 행동으로 옮길 작은 약속을 잡는다",
       "크게 약속하지 않고 이번 주 안에 할 수 있는 걸 정한다",
-      person ? linkedName + "과 이번 주에 할 일을 하나 정했다. " + beat.dialogue + " 약속을 지키면 다음 이야기도 달라질 수 있다."
+      person ? withKoreanParticle(linkedName!, "and") + (lane === "romance" ? " 다음 만남의 날짜와 하고 싶은 일을 함께 정했다. " : " 이번 주에 할 일을 하나 정했다. ") + beat.dialogue + " 약속을 지키면 다음 이야기도 달라질 수 있다."
         : "이번 주에 실천할 한 가지를 정했다. 작게 시작해 다음 주에 다시 돌아보기로 했다.",
       { relationship: person ? 3 : 0, focus: 2, stress: 1 }, thread.contactId),
     choice("thread-step-" + id + "-" + thread.stage + "-pause",
@@ -261,9 +320,9 @@ function ongoingChapter(state: GameState, id: string, thread: NonNullable<GameSt
         : "당장 결론을 내리지 않고 시간을 두기로 했다. 다음에 이어갈 수 있도록 해야 할 일을 기록했다.",
       { relationship: person ? 1 : 0, energy: 3, stress: -2 }, thread.contactId),
     choice("thread-finish-" + id,
-      "이 이야기는 여기서 마무리한다",
+      lane === "romance" ? "우리 관계를 지금 마음에 맞게 정리한다" : "이 이야기는 여기서 마무리한다",
       "지금까지의 선택을 정리하고 다음 생활로 넘어간다",
-      person ? linkedName + "과 지금까지의 일을 차분히 돌아봤다. 완벽한 결론은 아니어도 서로의 마음을 확인하고 이 이야기를 잘 마무리했다."
+      person ? withKoreanParticle(linkedName!, "and") + (lane === "romance" ? " 서로 바라는 관계와 지금 가능한 거리를 확인했다. 끝을 택하든 계속 만날 여지를 남기든, 두 사람의 마음을 존중하며 정리했다." : " 지금까지의 일을 차분히 돌아봤다. 완벽한 결론은 아니어도 서로의 마음을 확인하고 이 이야기를 잘 마무리했다.")
         : "이번 일을 돌아보고 앞으로 지킬 기준을 정했다. 이 이야기는 여기까지 두고 다음 생활로 넘어가기로 했다.",
       { relationship: person ? 2 : 0, mood: 1, focus: 1 }, thread.contactId),
   ];
