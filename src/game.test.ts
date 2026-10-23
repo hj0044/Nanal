@@ -669,21 +669,41 @@ describe("first week simulation", () => {
     expect(runYear("jobseeker", "자취", 3, 304).stats.money).toBeGreaterThan(0);
   });
 
-  it("carries route choices through two scheduled follow-up events", () => {
+  it("keeps a story open for as long as the player wants and closes only on request", () => {
     let state = createGame(character, 992);
     const root = commonEventLibrary.find((event) => event.id === "common-misunderstanding")!;
     state = chooseEvent({ ...state, phase: "event", pendingEvent: root }, "misunderstanding-ignore");
     expect(state.eventThreads?.["relationship-repair"]).toMatchObject({ route: "misunderstanding-ignore", stage: 1, nextWeek: 2 });
+
     let followUp = getEventThreadEvents({ ...state, week: 2 })[0];
-    expect(followUp.title).toContain("다시 마주한 대화");
-    expect(followUp.body).toContain("어색함이 쉽게 풀리지 않았다");
+    expect(followUp.title).toContain("먼저 연락");
     state = chooseEvent({ ...state, week: 2, phase: "event", pendingEvent: followUp }, "repair-listen");
-    expect(state.eventThreads?.["relationship-repair"]).toMatchObject({ route: "misunderstanding-ignore|repair-listen", stage: 2, nextWeek: 3 });
+    expect(state.eventThreads?.["relationship-repair"]).toMatchObject({ route: "misunderstanding-ignore", stage: 2, nextWeek: 3 });
+
     followUp = getEventThreadEvents({ ...state, week: 3 })[0];
     expect(followUp.thread).toEqual({ id: "relationship-repair", stage: 2 });
     state = chooseEvent({ ...state, week: 3, phase: "event", pendingEvent: followUp }, "repair-close");
+    expect(state.eventThreads?.["relationship-repair"]).toMatchObject({ stage: 3, nextWeek: 4 });
+
+    for (let stage = 3; stage <= 8; stage += 1) {
+      followUp = getEventThreadEvents({ ...state, week: stage + 1 })[0];
+      expect(followUp.thread).toEqual({ id: "relationship-repair", stage });
+      expect(followUp.eyebrow).toContain("이어지는 이야기");
+      state = chooseEvent({ ...state, week: stage + 1, phase: "event", pendingEvent: followUp }, "thread-step-relationship-repair-" + stage + "-act");
+      expect(state.eventThreads?.["relationship-repair"]?.stage).toBe(stage + 1);
+    }
+
+    followUp = getEventThreadEvents({ ...state, week: 10 })[0];
+    const ending = followUp.choices.find((choice) => choice.id === "thread-finish-relationship-repair")!;
+    state = chooseEvent({ ...state, week: 10, phase: "event", pendingEvent: followUp }, ending.id);
     expect(state.eventThreads?.["relationship-repair"]).toBeUndefined();
     expect(state.contacts[1].warmth).toBeGreaterThan(createGame(character, 992).contacts[1].warmth);
+  });
+
+  it("offers more connected relationship, family, hobby and mentorship story starters", () => {
+    const routeIds = commonEventLibrary.filter((event) => event.thread?.stage === 0).map((event) => event.thread!.id);
+    expect(routeIds).toEqual(expect.arrayContaining(["shared-project", "old-friend", "family-plan", "hobby-project", "career-mentor"]));
+    expect(new Set(routeIds).size).toBe(routeIds.length);
   });
 
   it("records social memories and fades them gradually at weekly boundaries", () => {
