@@ -100,6 +100,68 @@ export const commonEventLibrary: LifeEvent[] = [
       { id: "message-shift", title: "휴대전화를 내려놓고 다른 일을 한다", detail: "신경 쓰이는 시간을 줄인다", result: "메신저를 잠시 닫고 하던 일로 돌아갔다. 답을 기다리는 동안의 불편함이 줄었다.", effect: { mood: 2, focus: 3, stress: -3 } },
     ],
   },
+  ,
+  {
+    id: "common-shared-project",
+    thread: { id: "shared-project", stage: 0 },
+    title: "“우리 진짜 한번 해볼까?”",
+    eyebrow: "친구 · 같이 시작한 일",
+    body: "친구와 언젠가 해보자던 작은 계획이 다시 대화에 올랐다. 이번에는 말로만 끝내지 않고 시작해볼 수 있다.",
+    choices: [
+      { id: "shared-project-date", title: "이번 주에 만날 날짜부터 잡는다", detail: "계획을 실제 일정으로 옮긴다", result: "날짜를 정하고 장소와 준비물은 천천히 맞추기로 했다.", effect: { relationship: 3, focus: 2 }, contactIndex: 1 },
+      { id: "shared-project-small", title: "첫 단계만 정해 부담을 줄인다", detail: "완성보다 시작을 먼저 챙긴다", result: "이번 주에 할 수 있는 첫 단계만 정했다. 계획이 조금 현실적으로 느껴졌다.", effect: { relationship: 2, stress: -1, focus: 2 }, contactIndex: 1 },
+      { id: "shared-project-check", title: "서로 아직 하고 싶은지 확인한다", detail: "예전 계획에 억지로 매이지 않는다", result: "계획을 다시 꺼낸 이유와 지금의 마음을 나눴다. 계속할지는 함께 결정하기로 했다.", effect: { relationship: 2, mood: 1 }, contactIndex: 1 },
+    ],
+  },
+  {
+    id: "common-old-friend",
+    thread: { id: "old-friend", stage: 0 },
+    title: "오랜만에 온 “요즘 잘 지내?”",
+    eyebrow: "오래된 인연 · 다시 연락",
+    body: "한동안 뜸했던 사람이 먼저 안부를 물었다. 반가움과 어색함이 같이 들지만, 지금의 마음에 맞춰 답할 수 있다.",
+    choices: [
+      { id: "old-friend-honest", title: "요즘 내 얘기도 조금 솔직히 전한다", detail: "잘 지낸다는 말로 덮지 않는다", result: "요즘 있었던 일을 솔직하게 전했다. 상대도 자신의 근황을 들려주며 대화가 이어졌다.", effect: { relationship: 3, mood: 2 }, contactIndex: 1 },
+      { id: "old-friend-call", title: "짧게 통화하자고 제안한다", detail: "메시지보다 목소리로 안부를 나눈다", result: "통화로 근황을 나눴다. 어색함은 조금 남았지만 다시 연락할 이유가 생겼다.", effect: { relationship: 3, stress: -1 }, contactIndex: 1 },
+      { id: "old-friend-slow", title: "반갑다고 답하고 천천히 잇는다", detail: "급하게 예전처럼 돌아가려 하지 않는다", result: "반갑다고 답했다. 무리해 긴 대화를 만들지 않고 편한 속도로 연락하기로 했다.", effect: { relationship: 2, stress: -1 }, contactIndex: 1 },
+    ],
+  },
+  {
+    id: "common-family-plan",
+    thread: { id: "family-plan", stage: 0 },
+    title: "가족과 통화하다가 남은 이야기",
+    eyebrow: "가족 · 안부와 거리",
+    body: "가족과 안부를 나누다 평소엔 미뤄둔 이야기도 나왔다. 필요한 만큼 서로의 생각을 들어볼 수 있다.",
+    choices: [
+      { id: "family-plan-visit", title: "이번 달에 함께할 날짜를 정한다", detail: "막연한 안부를 실제 만남으로 잇는다", result: "이번 달에 만날 날을 정했다. 하고 싶었던 이야기도 천천히 나누기로 했다.", effect: { relationship: 3, mood: 2 }, contactIndex: 2 },
+      { id: "family-plan-boundary", title: "내가 가능한 범위부터 말한다", detail: "도움과 부담의 선을 함께 정한다", result: "지금 가능한 일과 어려운 일을 설명했다. 서로의 기대를 다시 맞췄다.", effect: { relationship: 2, stress: -2 }, contactIndex: 2 },
+      { id: "family-plan-call", title: "주말마다 짧게 통화하기로 한다", detail: "큰 약속보다 꾸준한 안부를 택한다", result: "주말에 짧게 통화하기로 했다. 서로의 생활을 놓치지 않을 방법이 생겼다.", effect: { relationship: 2, focus: 1 }, contactIndex: 2 },
+    ],
+  },
+  {
+    id: "common-hobby-project",
+    thread: { id: "hobby-project", stage: 0 },
+    title: "같이 해보자던 취미를 다시 꺼냈다",
+    eyebrow: "취미 · 새로운 일상",
+    body: "아는 사람이 예전에 이야기했던 취미를 다시 제안했다. 비용과 시간을 따져보면서 함께 웃을 일을 만들 수 있다.",
+    choices: [
+      { id: "hobby-project-try", title: "체험부터 가볍게 해본다", detail: "큰 지출 없이 서로 맞는지 살핀다", result: "체험을 알아봤다. 잘 맞으면 계속하고 아니면 좋은 하루로 남기기로 했다.", effect: { relationship: 3, mood: 3, money: -8000 }, contactIndex: 1 },
+      { id: "hobby-project-home", title: "돈 적게 드는 방식으로 시작한다", detail: "장비보다 같이 해보는 데 집중한다", result: "집 근처에서 가볍게 시작하기로 했다. 필요한 건 해본 다음에 사기로 했다.", effect: { relationship: 2, focus: 1 }, contactIndex: 1 },
+      { id: "hobby-project-later", title: "바쁜 일정이 지나면 날짜를 잡는다", detail: "관심은 남기되 이번 주 부담을 줄인다", result: "이번 주는 어렵다고 말하고 가능한 시기를 함께 찾았다. 계획을 접지는 않았다.", effect: { relationship: 1, stress: -1 }, contactIndex: 1 },
+    ],
+  },
+  {
+    id: "common-career-mentor",
+    thread: { id: "career-mentor", stage: 0 },
+    title: "아는 사람이 뜻밖의 연락처를 건넸다",
+    eyebrow: "기회 · 사람을 통한 연결",
+    body: "네가 고민하던 분야를 아는 사람을 소개해줄 수 있다고 한다. 당장 결과를 기대하기보다 어떤 이야기를 나누고 싶은지 정할 수 있다.",
+    choices: [
+      { id: "career-mentor-accept", title: "소개를 부탁하고 궁금한 점을 적는다", detail: "첫 대화에서 나눌 주제를 준비한다", result: "소개를 부탁했다. 궁금한 점을 정리해 편하게 물어보기로 했다.", effect: { relationship: 2, focus: 3 }, contactIndex: 0 },
+      { id: "career-mentor-ask", title: "그 사람이 어떤 일을 하는지 먼저 듣는다", detail: "나와 맞는 자리인지 살핀다", result: "상대의 경험과 현재 하는 일을 먼저 들었다. 필요한 도움인지 생각한 뒤 연락하기로 했다.", effect: { relationship: 2, focus: 2 }, contactIndex: 0 },
+      { id: "career-mentor-later", title: "준비를 조금 더 한 뒤 부탁한다", detail: "연결을 소중하게 쓰도록 시간을 둔다", result: "고맙다고 전하고 준비를 마친 뒤 소개를 부탁하기로 했다.", effect: { relationship: 1, stress: -1, focus: 1 }, contactIndex: 0 },
+    ],
+  },
+
 ];
 
 export const eventLibrary: Record<Background, LifeEvent[]> = {
