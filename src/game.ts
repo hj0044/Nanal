@@ -160,7 +160,7 @@ export interface LifeEvent {
   personalStory?: { contactId: string; stage: number };
   reunion?: { contactId: string };
   npcPair?: { linkId: string; kind: "bond" | "conflict" | "reconciliation" | "romance"; contactAId: string; contactBId: string; speakerId: string };
-  /** Optional multi-week authored thread marker; absent in older saves and events. */
+  /** A story route can continue until the player chooses to close it. */
   thread?: { id: string; stage: number };
   npcDialogue?: { speakerName: string; line: string };
   /** Marks an event whose copy was rewritten by the server; optional for save compatibility. */
@@ -188,8 +188,8 @@ export interface GameState {
   npcStoryStages?: Record<string, number>;
   npcStoryLastWeek?: Record<string, number>;
   npcStoryChoices?: Record<string, string>;
-  /** Active multi-week event routes. */
-  eventThreads?: Record<string, { route: string; stage: number; nextWeek: number; contactId?: string }>;
+  /** Open-ended story routes; history is bounded while stage can keep growing. */
+  eventThreads?: Record<string, { route: string; stage: number; nextWeek: number; contactId?: string; history?: string[]; lastChoiceTitle?: string; lastOutcome?: string }>;
   weeklyCashflow?: WeeklyCashflow;
   playerGoals?: PlayerGoal[];
   stats: Stats;
@@ -718,7 +718,7 @@ function nextEligibleEvent(state: GameState): [LifeEvent | undefined, number] {
   const [afterSelect, indexRoll] = nextRandom(afterRoll);
   const eventWeight = (event: LifeEvent) => {
     const family = getEventFamily(event);
-    let weight = event.npcPair ? 10 : event.reunion ? 14 : event.personalStory ? 12 : 1;
+    let weight = event.thread && event.thread.stage > 0 ? 8 : event.npcPair ? 10 : event.reunion ? 14 : event.personalStory ? 12 : event.thread?.stage === 0 ? 2.5 : 1;
     if (family === "money") weight *= state.stats.money < 180_000 ? 3 : state.stats.money < 450_000 ? 1.7 : 1;
     if (family === "health") weight *= state.stats.energy < 45 || state.stats.stress > 65 ? 2.2 : 1;
     if ((family === "friendship" || family === "romance") && state.contacts.length > 0 && state.contacts.reduce((sum, contact) => sum + contact.warmth, 0) / state.contacts.length < 38) weight *= 1.7;
