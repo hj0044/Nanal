@@ -235,7 +235,7 @@ function ongoingChapter(state: GameState, id: string, thread: NonNullable<GameSt
   const linkedName = person?.name;
   const continuity = thread.lastChoiceTitle ? "지난번에 \"" + thread.lastChoiceTitle + "\"를 고른 뒤의 이야기다. " : "";
   const goalLine = person?.goal ? linkedName + "은 요즘 \"" + person.goal + "\"도 마음에 두고 있다. " : "";
-  const actionLine = person?.lastAutonomousAction ? "한편 " + linkedName + "은 " + person.lastAutonomousAction + "고 한다. " : "";
+  const actionLine = person?.lastAutonomousAction ? "한편 " + linkedName + "은 최근 \"" + person.lastAutonomousAction + "\"이라고 했다. " : "";
   const relationshipLine = person ? (person.warmth >= 65 ? linkedName + "은 너와 있으면 편하다고 했다. " : person.warmth <= 30 ? linkedName + "은 아직 조심스럽게 거리를 두고 있다. " : "") : "";
   const body = continuity + beat.scene + (person ? " " + relationshipLine + actionLine + goalLine : "");
   const chapter = thread.stage - 2;
