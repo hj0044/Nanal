@@ -702,8 +702,38 @@ describe("first week simulation", () => {
 
   it("offers more connected relationship, family, hobby and mentorship story starters", () => {
     const routeIds = commonEventLibrary.filter((event) => event.thread?.stage === 0).map((event) => event.thread!.id);
-    expect(routeIds).toEqual(expect.arrayContaining(["shared-project", "old-friend", "family-plan", "hobby-project", "career-mentor"]));
+    expect(routeIds).toEqual(expect.arrayContaining(["shared-project", "old-friend", "family-plan", "hobby-project", "career-mentor", "romance-route"]));
     expect(new Set(routeIds).size).toBe(routeIds.length);
+  });
+
+  it("turns a date into an open-ended romance route with grammatical Korean names", () => {
+    let state = createGame(character, 993);
+    state = { ...state, contacts: state.contacts.map((person, index) => index === 1 ? { ...person, name: "이민서" } : person) };
+    const root = commonEventLibrary.find((event) => event.id === "common-date-plan")!;
+    state = chooseEvent({ ...state, phase: "event", pendingEvent: root }, "date-simple");
+    expect(state.eventThreads?.["romance-route"]).toMatchObject({ route: "date-simple", stage: 1 });
+
+    let scene = getEventThreadEvents({ ...state, week: 2 })[0];
+    expect(scene.title).toContain("편안해서");
+    state = chooseEvent({ ...state, week: 2, phase: "event", pendingEvent: scene }, "romance-second-date");
+    scene = getEventThreadEvents({ ...state, week: 3 })[0];
+    expect(scene.title).toContain("두 번째 만남");
+    state = chooseEvent({ ...state, week: 3, phase: "event", pendingEvent: scene }, "romance-talk-rhythm");
+
+    for (let stage = 3; stage <= 6; stage += 1) {
+      scene = getEventThreadEvents({ ...state, week: stage + 1 })[0];
+      expect(scene.thread).toEqual({ id: "romance-route", stage });
+      expect(scene.eyebrow).toContain("이어지는 이야기");
+      const copy = [scene.title, scene.body, scene.npcDialogue?.line, ...scene.choices.map((choice) => choice.result)].join(" ");
+      expect(copy).not.toMatch(/이민서(?:은|과|이)(?![가-힣])/);
+      state = chooseEvent({ ...state, week: stage + 1, phase: "event", pendingEvent: scene }, `thread-step-romance-route-${stage}-act`);
+      expect(state.eventThreads?.["romance-route"]?.stage).toBe(stage + 1);
+    }
+
+    scene = getEventThreadEvents({ ...state, week: 8 })[0];
+    const ending = scene.choices.find((choice) => choice.id === "thread-finish-romance-route")!;
+    state = chooseEvent({ ...state, week: 8, phase: "event", pendingEvent: scene }, ending.id);
+    expect(state.eventThreads?.["romance-route"]).toBeUndefined();
   });
 
   it("records social memories and fades them gradually at weekly boundaries", () => {
