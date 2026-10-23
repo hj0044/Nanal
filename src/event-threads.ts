@@ -20,7 +20,7 @@ export function getEventThreadEvents(state: GameState): LifeEvent[] {
     const name = person?.name ?? "가까운 사람";
     if (thread.stage === 1) return [stageOne(id, thread.route, name, thread.contactId)];
     if (thread.stage === 2) return [stageTwo(id, thread.route, name, thread.contactId)];
-    if (thread.stage >= 3) return [ongoingChapter(state, id, thread, name, person)];
+    if (thread.stage >= 3) return [ongoingChapter(state, id, thread, person)];
     return [];
   });
 }
@@ -277,7 +277,7 @@ const sharedBeats: StoryBeat[] = [
   { title: "계획보다 기억에 남은 하루", scene: "결과물보다 함께 준비하며 나눈 이야기가 오래 남을 것 같았다.", dialogue: "오늘은 많이 못 했는데, 그래도 만나길 잘했다." },
 ];
 
-function ongoingChapter(state: GameState, id: string, thread: NonNullable<GameState["eventThreads"]>[string], name: string, person?: Contact): LifeEvent {
+function ongoingChapter(state: GameState, id: string, thread: NonNullable<GameState["eventThreads"]>[string], person?: Contact): LifeEvent {
   const lane = id === "romance-route" ? "romance"
     : id === "old-friend" ? "friendship"
       : id === "relationship-repair" ? "relationship"
