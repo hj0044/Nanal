@@ -67,3 +67,50 @@ export async function synchronizeOfficialImageTargets(
     entries
   };
 }
+
+/**
+ * Game-side HTTPS adapter. The official source still MUST provide trusted
+ * listOfficialAppearanceIds and getOfficialReservation functions. Secrets
+ * stay in a privileged server/worker environment, never in the browser.
+ */
+export function createGameTargetApiClient({gameApiOrigin,adminToken,fetchFn=fetch} = {}) {
+  let origin;
+  try {
+    const url=new URL(gameApiOrigin);
+    if (url.protocol!=="https:" || url.username || url.password ||
+        url.pathname!=="/" || url.search || url.hash)
+      throw Error("invalid");
+    origin=url.origin;
+  } catch { throw Error("trusted_https_game_origin_required"); }
+  if (typeof adminToken!=="string" || adminToken.length<32)
+    throw Error("game_admin_token_required");
+  const auth={"authorization":"Bearer "+adminToken};
+  const safeId=id=> {
+    if (!/^AP[0-9]{3,5}$/.test(id??""))throw Error("valid_appearance_id_required");
+    return id;
+  };
+  return {
+    getGameIdentity:async({appearanceId})=>{
+      const response=await fetchFn(origin+"/api/appearance/admin/identities/"+safeId(appearanceId),
+        {headers:auth,redirect:"error"});
+      if (response.status===404)return null;
+      if (!response.ok)throw Error("game_identity_lookup_http_"+response.status);
+      return response.json();
+    },
+    submitGameTarget:async({appearanceId,slot,targetCount,source,profileSha256})=>{
+      if (!["portrait","fullBody"].includes(slot) ||
+          !Number.isSafeInteger(targetCount) || targetCount<0 || targetCount>9999 ||
+          source!=="verified_official_reservation" ||
+          !/^[a-f0-9]{64}$/i.test(profileSha256||""))
+        throw Error("invalid_verified_target");
+      const response=await fetchFn(origin+"/api/appearance/identities/"+safeId(appearanceId)+"/targets",{
+        method:"PUT",
+        headers:{...auth,"content-type":"application/json"},
+        body:JSON.stringify({slot,targetCount,source,profileSha256}),
+        redirect:"error"
+      });
+      if (!response.ok)throw Error("game_target_submit_http_"+response.status);
+      return response.json();
+    }
+  };
+}
