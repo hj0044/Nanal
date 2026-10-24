@@ -1,4 +1,4 @@
-import { buildAppearanceInventory } from "./appearance-inventory";
+import { buildAppearanceInventory } from "./appearance-inventory.ts";
 /** ChatGPT image upload API. No image model calls or Nanal application daily quota. */
 export type AppearanceStoreEnv = {
   NANAL_APPEARANCE_DB?: { prepare(sql: string): { bind(...args: unknown[]): {
