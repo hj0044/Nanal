@@ -67,7 +67,8 @@ test("same image produces idempotent upload request key",async()=>{
 test("missing host bytes and bad identity fail before network",async()=>{
  const {calls,fetcher}=stub();
  await assert.rejects(()=>autoSubmitGeneratedImage({appearanceId:"AP008",slot:"portrait"},{baseUrl:root,ownerToken:token,fetcher}),/not available/);
- await assert.rejects(()=>autoSubmitGeneratedImage({appearanceId:"APXYZ",slot:"portrait",pngBytes:await image("portrait")},{baseUrl:root,ownerToken:token,fetcher}),/locked AP/);
+ const validBytes=await image("portrait");
+ await assert.rejects(()=>autoSubmitGeneratedImage({appearanceId:"APXYZ",slot:"portrait",pngBytes:validBytes},{baseUrl:root,ownerToken:token,fetcher}),/locked AP/);
  assert.equal(calls.length,0);
 });
 test("unremoved background and wrong canvas are blocked",async()=>{
