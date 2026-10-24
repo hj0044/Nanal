@@ -60,6 +60,7 @@ export async function submitExistingOfficialVariant(input,backend){
   if(originalPng.length>16*1024*1024)throw Error("image_too_large");
   await (backend.preflight??preflightPng)(originalPng,input.kind);
   const fileSha256=hash(originalPng);
+  if(fileSha256===ref.toLowerCase())throw Error("duplicate_of_locked_master");
   const requestKey=input.appearanceId+":"+input.kind+":"+fileSha256;
   if(input.requestKey&&input.requestKey!==requestKey)
     throw Error("request_key_must_match_source_hash");
@@ -113,4 +114,9 @@ export async function submitExistingOfficialVariant(input,backend){
     source:"official_nanal_plugin",duplicate:false,fileSha256,
     visualQaStatus:metadata.visualQaStatus
   });
+}
+
+/** Register this as appearance_submit_variant ONLY inside the actual official MCP server. */
+export function createOfficialVariantAction(backend){
+  return fields=>submitExistingOfficialVariant(fields,backend);
 }
