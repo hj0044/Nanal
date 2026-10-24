@@ -19,6 +19,13 @@ function runUntil(targetDays: number, seed: number) {
 }
 
 describe("seeded long-run regression", () => {
+  it("offers a meaningful first-week choice for multiple seeds by the third day", () => {
+    for (const seed of [1, 7, 77, 713, 1001]) {
+      const state = advanceDays(createGame(character, seed), 3);
+      expect(state.phase).toBe("event");
+      expect(state.pendingEvent?.choices.length).toBeGreaterThanOrEqual(2);
+    }
+  });
   it.each([30, 90, 365, 1095, 3650])("runs %i days with valid saves and no duplicate salary or money mismatch", (days) => {
     const { state, meaningful } = runUntil(days, 713);
     const loaded = parseSave(JSON.parse(JSON.stringify(state)));

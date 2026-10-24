@@ -776,7 +776,8 @@ function nextEligibleEvent(state: GameState): [LifeEvent | undefined, number] {
     + (state.stats.energy <= 25 ? 0.09 : state.stats.energy <= 40 ? 0.04 : 0)
     + (state.stats.money <= 50_000 ? 0.09 : state.stats.money <= 120_000 ? 0.04 : 0);
   const chance = Math.min(0.52, 0.3 + urgency);
-  if (roll > chance) return [undefined, afterRoll];
+  // A new life reaches a meaningful choice by day three without bypassing the curated event pool.
+  if (roll > chance && !(state.week === 1 && state.day >= 3 && !(state.recentEventIds ?? []).length)) return [undefined, afterRoll];
   const [afterSelect, indexRoll] = nextRandom(afterRoll);
   const eventWeight = (event: LifeEvent) => {
     const family = getEventFamily(event);
