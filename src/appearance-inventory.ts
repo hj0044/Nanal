@@ -131,7 +131,7 @@ export function officialReservationTargetUpdates(reservation: unknown): Array<{
   const brief = (r.brief && typeof r.brief === "object") ? r.brief as Record<string, unknown> : null;
   const id = r.appearanceId;
   if (typeof id !== "string" || !VALID_ID.test(id) || !brief ||
-      !["approved","queued","awaiting_review"].includes(String(r.status))) return [];
+      !["approved","queued","awaiting_review","blocked","failed"].includes(String(r.status))) return [];
   const updates: Array<{
     appearanceId: string; slot: ImageSlot; targetCount: number;
     source: "verified_official_reservation";
