@@ -25,6 +25,7 @@ type SourceAsset = {
   cdnUrl?: string;
   status?: string;
   runtimeEligible: boolean;
+  role?: "portrait" | "fullbody";
 };
 
 const ageBand = (min: number, max: number) => `${min}–${max}세`;
@@ -48,7 +49,7 @@ export function trustedPortraitUrl(url: string | undefined, endpoint: string | u
 const imagekitEndpoint = import.meta.env.VITE_IMAGEKIT_URL_ENDPOINT as string | undefined;
 // Only sourceManifest-approved metadata is eligible for display.
 const eligiblePortraits: PortraitRecord[] = (sourceManifest.assets as unknown as SourceAsset[])
-  .filter((asset) => asset.status === "approved" && asset.runtimeEligible === true)
+  .filter((asset) => asset.role !== "fullbody" && asset.status === "approved" && asset.runtimeEligible === true)
   .map((asset) => ({
     id: asset.assetId,
     characterId: asset.characterId,
