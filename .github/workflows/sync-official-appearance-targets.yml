@@ -1,0 +1,29 @@
+name: Sync official Nanal image targets
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    # Requires explicit owner opt-in; scheduled workflows run only from main.
+    # A missing official backend must never appear as success.
+    if: ${{ vars.NANAL_OFFICIAL_SYNC_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Synchronize verified targets for ALL current and future AP identities
+        env:
+          NANAL_OFFICIAL_API_ORIGIN: ${{ secrets.NANAL_OFFICIAL_API_ORIGIN }}
+          NANAL_OFFICIAL_SERVICE_TOKEN: ${{ secrets.NANAL_OFFICIAL_SERVICE_TOKEN }}
+          NANAL_GAME_API_ORIGIN: ${{ secrets.NANAL_GAME_API_ORIGIN }}
+          NANAL_APPEARANCE_ADMIN_TOKEN: ${{ secrets.NANAL_APPEARANCE_ADMIN_TOKEN }}
+        run: node --experimental-strip-types scripts/sync-official-appearance-targets.mjs
