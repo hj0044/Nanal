@@ -137,6 +137,20 @@ export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv,
       return json({source:"game_d1_r2",officialDatabaseIncluded:false,
         totalIdentities:all.length,inventory:all});
     }
+    // A privileged sync worker reads only the game's already-verified identity;
+    // it must not guess or write a new AP identity from official target counts.
+    const adminIdentity=path.match(/^\/api\/appearance\/admin\/identities\/(AP\d{3,5})$/);
+    if (adminIdentity && req.method==="GET") {
+      const row=await db.prepare("SELECT * FROM appearance_identities WHERE appearance_id = ?")
+        .bind(adminIdentity[1]).first<Row>();
+      if (!row) return err("canonical_identity_missing",404);
+      return json({appearanceId:row.appearance_id,
+        reviewedOfficialReservation:row.source==="reviewed_official_reservation",
+        gender:row.gender,ageMin:row.age_min,ageMax:row.age_max,
+        profileSha256:row.profile_sha256,
+        portraitAnchorSha256:row.portrait_anchor_sha256,
+        fullBodyAnchorSha256:row.full_body_anchor_sha256});
+    }
     // Sync a verified target from the authoritative official reservation
     // or an explicit owner setting; never infer 0 or 12 for unknown identities.
     const targetRoute=path.match(/^\/api\/appearance\/identities\/(AP\d{3,5})\/targets$/);
