@@ -1,3 +1,8 @@
+# Portrait asset contract (historical v1)
+
+> Current canonical uploader/delivery instructions: [character-image-pipeline.md](character-image-pipeline.md).
+> The old local-WebP asset glob rules below are superseded by the ImageKit manifest integration in src/portrait-catalog.ts. As of 2026-10-24, no asset is approved in catalog.json.
+
 # Portrait asset contract
 
 Portrait files are reusable art assets, not identities. Never bind an asset to an NPC name or role.
