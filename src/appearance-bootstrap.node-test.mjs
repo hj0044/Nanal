@@ -141,3 +141,20 @@ test("submitted candidate stays private, owner compares canonical original then 
  const catalog=await (await handleAppearanceApi(req("GET","/api/appearance/catalog",undefined,false),env)).json();
  assert.equal(catalog.assets.length,1);assert.equal(catalog.assets[0].characterId,"AP008");
 });
+
+test("deployed URL offers accurate origin-bound GPT Actions schema without a separate server",async()=>{
+ const r=await handleAppearanceApi(req("GET","/api/appearance/actions/openapi.json",undefined,false),{});
+ assert.equal(r.status,200);
+ const schema=await r.json();
+ assert.equal(schema.servers[0].url,host);
+ assert.equal(schema.paths["/api/appearance/actions/ingest"].post.requestBody.content["application/json"]
+   .schema.properties.openaiFileIdRefs.items.type,"string");
+ assert.equal(schema.info.description.includes("Does not update a separate Nanal plugin"),true);
+});
+test("status fails closed when D1 migration is missing",async()=>{
+ const {env}=setup();
+ env.NANAL_APPEARANCE_DB={prepare:()=>({bind:()=>({first:async()=>{throw Error("no such table")}})})};
+ const r=await handleAppearanceApi(req("GET","/api/appearance/admin/status"),env);
+ assert.equal(r.status,503);
+ assert.equal((await r.json()).error,"asset_database_migration_missing");
+});
