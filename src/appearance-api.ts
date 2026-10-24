@@ -1,3 +1,4 @@
+import { buildAppearanceInventory } from "./appearance-inventory";
 /** ChatGPT image upload API. No image model calls or Nanal application daily quota. */
 export type AppearanceStoreEnv = {
   NANAL_APPEARANCE_DB?: { prepare(sql: string): { bind(...args: unknown[]): {
@@ -120,6 +121,46 @@ export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv,
       return json({ready:true,source:"chatgpt_upload_only",appDailyCap:null,remoteNanalPluginCap:"not_modified"});
     const origin=req.headers.get("origin");
     if (origin && new URL(origin).origin !== url.origin) return err("origin_not_allowed",403);
+    // Owner-only dynamic inventory: all registered AP identities, including
+    // future AP IDs. Official connector totals are NOT silently merged here.
+    // Migration 002 must be applied before this endpoint is enabled.
+    const inventoryRoute=path.match(/^\/api\/appearance\/admin\/inventory(?:\/(AP\d{3,5}))?$/);
+    if (inventoryRoute && req.method==="GET") {
+      const identities=await db.prepare("SELECT appearance_id FROM appearance_identities ORDER BY appearance_id").bind().all<Row>();
+      const targets=await db.prepare("SELECT appearance_id,slot,target_count,source,profile_sha256,updated_at FROM appearance_image_targets").bind().all<Row>();
+      const variants=await db.prepare("SELECT appearance_id,slot,status,file_sha256 FROM appearance_variants").bind().all<Row>();
+      const all=buildAppearanceInventory(identities.results,targets.results,variants.results);
+      if (inventoryRoute[1]) {
+        const found=all.find(row=>row.appearanceId===inventoryRoute[1]);
+        return found?json({inventory:found}):err("canonical_identity_missing",404);
+      }
+      return json({source:"game_d1_r2",officialDatabaseIncluded:false,
+        totalIdentities:all.length,inventory:all});
+    }
+    // Sync a verified target from the authoritative official reservation
+    // or an explicit owner setting; never infer 0 or 12 for unknown identities.
+    const targetRoute=path.match(/^\/api\/appearance\/identities\/(AP\d{3,5})\/targets$/);
+    if (targetRoute && req.method==="PUT") {
+      const p=await parseJson(req);
+      if (!["portrait","fullBody"].includes(p.slot) ||
+          !Number.isSafeInteger(p.targetCount) || p.targetCount<0 || p.targetCount>9999 ||
+          !["verified_official_reservation","explicit_owner_target"].includes(p.source) ||
+          typeof p.profileSha256!=="string" || !sha.test(p.profileSha256))
+        return err("target_metadata_invalid",400);
+      const locked=await db.prepare("SELECT * FROM appearance_identities WHERE appearance_id = ?")
+        .bind(targetRoute[1]).first<Row>();
+      if (!locked || locked.source!=="reviewed_official_reservation")
+        return err("canonical_identity_missing",409);
+      if (locked.profile_sha256!==p.profileSha256) return err("target_profile_mismatch",409);
+      const previous=await db.prepare("SELECT target_count,source,profile_sha256 FROM appearance_image_targets WHERE appearance_id = ? AND slot = ?")
+        .bind(targetRoute[1],p.slot).first<Row>();
+      if (previous && previous.target_count===p.targetCount &&
+          previous.source===p.source && previous.profile_sha256===p.profileSha256)
+        return json({appearanceId:targetRoute[1],slot:p.slot,targetCount:p.targetCount,status:"unchanged"});
+      await db.prepare("INSERT INTO appearance_image_targets(appearance_id,slot,target_count,source,profile_sha256) VALUES(?,?,?,?,?) ON CONFLICT(appearance_id,slot) DO UPDATE SET target_count=excluded.target_count,source=excluded.source,profile_sha256=excluded.profile_sha256,updated_at=datetime('now')")
+        .bind(targetRoute[1],p.slot,p.targetCount,p.source,p.profileSha256).run();
+      return json({appearanceId:targetRoute[1],slot:p.slot,targetCount:p.targetCount,status:"recorded"},previous?200:201);
+    }
 
     // A Custom GPT Action can hand the current conversation's file references
     // to an authenticated HTTPS endpoint without the user downloading PNGs.
