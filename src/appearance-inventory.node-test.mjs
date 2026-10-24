@@ -97,3 +97,13 @@ test("only actual official reservation target fields are imported", () => {
     appearanceId:"AP023",status:"approved",brief:{fullBodyTarget:"12"}
   }),[]);
 });
+
+test("blocked or provider-failed reservations retain their official target without approving images", () => {
+ for(const status of ["blocked","failed"]){
+   const updates=officialReservationTargetUpdates({
+     appearanceId:"AP014",status,brief:{fullBodyTarget:12}
+   });
+   assert.equal(updates[0]?.targetCount,12);
+   assert.equal(updates.length,1);
+ }
+});
