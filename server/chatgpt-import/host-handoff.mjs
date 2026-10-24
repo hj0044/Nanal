@@ -1,5 +1,5 @@
 import { importChatGptInitialPair } from "./bridge.mjs";
-import { submitChatGptPngBytes } from "../image-pipeline/game-db-submit.mjs";
+import { submitChatGptBytes } from "../image-pipeline/game-db-submit.mjs";
 
 /**
  * Adapter contract for trusted host code that receives actual ChatGPT image
@@ -26,8 +26,8 @@ export async function handoffGeneratedArtifact(payload,adapters={}) {
     throw Error("Trusted host must supply original image PNG Buffer");
   if(typeof adapters.submitGameVariant==="function")
     return adapters.submitGameVariant({...payload,source:"trusted-host"});
-  return submitChatGptPngBytes({
-    png:payload.png,characterId:payload.appearanceId,
+  return submitChatGptBytes({
+    pngBytes:payload.png,characterId:payload.appearanceId,
     kind:payload.kind,index:payload.index,profile:payload.profile,
     localOnly:payload.localOnly===true,privateRoot:payload.privateRoot,
     dryRun:payload.dryRun===true
