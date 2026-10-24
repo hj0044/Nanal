@@ -54,7 +54,7 @@ test("Game DB dry run validates real PNG and has no upload or local backup",asyn
   await writeFile(f,b);const profile=registry(H(b)).characters.AP008;
   const r=await submitChatGptFile({filePath:f,characterId:"AP008",kind:"portrait",
     index:1,profile,dryRun:true,privateRoot:path.join(root,"private")},{},
-    {fetch:async()=>{throw Error("network not allowed");}});
+    {fetch:async()=>{throw Error("network not allowed");},preflight:async()=>true});
   assert.equal(r.status,"dry_run");
 }));
 test("Game DB upload first backs up locally, then puts locked identity and stages variant",async()=>fixture(async(root)=>{
@@ -76,7 +76,7 @@ test("Game DB upload first backs up locally, then puts locked identity and stage
     throw Error("Unexpected method");
   };
   const r=await submitChatGptFile({filePath,characterId:"AP008",kind:"portrait",index:1,profile,
-    localOnly:true,privateRoot,optimize:false},{gameApiOrigin:"https://nanal.example",adminToken:"X".repeat(48)},{fetch});
+    localOnly:true,privateRoot,optimize:false},{gameApiOrigin:"https://nanal.example",adminToken:"X".repeat(48)},{fetch,preflight:async()=>true});
   assert.equal(r.status,"awaiting_review");
   assert.deepEqual(calls.map(x=>x.method),["PUT","POST"]);
 }));
@@ -84,12 +84,12 @@ test("refuses wrong anchor, unsafe API origin, and missing independent backup",a
   const b=png(1024,1024),filePath=path.join(root,"AP008-portrait-001.png");
   await writeFile(filePath,b);
   const params={filePath,characterId:"AP008",kind:"portrait",index:1};
-  await assert.rejects(()=>submitChatGptFile({...params,profile:registry(filler).characters.AP008,dryRun:true}),/master anchor/);
+  await assert.rejects(()=>submitChatGptFile({...params,profile:registry(filler).characters.AP008,dryRun:true},{},{preflight:async()=>true}),/master anchor/);
   const profile=registry(H(b)).characters.AP008;
   await assert.rejects(()=>submitChatGptFile({...params,profile,localOnly:true},
-    {gameApiOrigin:"http://nanal.example",adminToken:"X".repeat(48)}),/HTTPS/);
+    {gameApiOrigin:"http://nanal.example",adminToken:"X".repeat(48)},{preflight:async()=>true}),/HTTPS/);
   await assert.rejects(()=>submitChatGptFile({...params,profile},
-    {gameApiOrigin:"https://nanal.example",adminToken:"X".repeat(48)}),/Drive backup/);
+    {gameApiOrigin:"https://nanal.example",adminToken:"X".repeat(48)},{preflight:async()=>true}),/Drive backup/);
 }));
 
 
@@ -115,7 +115,7 @@ test("host-supplied PNG is automatically converted and four responsive WebPs are
  const result=await submitChatGptFile({filePath,characterId:"AP008",kind:"portrait",index:1,
    profile,localOnly:true,privateRoot:path.join(root,"private")},
    {gameApiOrigin:"https://nanal.example",adminToken:"X".repeat(48)},
-   {fetch,optimize:async()=>[160,320,640,1024].map(width=>({width,bytes:Buffer.from("webp") }))});
+   {fetch,preflight:async()=>true,optimize:async()=>[160,320,640,1024].map(width=>({width,bytes:Buffer.from("webp") }))});
  assert.equal(result.status,"awaiting_review");
  assert.deepEqual(result.optimizedWidths,[160,320,640,1024]);
  assert.equal(requests.length,6);
