@@ -134,7 +134,7 @@ export async function submitChatGptFile(spec,config={},adapters={}) {
   }
   if(visualQa){
     const outputPath=path.resolve(spec.privateRoot??".nanal-private","qa",result.assetId+".json");
-    await immutableWrite(outputPath,Buffer.from(JSON.stringify(visualQa,null,2)+"\\n"));
+    await immutableWrite(outputPath,Buffer.from(JSON.stringify(visualQa,null,2)));
   }
   return {characterId,slot,assetId:result.assetId,status:result.status,duplicate:result.duplicate===true,
     driveFileId:driveId,fileSha256:hash,optimizedWidths,
