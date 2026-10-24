@@ -128,3 +128,25 @@ export function createOfficialNanalBackendClient({
     }
   };
 }
+
+
+/** Safe adapter for the existing host-handoff bridge; never invent PNG bytes. */
+export function createOfficialHostAdapters(client) {
+  if(!client || typeof client.getOfficialReservation!=="function" ||
+     typeof client.getCanonicalAssets!=="function" ||
+     typeof client.submitOfficialVariant!=="function")
+    throw Error("official_host_adapter_client_invalid");
+  return {
+    getReservation:({appearanceId})=>client.getOfficialReservation({appearanceId}),
+    getCanonicalAssets:({appearanceId})=>client.getCanonicalAssets({appearanceId}),
+    submitOfficialVariant:({appearanceId,kind,index,pngBase64,referenceAnchorSha256,requestKey})=>{
+      if(typeof pngBase64!=="string"||!/^[a-zA-Z0-9+/]*={0,2}$/.test(pngBase64)||
+         pngBase64.length%4!==0)
+        throw Error("trusted_original_png_required");
+      return client.submitOfficialVariant({
+        appearanceId,kind,index,png:Buffer.from(pngBase64,"base64"),
+        referenceAnchorSha256,requestKey
+      });
+    }
+  };
+}
