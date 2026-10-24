@@ -79,7 +79,7 @@ test("unremoved background and wrong canvas are blocked",async()=>{
 });
 test("unverified profile, server unavailable and missing upload acknowledgement do not claim success",async()=>{
  const bytes=await image("portrait");
- for(const v of [{getStatus:404},{profile:{...profile,profileSha256:"f".repeat(64)}},{uploadStatus:503},{upload:{ok:true}}]){
+ for(const v of [{getStatus:404},{profile:{...profile,appearanceId:"AP009"}},{uploadStatus:503},{upload:{ok:true}}]){
    const {fetcher}=stub(v);
    await assert.rejects(()=>autoSubmitGeneratedImage({appearanceId:"AP008",slot:"portrait",pngBytes:bytes},{baseUrl:root,ownerToken:token,fetcher}));
  }
