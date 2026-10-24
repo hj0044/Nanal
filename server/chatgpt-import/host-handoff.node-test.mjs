@@ -50,7 +50,7 @@ test("pixel-level alpha QA rejects fully opaque images",async()=>{
 
 test("official existing-ID upload is never silently sent to game DB",async()=>{
  const payload={mode:"official-existing-variant",appearanceId:"AP008",kind:"portrait",
-   index:3,png:png(1024,1024),referenceAnchorSha256:"f".repeat(64)};
+   index:3,png:png(1024,1024),requestKey:"AP008-portrait-003",referenceAnchorSha256:"f".repeat(64)};
  await assert.rejects(()=>handoffGeneratedArtifact(payload,{
    submitGameVariant:async()=>{throw Error("must never use game DB");}
  }),/official_variant_submission_action_not_exposed/);
