@@ -78,6 +78,13 @@ test("reject bad anchor, missing visual QA and duplicate differing bytes",async(
  const rejected=await handleAppearanceApi(request("POST","/api/appearance/variants/"+first.assetId+"/review",JSON.stringify({decision:"approved",notes:"No verified visual comparison with the official character reference.",qa:{}})),env);
  assert.equal(rejected.status,409);
 });
+test("invalid PNG CRC never reaches storage", async()=>{
+  const {env,db}=setup();await identity(env);
+  const bytes=png(1024,1536);bytes[32]^=1;
+  const response=await handleAppearanceApi(upload("AP008:variant:brokencrc",bytes),env);
+  assert.equal(response.status,400);
+  assert.equal(db.assets.size,0);
+});
 test("101 valid distinct submissions accepted without local two-per-day quota",async()=>{
  const {env,db}=setup();await identity(env);
  const bytes=png(1024,1536);
