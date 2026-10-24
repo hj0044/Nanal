@@ -8,10 +8,11 @@
     "build": "tsc --noEmit -p tsconfig.app.json && vite build",
     "build:site": "npm run build && node scripts/build-site-worker.mjs",
     "verify:site": "npm run build:site && node scripts/verify-site-worker.mjs",
-    "test": "vitest run && node --test server/image-queue/policy.node-test.mjs server/chatgpt-import/bridge.node-test.mjs && node --experimental-strip-types --test src/appearance-api.node-test.mjs && node --test server/image-pipeline/import.node-test.mjs && node --test server/image-pipeline/batch.node-test.mjs && node --test server/image-pipeline/direct-bytes.node-test.mjs && node --test server/chatgpt-import/host-handoff.node-test.mjs && node --test server/image-pipeline/visual-consistency.node-test.mjs",
+    "test": "vitest run && node --test server/image-queue/policy.node-test.mjs server/chatgpt-import/bridge.node-test.mjs && node --experimental-strip-types --test src/appearance-api.node-test.mjs && node --test server/image-pipeline/import.node-test.mjs && node --test server/image-pipeline/batch.node-test.mjs && node --test server/image-pipeline/direct-bytes.node-test.mjs && node --test server/chatgpt-import/host-handoff.node-test.mjs && node --test server/image-pipeline/visual-consistency.node-test.mjs && node --test integrations/nanal-plugin/official-variant-server.node-test.mjs && node --test scripts/probe-gpt-action-live.node-test.mjs",
     "images:import": "node scripts/import-character-image.mjs",
     "images:batch": "node scripts/batch-character-images.mjs",
-    "images:visual-qa": "node scripts/review-appearance-visual.mjs"
+    "images:visual-qa": "node scripts/review-appearance-visual.mjs",
+    "images:probe-live-action": "node scripts/probe-gpt-action-live.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",
