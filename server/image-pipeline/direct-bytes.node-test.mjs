@@ -89,7 +89,7 @@ test("backup is mandatory by default, and remote 503 is not marked success",asyn
   await assert.rejects(()=>submitChatGptBytes(spec,{gameApiOrigin:"https://nanal.example",adminToken:key},{fetch}),/backup/);
   const {fetch:badFetch}=fetchMock(503);
   await assert.rejects(()=>submitChatGptBytes({...spec,localOnly:true},{gameApiOrigin:"https://nanal.example",adminToken:key},{fetch:badFetch}),/HTTP 503/);
-});
+}));
 test("no artificially enforced two-per-day image handoff cap",async()=>{
   const image=await makePng();
   const spec={characterId:"AP008",kind:"portrait",index:2,pngBytes:image,profile,dryRun:true};
