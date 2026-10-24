@@ -32,6 +32,7 @@ export function parseSave(input: unknown): GameState {
     seenEvents: stringList(input.seenEvents) ? input.seenEvents : [],
     recentEventIds: stringList(input.recentEventIds) ? input.recentEventIds : [],
     playerGoals: Array.isArray(input.playerGoals) ? input.playerGoals : [],
+    favoriteContactIds: stringList(input.favoriteContactIds) ? input.favoriteContactIds : [],
     eventThreads: object(input.eventThreads) ? input.eventThreads : {},
     archivedContacts: Array.isArray(input.archivedContacts) ? input.archivedContacts : [],
     relationshipRecords: Array.isArray(input.relationshipRecords) ? input.relationshipRecords : [],
