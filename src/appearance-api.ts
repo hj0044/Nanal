@@ -17,6 +17,16 @@ const MAX_BYTES = 16 * 1024 * 1024;
 const sha = /^[a-f0-9]{64}$/i;
 const apId = /^AP\d{3,5}$/;
 const requestKeyPattern = /^[a-zA-Z0-9:_-]{12,160}$/;
+const allowedWidths = new Set(["160","320","640","1024"]);
+const webpMaxBytes = 4 * 1024 * 1024;
+function validWebP(bytes: Uint8Array): boolean {
+  if (bytes.length < 20 || bytes.length > webpMaxBytes) return false;
+  const tag = (offset: number, length: number) => String.fromCharCode(...bytes.subarray(offset,offset+length));
+  const declared = new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(4,true);
+  return tag(0,4)==="RIFF" && tag(8,4)==="WEBP" && declared+8===bytes.length &&
+    ["VP8 ","VP8L","VP8X"].includes(tag(12,4));
+}
+const derivativeKey = (assetId: string,width: string) => "nanal/derivatives/"+assetId+"/"+width+".webp";
 const json = (body: object, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
 });
@@ -95,10 +105,14 @@ export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv,
     if (asset && ["GET","HEAD"].includes(req.method)) {
       const row=await db.prepare("SELECT storage_key FROM appearance_variants WHERE asset_id = ? AND status = 'approved'").bind(asset[1]).first<Row>();
       if (!row) return err("not_found",404);
-      const img=await storage.get(row.storage_key);
+      const width=url.searchParams.get("w");
+      if (width!==null && !allowedWidths.has(width)) return err("unsupported_image_width",400);
+      const optimized=width ? await storage.get(derivativeKey(asset[1],width)) : null;
+      const img=optimized ?? await storage.get(row.storage_key);
       if (!img) return err("missing_asset",503);
       return new Response(req.method==="HEAD"?null:await img.arrayBuffer(),{
-        headers:{"content-type":"image/png","x-content-type-options":"nosniff","cache-control":"public, max-age=300"}
+        headers:{"content-type":optimized?"image/webp":"image/png",
+          "x-content-type-options":"nosniff","cache-control":"public, max-age=300"}
       });
     }
     if (!await authorized(req,env)) return err("unauthorized",401);
@@ -228,6 +242,28 @@ export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv,
           .bind(assetId,key,variants[1],profile.gender,profile.age_min,profile.age_max,slot,profileHash,anchorHash,checksum,storageKey,"awaiting_review").run();
       } catch(e) { await storage.delete(storageKey); throw e; }
       return json({assetId,status:"awaiting_review",fileSha256:checksum},201);
+    }
+    const derivative=path.match(/^\/api\/appearance\/variants\/([a-f0-9-]{36})\/derivatives\/(160|320|640|1024)$/);
+    if (derivative && req.method==="PUT") {
+      const row=await db.prepare("SELECT asset_id,file_sha256,status FROM appearance_variants WHERE asset_id = ?").bind(derivative[1]).first<Row>();
+      if (!row || row.status==="blocked") return err("candidate_missing",404);
+      if (req.headers.get("x-source-sha256")!==row.file_sha256)
+        return err("optimized_source_mismatch",409);
+      if (req.headers.get("content-type")!=="image/webp")
+        return err("optimized_format_invalid",415);
+      if (Number(req.headers.get("content-length")||0)>webpMaxBytes)
+        return err("optimized_too_large",413);
+      const bytes=new Uint8Array(await req.arrayBuffer());
+      if(!validWebP(bytes)) return err("optimized_webp_invalid",400);
+      const key=derivativeKey(derivative[1],derivative[2]);
+      const previous=await storage.get(key);
+      if(previous) {
+        const old=new Uint8Array(await previous.arrayBuffer());
+        if(await digest(old)!==await digest(bytes))return err("optimized_immutable_conflict",409);
+        return json({assetId:derivative[1],width:Number(derivative[2]),status:"existing"});
+      }
+      await storage.put(key,bytes,{httpMetadata:{contentType:"image/webp"}});
+      return json({assetId:derivative[1],width:Number(derivative[2]),status:"stored"},201);
     }
     const review=path.match(/^\/api\/appearance\/variants\/([a-f0-9-]{36})\/review$/);
     if (review && req.method==="POST") {

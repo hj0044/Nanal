@@ -98,15 +98,24 @@ function App() {
 
   useEffect(() => {
     const controller=new AbortController();
-    fetch("/api/appearance/catalog",{credentials:"same-origin",signal:controller.signal})
-      .then(r=>r.ok?r.json():null)
-      .then(data=>{
-        if (!data || controller.signal.aborted) return;
-        if (importApprovedRemoteCatalog(data)>0)
+    let running=false;
+    const refresh=async()=>{
+      if (running || controller.signal.aborted || document.visibilityState==="hidden") return;
+      running=true;
+      try {
+        const r=await fetch("/api/appearance/catalog",{credentials:"same-origin",signal:controller.signal,cache:"no-store"});
+        if (!r.ok) return;
+        const data=await r.json();
+        if (!controller.signal.aborted && importApprovedRemoteCatalog(data)>0)
           setGame(current=>current?normalizeSave(current):current);
-      })
-      .catch(()=>{ /* Approved image API is optional until D1/R2 bindings are deployed. */ });
-    return ()=>controller.abort();
+      } catch { /* DB optional; existing gameplay stays available. */ }
+      finally { running=false; }
+    };
+    void refresh();
+    const timer=window.setInterval(()=>void refresh(),60_000);
+    const onVisible=()=>{if(document.visibilityState==="visible")void refresh();};
+    document.addEventListener("visibilitychange",onVisible);
+    return ()=>{controller.abort();window.clearInterval(timer);document.removeEventListener("visibilitychange",onVisible);};
   }, []);
 
 

@@ -160,3 +160,45 @@ test("GPT Action cannot claim success when signed link has invalid image bytes",
   assert.equal((await response.json()).error,"image_format_invalid");
   assert.equal(db.assets.size,0);
 });
+
+
+function webpMock(marker=1) {
+ const payload=Buffer.from([marker,2,3,4]);
+ const body=Buffer.alloc(20+payload.length);
+ body.write("RIFF",0);body.writeUInt32LE(body.length-8,4);
+ body.write("WEBP",8);body.write("VP8L",12);body.writeUInt32LE(payload.length,16);
+ payload.copy(body,20);
+ return body;
+}
+test("optimized derivatives are private before QA and require canonical source SHA-256",async()=>{
+ const {env}=setup();await identity(env);
+ const candidate=await (await handleAppearanceApi(upload(),env)).json();
+ const url="/api/appearance/variants/"+candidate.assetId+"/derivatives/320";
+ const b=webpMock();
+ const unauth=await handleAppearanceApi(request("PUT",url,b,false),env);
+ assert.equal(unauth.status,401);
+ const wrong=await handleAppearanceApi(new Request(host+url,{method:"PUT",
+   headers:{authorization:"Bearer "+token,"content-type":"image/webp","x-source-sha256":profile},body:b}),env);
+ assert.equal(wrong.status,409);
+ const pngHash=await crypto.subtle.digest("SHA-256",png(1024,1536));
+ const sourceHash=Buffer.from(pngHash).toString("hex");
+ const good=()=>new Request(host+url,{method:"PUT",
+   headers:{authorization:"Bearer "+token,"content-type":"image/webp","x-source-sha256":sourceHash},body:b});
+ assert.equal((await handleAppearanceApi(good(),env)).status,201);
+ assert.equal((await handleAppearanceApi(good(),env)).status,200);
+ const conflict=new Request(host+url,{method:"PUT",headers:{
+    authorization:"Bearer "+token,"content-type":"image/webp","x-source-sha256":sourceHash},
+   body:webpMock(99)});
+ assert.equal((await handleAppearanceApi(conflict,env)).status,409);
+ const imagePath="/api/appearance/assets/"+candidate.assetId+"?w=320";
+ assert.equal((await handleAppearanceApi(request("GET",imagePath,undefined,false),env)).status,404);
+ await handleAppearanceApi(request("POST","/api/appearance/variants/"+candidate.assetId+"/review",JSON.stringify({
+   decision:"approved",notes:"This fictional AP008 image was independently checked against its locked original dimensions and reference silhouette.",
+   qa})),env);
+ const optimized=await handleAppearanceApi(request("GET",imagePath,undefined,false),env);
+ assert.equal(optimized.headers.get("content-type"),"image/webp");
+ assert.deepEqual(Buffer.from(await optimized.arrayBuffer()),b);
+ const fallback=await handleAppearanceApi(request("GET","/api/appearance/assets/"+candidate.assetId+"?w=160",undefined,false),env);
+ assert.equal(fallback.headers.get("content-type"),"image/png");
+ assert.equal((await handleAppearanceApi(request("GET","/api/appearance/assets/"+candidate.assetId+"?w=123",undefined,false),env)).status,400);
+});
