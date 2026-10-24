@@ -77,7 +77,7 @@ const validIdentity = (p: Row): boolean =>
   p.qaSource==="reviewed_official_reservation";
 
 /** Serve only registered/approved images; all write routes require the owner token. */
-export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv): Promise<Response | undefined> {
+export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv, fetcher: typeof fetch = fetch): Promise<Response | undefined> {
   const url=new URL(req.url), path=url.pathname;
   if (!path.startsWith("/api/appearance/")) return undefined;
   const db=env.NANAL_APPEARANCE_DB, storage=env.NANAL_APPEARANCE_IMAGES;
@@ -106,6 +106,87 @@ export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv)
       return json({ready:true,source:"chatgpt_upload_only",appDailyCap:null,remoteNanalPluginCap:"not_modified"});
     const origin=req.headers.get("origin");
     if (origin && new URL(origin).origin !== url.origin) return err("origin_not_allowed",403);
+
+    // A Custom GPT Action can hand the current conversation's file references
+    // to an authenticated HTTPS endpoint without the user downloading PNGs.
+    // It never creates images or accesses ChatGPT Library without a supplied
+    // signed reference. Legacy DALL-E files are documented; new ChatGPT Images
+    // compatibility must be confirmed by a live Action.
+    if (path==="/api/appearance/actions/ingest" && req.method==="POST") {
+      const body=await parseJson(req);
+      const appearanceId=body.appearanceId,slot=body.slot,refs=body.openaiFileIdRefs;
+      if (!apId.test(appearanceId) || !["portrait","fullBody"].includes(slot) ||
+          !Array.isArray(refs) || refs.length!==1) return err("file_reference_invalid",422);
+      const item=refs[0] as Row;
+      if (!item || typeof item!=="object" || Array.isArray(item) ||
+          typeof item.id!=="string" || !/^file-[A-Za-z0-9_-]{8,200}$/.test(item.id) ||
+          typeof item.download_link!=="string") return err("file_reference_invalid",422);
+      let signed: URL;
+      try { signed=new URL(item.download_link); } catch { return err("file_reference_invalid",422); }
+      if (signed.protocol!=="https:" || signed.hostname!=="files.oaiusercontent.com" ||
+          signed.port!=="" || signed.username || signed.password ||
+          !/^\/file-[A-Za-z0-9_-]+$/.test(signed.pathname) || signed.hash)
+        return err("file_source_not_trusted",422);
+      // No cross-domain redirect, no arbitrary host, and no logging signed URLs.
+      const expiry=signed.searchParams.get("se");
+      if (expiry && (!Number.isFinite(Date.parse(expiry)) || Date.parse(expiry)<=Date.now()))
+        return err("file_reference_expired",422);
+      const identityRow=await db.prepare("SELECT * FROM appearance_identities WHERE appearance_id = ?").bind(appearanceId).first<Row>();
+      if (!identityRow || identityRow.source!=="reviewed_official_reservation") return err("canonical_identity_missing",409);
+      let downloaded: Response;
+      try {
+        downloaded=await fetcher(signed.href,{method:"GET",redirect:"error",credentials:"omit",
+          signal:AbortSignal.timeout(20_000)});
+      } catch { return err("source_fetch_failed",502); }
+      if (!downloaded.ok || !downloaded.body) return err("source_fetch_failed",502);
+      const length=Number(downloaded.headers.get("content-length")||0);
+      if (length>MAX_BYTES) return err("image_too_large",413);
+      const reader=downloaded.body.getReader();
+      const chunks:Uint8Array[]=[];
+      let size=0;
+      try {
+        while (true) {
+          const {done,value}=await reader.read();
+          if (done) break;
+          size+=value.byteLength;
+          if (size>MAX_BYTES) { await reader.cancel(); return err("image_too_large",413); }
+          chunks.push(value);
+        }
+      } catch { return err("source_fetch_failed",502); }
+      const bytes=new Uint8Array(size);
+      let offset=0;
+      for(const chunk of chunks){ bytes.set(chunk,offset);offset+=chunk.length; }
+      if (!size) return err("image_invalid",422);
+      try { inspectAppearancePng(bytes,slot); }
+      catch { return err("image_format_invalid",422); }
+      const digestValue=await digest(bytes);
+      const key=appearanceId+":"+slot+":"+digestValue;
+      const existing=await db.prepare("SELECT asset_id,appearance_id,slot,file_sha256,status FROM appearance_variants WHERE request_key = ?")
+        .bind(key).first<Row>();
+      if (existing) return existing.appearance_id===appearanceId && existing.slot===slot && existing.file_sha256===digestValue
+        ? json({appearanceId,assetId:existing.asset_id,status:existing.status,duplicate:true})
+        : err("idempotency_conflict",409);
+      const assetId=crypto.randomUUID(),storageKey="nanal/pending/"+assetId+".png";
+      await storage.put(storageKey,bytes,{httpMetadata:{contentType:"image/png"}});
+      const profileSha=identityRow.profile_sha256;
+      const anchorSha=slot==="portrait"?identityRow.portrait_anchor_sha256:identityRow.full_body_anchor_sha256;
+      try {
+        await db.prepare("INSERT INTO appearance_variants(asset_id,request_key,appearance_id,gender,age_min,age_max,slot,profile_sha256,anchor_sha256,file_sha256,storage_key,status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
+          .bind(assetId,key,appearanceId,identityRow.gender,identityRow.age_min,identityRow.age_max,slot,profileSha,anchorSha,digestValue,storageKey,"awaiting_review").run();
+      } catch(e) { await storage.delete(storageKey); throw e; }
+      return json({appearanceId,assetId,status:"awaiting_review",fileSha256:digestValue},201);
+    }
+    const privateAsset=path.match(/^\/api\/appearance\/admin\/assets\/([a-f0-9-]{36})$/);
+    if(privateAsset && ["GET","HEAD"].includes(req.method)) {
+      const row=await db.prepare("SELECT storage_key FROM appearance_variants WHERE asset_id = ?")
+        .bind(privateAsset[1]).first<Row>();
+      if (!row) return err("not_found",404);
+      const file=await storage.get(row.storage_key);
+      if(!file) return err("missing_asset",503);
+      return new Response(req.method==="HEAD"?null:await file.arrayBuffer(),{
+        headers:{"content-type":"image/png","cache-control":"no-store","x-content-type-options":"nosniff"}
+      });
+    }
     const identity=path.match(/^\/api\/appearance\/identities\/(AP\d{3,5})$/);
     if (identity && req.method==="PUT") {
       const p=await parseJson(req);p.appearanceId=identity[1];
