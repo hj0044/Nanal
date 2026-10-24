@@ -121,10 +121,10 @@ export async function recoverCanonicalSource({
   // CRC, PNG RGBA structure and dimensions: independent of the test adapter.
   inspectPngBase64(portraitPng.toString("base64"), { width: 1024, height: 1024 });
   inspectPngBase64(fullBodyPng.toString("base64"), { width: 1024, height: 1536 });
-  const verifyPng = adapters.verifyPng || async (bytes, kind) => {
+  const verifyPng = adapters.verifyPng || (async (bytes, kind) => {
     const { preflightPng } = await import("./game-db-submit.mjs");
     return preflightPng(bytes, kind);
-  };
+  });
   await verifyPng(portraitPng, "portrait");
   await verifyPng(fullBodyPng, "fullbody");
 
