@@ -8,7 +8,7 @@
     "build": "tsc --noEmit -p tsconfig.app.json && vite build",
     "build:site": "npm run build && node scripts/build-site-worker.mjs",
     "verify:site": "npm run build:site && node scripts/verify-site-worker.mjs",
-    "test": "vitest run"
+    "test": "vitest run && node --test server/image-queue/policy.node-test.mjs server/chatgpt-import/bridge.node-test.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",
