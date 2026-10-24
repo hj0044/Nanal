@@ -128,7 +128,7 @@ test("optimized derivatives are private before QA and require canonical source S
  assert.equal((await handleAppearanceApi(request("GET",imagePath,undefined,false),env)).status,404);
  await handleAppearanceApi(request("POST","/api/appearance/variants/"+candidate.assetId+"/review",JSON.stringify({
    decision:"approved",notes:"This fictional AP008 image was independently checked against its locked original dimensions and reference silhouette.",
-   qa}),env);
+   qa})),env);
  const optimized=await handleAppearanceApi(request("GET",imagePath,undefined,false),env);
  assert.equal(optimized.headers.get("content-type"),"image/webp");
  assert.deepEqual(Buffer.from(await optimized.arrayBuffer()),b);
