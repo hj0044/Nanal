@@ -1,0 +1,97 @@
+openapi: 3.0.3
+info:
+  title: Nanal ChatGPT Image Auto-Import
+  version: "1.0.0"
+  description: >
+    Transfers the image file created within this GPT conversation into the
+    Nanal review database. The current GPT Action runtime must supply a real
+    openaiFileIdRefs file reference; never create download links yourself.
+servers:
+  - url: https://YOUR-LIVE-NANAL-GAME-DOMAIN
+paths:
+  /api/appearance/admin/status:
+    get:
+      operationId: checkNanalImageImportStatus
+      summary: Check Nanal image-import backend readiness
+      description: Check whether the authenticated image submission database and storage are configured.
+      responses:
+        '200':
+          description: Image backend is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ready: {type: boolean}
+                  source: {type: string}
+                  appDailyCap: {type: integer, nullable: true}
+        '401':
+          description: Authentication is not configured correctly
+        '503':
+          description: D1/R2 storage is not configured
+  /api/appearance/actions/ingest:
+    post:
+      operationId: importGeneratedCharacterImage
+      summary: Save one generated PNG image as a Nanal character candidate
+      description: >
+        Call immediately after generating an adult fictional Nanal character
+        PNG in this conversation. The openaiFileIdRefs parameter must contain
+        exactly one actual file from the current conversation, not an invented
+        URL or text. The model must use the locked AP character ID and the
+        correct portrait/fullBody role. The image is only queued for visual
+        review and is never auto-approved.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - appearanceId
+                - slot
+                - openaiFileIdRefs
+              properties:
+                appearanceId:
+                  type: string
+                  pattern: "^AP[0-9]{3,5}$"
+                  description: Locked existing canonical character ID, for example AP008
+                slot:
+                  type: string
+                  enum: [portrait, fullBody]
+                  description: Portrait is 1024x1024; fullBody is 1024x1536
+                openaiFileIdRefs:
+                  type: array
+                  minItems: 1
+                  maxItems: 1
+                  description: >
+                    Exactly one image file created in the conversation.
+                    The ChatGPT Action runtime supplies a signed file reference
+                    with a temporary download link. Never synthesize one.
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Image uploaded to the private Nanal review database
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  appearanceId: {type: string}
+                  assetId: {type: string}
+                  status: {type: string, enum: [awaiting_review]}
+                  fileSha256: {type: string}
+        '200':
+          description: Duplicate file already submitted; no extra image created
+        '401':
+          description: Missing or incorrect owner API key
+        '409':
+          description: Official canonical AP identity not registered
+        '413':
+          description: Image too large
+        '422':
+          description: Image absent, expired, unsupported format, or invalid reference
+        '502':
+          description: Temporary download error
+        '503':
+          description: Image storage is not deployed
