@@ -54,7 +54,7 @@ test("Game DB dry run validates real PNG and has no upload or local backup",asyn
   await writeFile(f,b);const profile=registry(H(b)).characters.AP008;
   const r=await submitChatGptFile({filePath:f,characterId:"AP008",kind:"portrait",
     index:1,profile,dryRun:true,privateRoot:path.join(root,"private")},{},
-    {fetch:async()=>{throw Error("network not allowed");}});
+    {fetch:async()=>{throw Error("network not allowed");},preflight:async()=>true});
   assert.equal(r.status,"dry_run");
 }));
 test("Game DB upload first backs up locally, then puts locked identity and stages variant",async()=>fixture(async(root)=>{
@@ -76,7 +76,7 @@ test("Game DB upload first backs up locally, then puts locked identity and stage
     throw Error("Unexpected method");
   };
   const r=await submitChatGptFile({filePath,characterId:"AP008",kind:"portrait",index:1,profile,
-    localOnly:true,privateRoot},{gameApiOrigin:"https://nanal.example",adminToken:"X".repeat(48)},{fetch});
+    localOnly:true,privateRoot,optimize:false},{gameApiOrigin:"https://nanal.example",adminToken:"X".repeat(48)},{fetch,preflight:async()=>true});
   assert.equal(r.status,"awaiting_review");
   assert.deepEqual(calls.map(x=>x.method),["PUT","POST"]);
 }));
@@ -84,10 +84,39 @@ test("refuses wrong anchor, unsafe API origin, and missing independent backup",a
   const b=png(1024,1024),filePath=path.join(root,"AP008-portrait-001.png");
   await writeFile(filePath,b);
   const params={filePath,characterId:"AP008",kind:"portrait",index:1};
-  await assert.rejects(()=>submitChatGptFile({...params,profile:registry(filler).characters.AP008,dryRun:true}),/master anchor/);
+  await assert.rejects(()=>submitChatGptFile({...params,profile:registry(filler).characters.AP008,dryRun:true},{},{preflight:async()=>true}),/master anchor/);
   const profile=registry(H(b)).characters.AP008;
   await assert.rejects(()=>submitChatGptFile({...params,profile,localOnly:true},
-    {gameApiOrigin:"http://nanal.example",adminToken:"X".repeat(48)}),/HTTPS/);
+    {gameApiOrigin:"http://nanal.example",adminToken:"X".repeat(48)},{preflight:async()=>true}),/HTTPS/);
   await assert.rejects(()=>submitChatGptFile({...params,profile},
-    {gameApiOrigin:"https://nanal.example",adminToken:"X".repeat(48)}),/Drive backup/);
+    {gameApiOrigin:"https://nanal.example",adminToken:"X".repeat(48)},{preflight:async()=>true}),/Drive backup/);
+}));
+
+
+test("host-supplied PNG is automatically converted and four responsive WebPs are submitted",async()=>fixture(async(root)=>{
+ const b=png(1024,1024),filePath=path.join(root,"AP008-portrait-001.png");
+ await writeFile(filePath,b);
+ const profile=registry(H(b)).characters.AP008;
+ const requests=[];
+ const fetch=async(url,init)=>{
+   const u=String(url);
+   requests.push({url:u,method:init.method});
+   if(u.endsWith("/identities/AP008") && init.method==="PUT")
+     return new Response(JSON.stringify({appearanceId:"AP008",status:"registered"}));
+   if(u.endsWith("/identities/AP008/variants") && init.method==="POST")
+     return new Response(JSON.stringify({assetId:"c4ac2f55-238c-41c2-9077-5ab44cf382a4",status:"awaiting_review"}));
+   if(u.includes("/derivatives/") && init.method==="PUT"){
+     assert.equal(init.headers["x-source-sha256"],H(b));
+     assert.equal(init.headers["Content-Type"],"image/webp");
+     return new Response(JSON.stringify({status:"stored"}));
+   }
+   throw Error("unexpected "+u);
+ };
+ const result=await submitChatGptFile({filePath,characterId:"AP008",kind:"portrait",index:1,
+   profile,localOnly:true,privateRoot:path.join(root,"private")},
+   {gameApiOrigin:"https://nanal.example",adminToken:"X".repeat(48)},
+   {fetch,preflight:async()=>true,optimize:async()=>[160,320,640,1024].map(width=>({width,bytes:Buffer.from("webp") }))});
+ assert.equal(result.status,"awaiting_review");
+ assert.deepEqual(result.optimizedWidths,[160,320,640,1024]);
+ assert.equal(requests.length,6);
 }));
