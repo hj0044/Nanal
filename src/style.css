@@ -263,6 +263,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 }
 .career-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
 .career-actions button { min-height: 44px; }
+.identity-fullbody { margin: 16px auto; max-width: 220px; text-align: center; }
+.identity-fullbody img { display: block; width: 100%; aspect-ratio: 2 / 3; object-fit: contain; border-radius: 14px; background: var(--surface-soft); }
+.identity-fullbody figcaption { margin-top: 6px; font-size: 11px; color: var(--muted); }
 .economy-hero strong, .economy-hero small { display: block; }
 .economy-hero small { margin-top: 7px; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) {

@@ -2,7 +2,7 @@ name: Verify web app
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'codex/**']
   push:
     branches: [main]
 
@@ -22,3 +22,18 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run verify:site
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run test:mobile
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mobile-screenshots-and-traces
+          path: test-results/

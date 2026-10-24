@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { addPlayerGoal, advanceDay, advanceDays, chooseEvent, contactArchivedNpc, createGame, createInitialNPCRelationships, generateBodyMetrics, generateContacts, getContactAffiliation, getEventFamily, getNpcRelationshipEvents, getNpcReunionEvents, getPersonalStoryEvents, getPlayerAffiliation, getRelationshipProfile, getWeeklyCashflowPlan, normalizeContactName, personalizeAuthoredEvent, setPlayerGoalStatus, startNextWeek, takeDailyAction, type Character, type LifeEvent } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
+import { withKoreanParticle } from "./korean";
 import { applyNarrativeRewrite, buildNarrativeRewriteRequest } from "./narrative-rewrite";
 import { getEventThreadEvents } from "./event-threads";
 import { getPortrait, getPortraitCandidates, getPortraitIdentityId, portraitCatalog } from "./portrait-catalog";
@@ -292,10 +293,12 @@ describe("first week simulation", () => {
     expect(game.contacts.every((person) => person.portraitId === undefined)).toBe(true);
   });
 
-  it("ages the player and NPCs once at each simulated year boundary", () => {
+  it("ages the player and NPCs once at the calendar year boundary", () => {
     const state = createGame(character, 72392);
-    const next = startNextWeek({ ...state, week: 52, phase: "summary" });
-    expect(next.week).toBe(53);
+    const stillDecember = startNextWeek({ ...state, week: 52, phase: "summary" });
+    expect(stillDecember.character.age).toBe(character.age);
+    const next = startNextWeek({ ...stillDecember, week: 53, phase: "summary" });
+    expect(next.week).toBe(54);
     expect(next.character.age).toBe(character.age + 1);
     expect(next.contacts.every((person, index) => person.age === state.contacts[index].age! + 1)).toBe(true);
     const ordinaryWeek = startNextWeek({ ...state, week: 1, phase: "summary" });
@@ -759,7 +762,7 @@ describe("first week simulation", () => {
       if (person) completed = { name: person.name, goal: base.contacts.find((contact) => contact.id === person.id)!.goal!, result };
     }
     expect(completed).toBeDefined();
-    const line = `${completed!.name}이(가) “${completed!.goal}”에서 한 단계를 마쳤어요.`;
+    const line = `${withKoreanParticle(completed!.name, "subject")} “${completed!.goal}”에서 한 단계를 마쳤어요.`;
     expect(completed!.result.log.filter((entry) => entry === line)).toHaveLength(1);
     const following = finishWeek({ ...completed!.result, phase: "playing", day: 7, evaluatedDays: [7], week: 2 });
     expect(following.log.filter((entry) => entry === line)).toHaveLength(1);
