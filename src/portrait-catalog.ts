@@ -106,7 +106,7 @@ export function importApprovedRemoteCatalog(payload: unknown): number {
 }
 
 export function getPortrait(id?: string): PortraitRecord | undefined {
-  return portraitCatalog.find((portrait) => portrait.id === id);
+  return portraitVariantCatalog.find((portrait) => portrait.id === id);
 }
 
 export function getPortraitIdentityId(id?: string): string | undefined {
