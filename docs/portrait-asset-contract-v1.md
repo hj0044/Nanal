@@ -1,3 +1,9 @@
+# Portrait asset contract (historical v1)
+
+> Current image importer and CDN delivery: [character-image-pipeline.md](character-image-pipeline.md).
+> The local asset glob rules below have been superseded by the reviewed CDN and same-origin manifest.
+> Only approved imagery may appear in the game.
+
 # Portrait asset contract
 
 Portrait files are reusable art assets, not identities. Never bind an asset to an NPC name or role.
