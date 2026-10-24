@@ -4,7 +4,7 @@ const env = {};
 const page = await worker.fetch(new Request("https://nanal.test/"), env);
 if (page.status !== 200) throw new Error(`Homepage returned ${page.status}`);
 const html = await page.text();
-const assetPaths = [...html.matchAll(/(?:src|href)="([^"]+\\.(?:js|css))"/g)].map((match) => match[1]);
+const assetPaths = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)].map((match) => match[1]);
 if (!assetPaths.some((asset) => asset.endsWith(".js")) || !assetPaths.some((asset) => asset.endsWith(".css"))) {
   throw new Error("Homepage does not reference both a JavaScript and CSS bundle");
 }
@@ -18,4 +18,10 @@ const status = await worker.fetch(new Request("https://nanal.test/api/narrative-
 if (status.status !== 200 || (await status.json()).available !== false) {
   throw new Error("Narrative status route did not return its keyless availability state");
 }
-console.log(`Verified homepage, ${assetPaths.length} hashed assets, and narrative status route`);
+const imageCatalog = await worker.fetch(new Request("https://nanal.test/api/appearance/catalog"), env);
+if (imageCatalog.status !== 503 || (await imageCatalog.json()).error !== "asset_database_not_configured") {
+  throw new Error("Unconfigured image database must fail closed with 503");
+}
+const admin = await worker.fetch(new Request("https://nanal.test/api/appearance/admin/status"), env);
+if (admin.status !== 503) throw new Error("Admin image API must not bypass missing database bindings");
+console.log(`Verified homepage, ${assetPaths.length} hashed assets, and narrative and image API routes`);

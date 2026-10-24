@@ -6,7 +6,7 @@ import {
   type SensitiveTopic, type Tab,
 } from "./game";
 import "./style.css";
-import { choosePortraitId, getPortrait, getPortraitIdentityId } from "./portrait-catalog";
+import { choosePortraitId, getPortrait, getPortraitIdentityId, importApprovedRemoteCatalog } from "./portrait-catalog";
 import { rewriteNarrative } from "./narrative-rewrite";
 
 const SAVE_KEY = "nanal-save-v1";
@@ -94,6 +94,20 @@ function App() {
   const [nightNow, setNightNow] = useState(false);
   const [narrativeAvailable, setNarrativeAvailable] = useState(false);
   const narrativeRequests = useRef(new Set<string>());
+
+  useEffect(() => {
+    const controller=new AbortController();
+    fetch("/api/appearance/catalog",{credentials:"same-origin",signal:controller.signal})
+      .then(r=>r.ok?r.json():null)
+      .then(data=>{
+        if (!data || controller.signal.aborted) return;
+        if (importApprovedRemoteCatalog(data)>0)
+          setGame(current=>current?normalizeSave(current):current);
+      })
+      .catch(()=>{ /* Approved image API is optional until D1/R2 bindings are deployed. */ });
+    return ()=>controller.abort();
+  }, []);
+
 
   useEffect(() => {
     const controller = new AbortController();

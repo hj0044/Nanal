@@ -21,3 +21,4 @@ jobs:
       - run: node --test server/image-queue/policy.node-test.mjs
       - run: npm test
       - run: npm run build
+      - run: npm run verify:site

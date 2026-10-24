@@ -71,8 +71,42 @@ export const portraitCatalog: PortraitRecord[] = eligiblePortraits.filter((asset
   return true;
 });
 
+/**
+ * Import approved assets from the SAME-ORIGIN game asset API.
+ * Never turn pending/blocked uploads into runtime artwork.
+ */
+export function importApprovedRemoteCatalog(payload: unknown): number {
+  if (!payload || typeof payload !== "object" || !("assets" in payload)) return 0;
+  const assets = (payload as { assets?: unknown }).assets;
+  if (!Array.isArray(assets)) return 0;
+  let added=0;
+  for (const raw of assets) {
+    if (!raw || typeof raw !== "object") continue;
+    const a=raw as Record<string, unknown>;
+    if (a.status!=="approved" || a.runtimeEligible!==true || a.slot!=="portrait" ||
+        typeof a.assetId!=="string" || !/^[a-f0-9-]{36}$/.test(a.assetId) ||
+        typeof a.characterId!=="string" || !/^AP\d{3,5}$/.test(a.characterId) ||
+        (a.gender!=="남성" && a.gender!=="여성") ||
+        typeof a.imagePath!=="string" || a.imagePath!=="/api/appearance/assets/"+a.assetId) continue;
+    const ages=a.ageEstimate as {min?:unknown;max?:unknown}|undefined;
+    if (!ages || typeof ages.min!=="number" || typeof ages.max!=="number" ||
+        !Number.isInteger(ages.min) || !Number.isInteger(ages.max) ||
+        ages.min<20 || ages.max>59 || ages.min>ages.max) continue;
+    if (portraitVariantCatalog.some(p=>p.id===a.assetId)) continue;
+    const item:PortraitRecord = {
+      id:a.assetId,characterId:a.characterId,gender:a.gender,ageMin:ages.min,ageMax:ages.max,
+      age:Math.round((ages.min+ages.max)/2),ageBand:ageBand(ages.min,ages.max),
+      filename:a.assetId+".png",imageUrl:a.imagePath,source:"single"
+    };
+    portraitVariantCatalog.push(item);
+    if (!portraitCatalog.some(p=>(p.characterId??p.id)===a.characterId)) portraitCatalog.push(item);
+    added++;
+  }
+  return added;
+}
+
 export function getPortrait(id?: string): PortraitRecord | undefined {
-  return portraitCatalog.find((portrait) => portrait.id === id);
+  return portraitVariantCatalog.find((portrait) => portrait.id === id);
 }
 
 export function getPortraitIdentityId(id?: string): string | undefined {
