@@ -20,3 +20,20 @@ CREATE TABLE IF NOT EXISTS appearance_image_target_audit (
  recorded_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_appearance_target_audit_id ON appearance_image_target_audit(appearance_id,slot,recorded_at);
+
+-- Keep audit in the same SQLite statement transaction as target creation/update.
+CREATE TRIGGER IF NOT EXISTS appearance_target_insert_audit
+AFTER INSERT ON appearance_image_targets
+BEGIN
+ INSERT INTO appearance_image_target_audit(appearance_id,slot,previous_target,next_target,source,profile_sha256)
+ VALUES(NEW.appearance_id,NEW.slot,NULL,NEW.target_count,NEW.source,NEW.profile_sha256);
+END;
+CREATE TRIGGER IF NOT EXISTS appearance_target_change_audit
+AFTER UPDATE ON appearance_image_targets
+WHEN OLD.target_count <> NEW.target_count
+ OR OLD.source <> NEW.source
+ OR OLD.profile_sha256 <> NEW.profile_sha256
+BEGIN
+ INSERT INTO appearance_image_target_audit(appearance_id,slot,previous_target,next_target,source,profile_sha256)
+ VALUES(NEW.appearance_id,NEW.slot,OLD.target_count,NEW.target_count,NEW.source,NEW.profile_sha256);
+END;
