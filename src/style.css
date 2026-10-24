@@ -396,3 +396,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .weekly-cashflow-summary strong { font-size: 11px; }
 .weekly-cashflow-summary span { color: var(--muted); }
 .weekly-cashflow-summary small { color: #a94e4e; font-size: 9px; }
+
+/* Reviewed image imports render inside the existing initial-avatar shapes. */
+.character-avatar { overflow: hidden; position: relative; }
+.character-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
