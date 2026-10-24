@@ -1,7 +1,8 @@
 import { handleNarrativeApi } from "../src/narrative-api";
+import { handleAppearanceApi, type AppearanceStoreEnv } from "../src/appearance-api";
 import assets from "../dist/site-assets.generated.js";
 
-type WorkerEnv = { NANAL_GEMINI_API_KEY?: string; NANAL_GEMINI_MODEL?: string };
+type WorkerEnv = AppearanceStoreEnv & { NANAL_GEMINI_API_KEY?: string; NANAL_GEMINI_MODEL?: string };
 
 const contentTypes: Record<string, string> = {
   css: "text/css; charset=utf-8", html: "text/html; charset=utf-8",
@@ -12,6 +13,8 @@ const contentTypes: Record<string, string> = {
 
 export default {
   async fetch(request: Request, env: WorkerEnv): Promise<Response> {
+    const imageResponse = await handleAppearanceApi(request, env);
+    if (imageResponse) return imageResponse;
     const apiResponse = await handleNarrativeApi(request, env);
     if (apiResponse) return apiResponse;
     const url = new URL(request.url);
