@@ -162,7 +162,7 @@ export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv)
       } catch(e) { await storage.delete(storageKey); throw e; }
       return json({assetId,status:"awaiting_review",fileSha256:checksum},201);
     }
-    const derivative=path.match(/^\\/api\\/appearance\\/variants\\/([a-f0-9-]{36})\\/derivatives\\/(160|320|640|1024)$/);
+    const derivative=path.match(/^\/api\/appearance\/variants\/([a-f0-9-]{36})\/derivatives\/(160|320|640|1024)$/);
     if (derivative && req.method==="PUT") {
       const row=await db.prepare("SELECT asset_id,file_sha256,status FROM appearance_variants WHERE asset_id = ?").bind(derivative[1]).first<Row>();
       if (!row || row.status==="blocked") return err("candidate_missing",404);
