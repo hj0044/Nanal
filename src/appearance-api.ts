@@ -116,8 +116,17 @@ export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv,
       });
     }
     if (!await authorized(req,env)) return err("unauthorized",401);
-    if (path==="/api/appearance/admin/status" && req.method==="GET")
-      return json({ready:true,source:"chatgpt_upload_only",appDailyCap:null,remoteNanalPluginCap:"not_modified"});
+    if (path==="/api/appearance/admin/status" && req.method==="GET"){
+      try {
+        await db.prepare("SELECT COUNT(*) AS total FROM appearance_identities").bind().first<Row>();
+        await db.prepare("SELECT COUNT(*) AS total FROM appearance_variants").bind().first<Row>();
+      } catch {
+        return err("asset_database_migration_missing",503);
+      }
+      return json({ready:true,source:"game_cloudflare_d1_r2",ownerBootstrap:true,
+        reviewConsole:"/appearance-admin.html",appDailyCap:null,
+        remoteNanalPluginCap:"independent_not_modified"});
+    }
     const origin=req.headers.get("origin");
     if (origin && new URL(origin).origin !== url.origin) return err("origin_not_allowed",403);
 
