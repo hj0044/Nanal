@@ -4,7 +4,27 @@ import { deflateSync } from "node:zlib";
 import { handleAppearanceApi } from "./appearance-api.ts";
 function crc(bytes){let c=0xffffffff;for(const b of bytes){c^=b;for(let i=0;i<8;i++)c=(c>>>1)^(c&1?0xedb88320:0)}return(c^0xffffffff)>>>0}
 function chunk(type,data){const l=Buffer.alloc(4),c=Buffer.alloc(4);l.writeUInt32BE(data.length);const b=Buffer.concat([Buffer.from(type),data]);c.writeUInt32BE(crc(b));return Buffer.concat([l,b,c])}
-function png(w,h){const a=Buffer.alloc(13);a.writeUInt32BE(w);a.writeUInt32BE(h,4);a[8]=8;a[9]=6;return Buffer.concat([Buffer.from("89504e470d0a1a0a","hex"),chunk("IHDR",a),chunk("IDAT",deflateSync(Buffer.alloc(h*(1+w*4)))),chunk("IEND",Buffer.alloc(0))])}
+const cachedPngs=new Map();
+function png(w,h){
+ const key=w+"x"+h;
+ if(cachedPngs.has(key))return Buffer.from(cachedPngs.get(key));
+ const a=Buffer.alloc(13);a.writeUInt32BE(w);a.writeUInt32BE(h,4);a[8]=8;a[9]=6;
+ const raw=Buffer.alloc(h*(1+w*4));
+ for(let y=Math.floor(h*0.07);y<Math.floor(h*0.94);y++){
+   for(let x=Math.floor(w*0.30);x<Math.floor(w*0.70);x++){
+     const i=y*(1+w*4)+1+x*4;
+     raw[i]=150;raw[i+1]=120;raw[i+2]=100;raw[i+3]=255;
+   }
+ }
+ const encoded=Buffer.concat([Buffer.from("89504e470d0a1a0a","hex"),chunk("IHDR",a),chunk("IDAT",deflateSync(raw)),chunk("IEND",Buffer.alloc(0))]);
+ cachedPngs.set(key,encoded);
+ return Buffer.from(encoded);
+}
+function emptyPng(w,h){
+ const a=Buffer.alloc(13);a.writeUInt32BE(w);a.writeUInt32BE(h,4);a[8]=8;a[9]=6;
+ return Buffer.concat([Buffer.from("89504e470d0a1a0a","hex"),chunk("IHDR",a),
+   chunk("IDAT",deflateSync(Buffer.alloc(h*(1+w*4)))),chunk("IEND",Buffer.alloc(0))]);
+}
 class DB {
   constructor(){this.ids=new Map();this.assets=new Map();this.targets=new Map();this.targetAudit=[]}
   prepare(sql){return{bind:(...args)=>({
@@ -280,4 +300,24 @@ test("verified identity metadata available only to owner sync worker",async()=>{
  assert.equal(meta.profileSha256,profile);
  assert.equal(meta.fullBodyAnchorSha256,body);
  assert.equal((await handleAppearanceApi(request("GET","/api/appearance/admin/identities/AP999"),env)).status,404);
+});
+
+test("automatic pixel QA blocks transparent-only candidates before DB writes",async()=>{
+ const {env,db}=setup();await identity(env);
+ const bad=emptyPng(1024,1536);
+ const result=await handleAppearanceApi(upload("AP008:autoqa:empty",bad),env);
+ assert.equal(result.status,422);
+ assert.equal((await result.json()).error,"image_pixel_qa_foreground_missing");
+ assert.equal(db.assets.size,0);
+});
+test("automatic pixel QA applies to GPT Action ingest (no pending bypass)",async()=>{
+ const {env,db}=setup();await identity(env);
+ const signed="https://files.oaiusercontent.com/file-EXAMPLE123456789";
+ const payload=JSON.stringify({appearanceId:"AP008",slot:"portrait",openaiFileIdRefs:[
+   {id:"file-EXAMPLE123456789",download_link:signed}
+ ]});
+ const response=await handleAppearanceApi(request("POST","/api/appearance/actions/ingest",payload),env,
+   async()=>new Response(emptyPng(1024,1024),{status:200}));
+ assert.equal(response.status,422);
+ assert.equal(db.assets.size,0);
 });
