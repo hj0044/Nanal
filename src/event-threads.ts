@@ -1,16 +1,9 @@
 import type { GameState, LifeEvent, EventChoice, Contact } from "./game";
+import { withKoreanParticle } from "./korean";
 
 const choice = (id: string, title: string, detail: string, result: string, effect: EventChoice["effect"], contactId?: string): EventChoice => ({
   id, title, detail, result, effect, ...(contactId ? { contactId } : {}),
 });
-
-function withKoreanParticle(name: string, kind: "and" | "subject" | "topic"): string {
-  const code = name.charCodeAt(name.length - 1);
-  const hasFinal = code >= 0xac00 && code <= 0xd7a3 && (code - 0xac00) % 28 !== 0;
-  return name + (kind === "and" ? (hasFinal ? "과" : "와")
-    : kind === "subject" ? (hasFinal ? "이" : "가")
-      : hasFinal ? "은" : "는");
-}
 
 /** Returns due authored follow-ups from saved route state; no random rolls or external calls. */
 export function getEventThreadEvents(state: GameState): LifeEvent[] {
@@ -31,7 +24,7 @@ export function updateEventThreads(state: GameState, selected: EventChoice): Gam
   if (!event?.thread) return state.eventThreads;
   const { id, stage } = event.thread;
   if (stage === 0) {
-    if (Object.keys(threads).length >= 4) return threads;
+    // A newly accepted story must always retain its follow-up, including busy weeks.
     const contactId = selected.contactId ?? (selected.contactIndex === undefined ? undefined : state.contacts[selected.contactIndex]?.id);
     threads[id] = {
       route: selected.id,
