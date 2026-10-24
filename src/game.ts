@@ -1,4 +1,4 @@
-import { withKoreanParticle } from "./korean";
+import { lifeDate, withKoreanParticle } from "./korean";
 import { calendarWeekIncludes, careerTransition, debtAction, initialEconomy, monthKey, type Economy, type Transaction } from "./economy";
 
 export type Background = "student" | "jobseeker" | "worker";
@@ -181,7 +181,8 @@ export interface LifeEvent {
   choices: EventChoice[];
 }
 export interface GameState {
-  version: 3;
+  version: 4;
+  lastAgedCalendarYear?: number;
   economy?: Economy;
   character: Character;
   week: number;
@@ -420,7 +421,7 @@ export function createGame(character: Character, seed = createSeed(`${character.
   const player = { ...character, ...body, weightKg: character.weightKg ?? body.weightKg, affiliation: getPlayerAffiliation(character), portraitId: getPortrait(character.portraitId)?.id ?? choosePortraitId(character.gender, character.age, seed) };
   const contacts = generateContacts(character.background, seed, character.age, player.portraitId ? [player.portraitId] : []).map((person) => ({ ...person, firstMetWeek: 1, lastInteractionWeek: 1, returnCount: 0 }));
   return {
-    version: 3, character: player, week: 1, day: 1, phase: "playing", seed, economy: initialEconomy(character),
+    version: 4, character: player, week: 1, day: 1, phase: "playing", seed, economy: initialEconomy(character), lastAgedCalendarYear: character.year,
     evaluatedDays: [], seenEvents: [], npcStoryStages: {}, npcStoryLastWeek: {}, npcStoryChoices: {},
     playerGoals: [], storyArcs: {}, worldFacts: [], playerRelationships: Object.fromEntries(contacts.filter((person) => getRelationshipProfile(person.role).type === "family").map((person) => [person.id, { kind: "family", sinceWeek: 1 }])),
     stats: { money, energy: 72, stress: 24, mood: 61, focus: 52 },
@@ -1215,7 +1216,9 @@ export function startNextWeek(state: GameState): GameState {
   const playerGoals = (state.playerGoals ?? []).map((goal) => goal.status === "active" && state.week - goal.createdWeek >= PLAYER_GOAL_CYCLE_WEEKS - 1
     ? { ...goal, status: "paused" as const, reviewDue: true, weeklyProgress: 0 }
     : { ...goal, weeklyProgress: 0 });
-  const yearTurn = week > 1 && (week - 1) % 52 === 0;
+  const lastAgedCalendarYear = state.lastAgedCalendarYear ?? state.character.year + Math.floor((state.week - 1) / 52);
+  const nextCalendarYear = lifeDate(state.character.year, week).getFullYear();
+  const yearTurn = nextCalendarYear > lastAgedCalendarYear;
   const agePerson = <T extends { age?: number; portraitId?: string; portraitAgeBand?: string; appearanceHistory?: AppearanceSnapshot[]; warmth?: number; name?: string }>(person: T): T => {
     if (!yearTurn || person.age === undefined) return person;
     const age = person.age + 1;
@@ -1234,7 +1237,7 @@ export function startNextWeek(state: GameState): GameState {
     ...agedContacts.filter((person, index) => person.portraitId !== state.contacts[index]?.portraitId && (person.warmth ?? 0) >= 70).map((person) => `${person.name}의 인상이 세월에 따라 달라졌다.`),
   ].filter(Boolean) : [];
   return {
-    ...state, character: agedCharacter, contacts: agedContacts, archivedContacts: agedArchived, economy, week, day: 1, phase: "playing",
+    ...state, character: agedCharacter, contacts: agedContacts, archivedContacts: agedArchived, economy, lastAgedCalendarYear: yearTurn ? nextCalendarYear : lastAgedCalendarYear, week, day: 1, phase: "playing",
     playerGoals,
     evaluatedDays: [], actionDays: [], weeklyActions: {}, weeklyEarnedIncome: 0, weeklyMeetingMomentum: 0, weeklyMeetingContext: undefined, seenEvents: [], lastChoice: undefined, lastChoiceCause: undefined, lastChoiceNextWeek: undefined, lastChoiceEffect: undefined,
     stats: { ...state.stats, energy: clamp(state.stats.energy + 12), stress: clamp(state.stats.stress - 7) },

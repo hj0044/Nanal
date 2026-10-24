@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getPortrait, portraitCatalog, trustedPortraitUrl, importApprovedRemoteCatalog } from "./portrait-catalog";
+import { getApprovedAppearanceSet, getPortrait, portraitCatalog, trustedPortraitUrl, importApprovedRemoteCatalog } from "./portrait-catalog";
+import { fullBodyUrl } from "./portrait-image";
 
 describe("approved portrait delivery", () => {
   it("rejects unknown or unreviewed artwork", () => {
@@ -24,8 +25,21 @@ describe("approved portrait delivery", () => {
       {...fields,assetId:bad,slot:"fullBody",imagePath:"/api/appearance/assets/"+bad},
       {...fields,assetId:good,slot:"portrait",imagePath:"https://evil.invalid/"+good},
       {...fields,assetId:good,slot:"portrait",imagePath:"/api/appearance/assets/"+good}
-    ]})).toBe(1);
+    ]})).toBe(2);
     expect(getPortrait(good)?.imageUrl).toBe("/api/appearance/assets/"+good);
     expect(getPortrait(bad)).toBeUndefined();
+  });
+
+  it("pairs only approved same-ID face/body and requires locked physical dimensions to render a body", () => {
+    const portrait = "a4ac2f55-238c-41c2-9077-5ab44cf382a4";
+    const body = "b4ac2f55-238c-41c2-9077-5ab44cf382a4";
+    const wrong = "d4ac2f55-238c-41c2-9077-5ab44cf382a4";
+    const asset = (assetId: string, characterId: string, slot: string, status = "approved", heightCm = 164) => ({ assetId, characterId, slot, status, runtimeEligible: true, gender: "여성", ageEstimate: { min: 20, max: 29 }, heightCm, weightKg: 52, imagePath: "/api/appearance/assets/" + assetId });
+    importApprovedRemoteCatalog({ assets: [asset(body, "AP011", "fullBody"), asset(wrong, "AP012", "fullBody"), asset(portrait, "AP011", "portrait")] });
+    expect(getApprovedAppearanceSet(portrait)?.fullBody?.id).toBe(body);
+    expect(fullBodyUrl(portrait, 164, 52, 320)).toBe(`/api/appearance/assets/${body}?w=320`);
+    expect(fullBodyUrl(portrait, 170, 52, 320)).toBeUndefined();
+    expect(importApprovedRemoteCatalog({ assets: [asset("e4ac2f55-238c-41c2-9077-5ab44cf382a4", "AP011", "fullBody", "awaiting_review")] })).toBe(0);
+    expect(getApprovedAppearanceSet(portrait)?.fullBody?.id).toBe(body);
   });
 });

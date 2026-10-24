@@ -1,5 +1,6 @@
 import type { GameState } from "./game";
 import { migrateEconomy } from "./economy";
+import { lifeDate } from "./korean";
 
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
@@ -8,7 +9,7 @@ const stringList = (value: unknown): value is string[] => Array.isArray(value) &
 
 /** Retain the original payload on failure; callers can export it before any replacement. */
 export function parseSave(input: unknown): GameState {
-  if (!object(input) || ![1, 2, 3].includes(Number(input.version))) throw new Error("지원하지 않는 저장 버전입니다.");
+  if (!object(input) || ![1, 2, 3, 4].includes(Number(input.version))) throw new Error("지원하지 않는 저장 버전입니다.");
   const c = input.character, s = input.stats;
   if (!object(c) || !text(c.name) || !finite(c.age) || c.age < 0 || !finite(c.year) ||
     !["student", "jobseeker", "worker"].includes(String(c.background)) || !["여성", "남성"].includes(String(c.gender)) ||
@@ -27,8 +28,9 @@ export function parseSave(input: unknown): GameState {
   const settings = input.settings;
   const migrated = {
     ...input,
-    version: 3,
-    economy: input.version === 3 && object(input.economy) ? input.economy : migrateEconomy(c as unknown as GameState["character"], Number(input.week)),
+    version: 4,
+    lastAgedCalendarYear: finite(input.lastAgedCalendarYear) ? input.lastAgedCalendarYear : Math.max(lifeDate(Number(c.year), Number(input.week)).getFullYear(), Number(c.year) + Math.floor((Number(input.week) - 1) / 52)),
+    economy: Number(input.version) >= 3 && object(input.economy) ? input.economy : migrateEconomy(c as unknown as GameState["character"], Number(input.week)),
     evaluatedDays: Array.isArray(input.evaluatedDays) ? input.evaluatedDays : [],
     actionDays: stringList(input.actionDays) ? input.actionDays : [],
     seenEvents: stringList(input.seenEvents) ? input.seenEvents : [],

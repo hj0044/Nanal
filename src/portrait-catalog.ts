@@ -14,6 +14,8 @@ export interface PortraitRecord {
   source: "single";
   filename?: string;
   imageUrl?: string;
+  heightCm?: number;
+  weightKg?: number;
 }
 
 type SourceAsset = {
@@ -26,6 +28,8 @@ type SourceAsset = {
   status?: string;
   runtimeEligible: boolean;
   role?: "portrait" | "fullbody";
+  heightCm?: number;
+  weightKg?: number;
 };
 
 const ageBand = (min: number, max: number) => `${min}–${max}세`;
@@ -48,8 +52,8 @@ export function trustedPortraitUrl(url: string | undefined, endpoint: string | u
 }
 const imagekitEndpoint = import.meta.env.VITE_IMAGEKIT_URL_ENDPOINT as string | undefined;
 // Only sourceManifest-approved metadata is eligible for display.
-const eligiblePortraits: PortraitRecord[] = (sourceManifest.assets as unknown as SourceAsset[])
-  .filter((asset) => asset.role !== "fullbody" && asset.status === "approved" && asset.runtimeEligible === true)
+const eligibleAssets: PortraitRecord[] = (sourceManifest.assets as unknown as SourceAsset[])
+  .filter((asset) => asset.status === "approved" && asset.runtimeEligible === true)
   .map((asset) => ({
     id: asset.assetId,
     characterId: asset.characterId,
@@ -60,8 +64,12 @@ const eligiblePortraits: PortraitRecord[] = (sourceManifest.assets as unknown as
     ageBand: ageBand(asset.ageEstimate.min, asset.ageEstimate.max),
     filename: asset.filename.split("/").pop(),
     imageUrl: trustedPortraitUrl(asset.cdnUrl, imagekitEndpoint),
+    heightCm: asset.heightCm, weightKg: asset.weightKg,
     source: "single",
   }));
+const manifest = sourceManifest.assets as unknown as SourceAsset[];
+const eligiblePortraits = eligibleAssets.filter((asset) => manifest.find((row) => row.assetId === asset.id)?.role !== "fullbody");
+export const approvedFullBodyCatalog: PortraitRecord[] = eligibleAssets.filter((asset) => manifest.find((row) => row.assetId === asset.id)?.role === "fullbody");
 
 export const portraitVariantCatalog: PortraitRecord[] = eligiblePortraits;
 const usedCharacterIds = new Set<string>();
@@ -84,7 +92,7 @@ export function importApprovedRemoteCatalog(payload: unknown): number {
   for (const raw of assets) {
     if (!raw || typeof raw !== "object") continue;
     const a=raw as Record<string, unknown>;
-    if (a.status!=="approved" || a.runtimeEligible!==true || a.slot!=="portrait" ||
+    if (a.status!=="approved" || a.runtimeEligible!==true || !["portrait","fullBody"].includes(String(a.slot)) ||
         typeof a.assetId!=="string" || !/^[a-f0-9-]{36}$/.test(a.assetId) ||
         typeof a.characterId!=="string" || !/^AP\d{3,5}$/.test(a.characterId) ||
         (a.gender!=="남성" && a.gender!=="여성") ||
@@ -93,17 +101,33 @@ export function importApprovedRemoteCatalog(payload: unknown): number {
     if (!ages || typeof ages.min!=="number" || typeof ages.max!=="number" ||
         !Number.isInteger(ages.min) || !Number.isInteger(ages.max) ||
         ages.min<20 || ages.max>59 || ages.min>ages.max) continue;
-    if (portraitVariantCatalog.some(p=>p.id===a.assetId)) continue;
+    if (portraitVariantCatalog.some(p=>p.id===a.assetId) || approvedFullBodyCatalog.some(p=>p.id===a.assetId)) continue;
     const item:PortraitRecord = {
       id:a.assetId,characterId:a.characterId,gender:a.gender,ageMin:ages.min,ageMax:ages.max,
       age:Math.round((ages.min+ages.max)/2),ageBand:ageBand(ages.min,ages.max),
-      filename:a.assetId+".png",imageUrl:a.imagePath,source:"single"
+      filename:a.assetId+".png",imageUrl:a.imagePath,source:"single",
+      heightCm:typeof a.heightCm==="number" && a.heightCm>=130 && a.heightCm<=220 ? a.heightCm : undefined,
+      weightKg:typeof a.weightKg==="number" && a.weightKg>=30 && a.weightKg<=200 ? a.weightKg : undefined,
     };
-    portraitVariantCatalog.push(item);
-    if (!portraitCatalog.some(p=>(p.characterId??p.id)===a.characterId)) portraitCatalog.push(item);
+    if (a.slot==="fullBody") approvedFullBodyCatalog.push(item);
+    else {
+      portraitVariantCatalog.push(item);
+      if (!portraitCatalog.some(p=>(p.characterId??p.id)===a.characterId)) portraitCatalog.push(item);
+    }
     added++;
   }
   return added;
+}
+
+/** Never pair pictures by display name or array order. AP ID and approved age/gender must agree. */
+export function getApprovedAppearanceSet(portraitId?: string): { portrait: PortraitRecord; fullBody?: PortraitRecord; physicalVerified: boolean } | undefined {
+  const portrait = getPortrait(portraitId);
+  if (!portrait) return undefined;
+  const fullBody = approvedFullBodyCatalog.find((asset) => asset.characterId === portrait.characterId && asset.gender === portrait.gender &&
+    asset.ageMin <= portrait.ageMax && asset.ageMax >= portrait.ageMin && Boolean(asset.imageUrl));
+  const physicalVerified = Boolean(fullBody && Number.isFinite(portrait.heightCm) && Number.isFinite(portrait.weightKg) &&
+    portrait.heightCm === fullBody.heightCm && portrait.weightKg === fullBody.weightKg);
+  return { portrait, fullBody, physicalVerified };
 }
 
 export function getPortrait(id?: string): PortraitRecord | undefined {

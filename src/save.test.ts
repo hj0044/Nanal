@@ -11,7 +11,7 @@ describe("save compatibility and recovery", () => {
     const event = { id: "saved-event", eyebrow: "생활", title: "약속", body: "사건", choices: [{ id: "yes", title: "선택", detail: "", result: "결과", effect: { money: 10, relationship: 3 }, contactId: base.contacts[0].id }] };
     const legacy = { ...base, version: 1, phase: "event", pendingEvent: event, eventThreads: { route: { route: "yes", stage: 3, nextWeek: 4 } }, contacts: base.contacts.map((person, i) => i ? person : { ...person, portraitId: "saved-canonical-id", memories: [{ id: "m1", text: "약속", week: 1, vividness: 1 }] }) };
     const migrated = parseSave(JSON.parse(JSON.stringify(legacy)));
-    expect(migrated.version).toBe(3);
+    expect(migrated.version).toBe(4);
     expect(migrated.economy?.employment.status).toBe("seeking");
     expect(migrated.pendingEvent).toEqual(event);
     expect(migrated.eventThreads?.route.stage).toBe(3);

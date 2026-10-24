@@ -292,10 +292,12 @@ describe("first week simulation", () => {
     expect(game.contacts.every((person) => person.portraitId === undefined)).toBe(true);
   });
 
-  it("ages the player and NPCs once at each simulated year boundary", () => {
+  it("ages the player and NPCs once at the calendar year boundary", () => {
     const state = createGame(character, 72392);
-    const next = startNextWeek({ ...state, week: 52, phase: "summary" });
-    expect(next.week).toBe(53);
+    const stillDecember = startNextWeek({ ...state, week: 52, phase: "summary" });
+    expect(stillDecember.character.age).toBe(character.age);
+    const next = startNextWeek({ ...stillDecember, week: 53, phase: "summary" });
+    expect(next.week).toBe(54);
     expect(next.character.age).toBe(character.age + 1);
     expect(next.contacts.every((person, index) => person.age === state.contacts[index].age! + 1)).toBe(true);
     const ordinaryWeek = startNextWeek({ ...state, week: 1, phase: "summary" });
