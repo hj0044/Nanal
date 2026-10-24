@@ -1,4 +1,5 @@
 import { importChatGptInitialPair } from "./bridge.mjs";
+import { inspectPngBase64 } from "./validation.mjs";
 import { submitChatGptBytes } from "../image-pipeline/game-db-submit.mjs";
 
 /**
@@ -25,6 +26,13 @@ export async function handoffGeneratedArtifact(payload,adapters={}) {
   if(payload.mode==="official-existing-variant"){
     if(!Buffer.isBuffer(payload.png)||!/^AP\\d{3,5}$/.test(payload.appearanceId??""))
       throw Error("Official existing-ID variant requires canonical AP ID and real PNG Buffer");
+    if(!["portrait","fullbody"].includes(payload.kind)||!Number.isInteger(payload.index)||
+       payload.index<2||payload.index>999||
+       !/^[a-f0-9]{64}$/i.test(payload.referenceAnchorSha256??"")||
+       !/^[A-Za-z0-9:_-]{12,160}$/.test(payload.requestKey??""))
+      throw Error("Official variant requires index 2+, verified reference anchor and request key");
+    inspectPngBase64(payload.png.toString("base64"),
+      payload.kind==="portrait"?{width:1024,height:1024}:{width:1024,height:1536});
     if(typeof adapters.submitOfficialVariant!=="function")
       throw Error("official_variant_submission_action_not_exposed");
     const result=await adapters.submitOfficialVariant({
