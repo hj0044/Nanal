@@ -7,6 +7,11 @@ export function portraitUrl(id: string | undefined, width: PortraitWidth): strin
   const approvedUrl = getPortrait(id)?.imageUrl;
   if (!approvedUrl) return undefined;
   // Live approved assets use same-origin /api/... URLs and must not be sent to ImageKit.
+  if (approvedUrl.startsWith("/api/appearance/assets/")) {
+    const requested = new URL(approvedUrl,"https://nanal.local");
+    requested.searchParams.set("w",String(width));
+    return requested.pathname+requested.search;
+  }
   if (approvedUrl.startsWith("/")) return approvedUrl;
   const image = new URL(approvedUrl);
   const quality = width <= 320 ? 75 : width <= 640 ? 82 : 85;
