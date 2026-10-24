@@ -6,17 +6,21 @@ function crc(bytes){let c=0xffffffff;for(const b of bytes){c^=b;for(let i=0;i<8;
 function chunk(type,data){const l=Buffer.alloc(4),c=Buffer.alloc(4);l.writeUInt32BE(data.length);const b=Buffer.concat([Buffer.from(type),data]);c.writeUInt32BE(crc(b));return Buffer.concat([l,b,c])}
 function png(w,h){const a=Buffer.alloc(13);a.writeUInt32BE(w);a.writeUInt32BE(h,4);a[8]=8;a[9]=6;return Buffer.concat([Buffer.from("89504e470d0a1a0a","hex"),chunk("IHDR",a),chunk("IDAT",deflateSync(Buffer.alloc(h*(1+w*4)))),chunk("IEND",Buffer.alloc(0))])}
 class DB {
-  constructor(){this.ids=new Map();this.assets=new Map()}
+  constructor(){this.ids=new Map();this.assets=new Map();this.targets=new Map();this.targetAudit=[]}
   prepare(sql){return{bind:(...args)=>({
     first:async()=>{
       if(sql.includes("FROM appearance_identities"))return this.ids.get(args[0])||null;
+      if(sql.includes("FROM appearance_image_targets"))return this.targets.get(args[0]+":"+args[1])||null;
       if(sql.includes("WHERE request_key"))return [...this.assets.values()].find(x=>x.request_key===args[0])||null;
       if(sql.includes("FROM appearance_variants")){
         const a=this.assets.get(args[0]);return sql.includes("status = 'approved'")&&a?.status!=="approved"?null:a||null;
       }
       return null;
     },
-    all:async()=>({results:[...this.assets.values()].filter(x=>x.status==="approved")}),
+    all:async()=>({results:sql.includes("FROM appearance_identities")?[...this.ids.values()]:
+      sql.includes("FROM appearance_image_targets")?[...this.targets.values()]:
+      sql.includes("SELECT appearance_id,slot,status,file_sha256 FROM appearance_variants")?[...this.assets.values()]:
+      [...this.assets.values()].filter(x=>x.status==="approved")}),
     run:async()=>{
       if(sql.startsWith("INSERT INTO appearance_identities")){
         const [id,gender,min,max,profile,portrait,fullBody,source]=args;
@@ -25,6 +29,11 @@ class DB {
         const [assetId,key,id,gender,min,max,slot,profile,anchor,fileHash,storageKey,status]=args;
         if([...this.assets.values()].some(x=>x.request_key===key))throw Error("duplicate");
         this.assets.set(assetId,{asset_id:assetId,request_key:key,appearance_id:id,gender,age_min:min,age_max:max,slot,profile_sha256:profile,anchor_sha256:anchor,file_sha256:fileHash,storage_key:storageKey,status});
+      } else if(sql.startsWith("INSERT INTO appearance_image_targets")){
+        const [id,slot,target,source,profile]=args;
+        const key=id+":"+slot,old=this.targets.get(key);
+        this.targets.set(key,{appearance_id:id,slot,target_count:target,source,profile_sha256:profile,updated_at:"2026-10-24"});
+        this.targetAudit.push({id,slot,previous:old?.target_count??null,target});
       } else if(sql.startsWith("UPDATE appearance_variants")){
         const [status,note,at,id]=args;Object.assign(this.assets.get(id),{status,review_note:note,approved_at:at});
       }
@@ -201,4 +210,59 @@ test("optimized derivatives are private before QA and require canonical source S
  const fallback=await handleAppearanceApi(request("GET","/api/appearance/assets/"+candidate.assetId+"?w=160",undefined,false),env);
  assert.equal(fallback.headers.get("content-type"),"image/png");
  assert.equal((await handleAppearanceApi(request("GET","/api/appearance/assets/"+candidate.assetId+"?w=123",undefined,false),env)).status,400);
+});
+
+
+test("owner can set official per-AP goals without modifying image approval",async()=>{
+ const {env,db}=setup();await identity(env);
+ const endpoint="/api/appearance/identities/AP008/targets";
+ const content=JSON.stringify({slot:"fullBody",targetCount:12,source:"verified_official_reservation",profileSha256:profile});
+ assert.equal((await handleAppearanceApi(request("PUT",endpoint,content,false),env)).status,401);
+ assert.equal((await handleAppearanceApi(request("PUT",endpoint,content),env)).status,201);
+ assert.equal((await handleAppearanceApi(request("PUT",endpoint,content),env)).status,200);
+ assert.equal(db.targetAudit.length,1);
+ const path="/api/appearance/admin/inventory/AP008";
+ assert.equal((await handleAppearanceApi(request("GET",path,undefined,false),env)).status,401);
+ const inv=(await (await handleAppearanceApi(request("GET",path),env)).json()).inventory;
+ assert.equal(inv.counts.fullBody.targetCount,12);
+ assert.equal(inv.counts.fullBody.approved,0);
+ assert.equal(inv.counts.fullBody.remainingToApprove,12);
+ assert.equal(inv.counts.portrait.targetCount,null);
+ const image=await handleAppearanceApi(upload("AP008:dynamic:001"),env);
+ assert.equal(image.status,201);
+ const after=(await (await handleAppearanceApi(request("GET",path),env)).json()).inventory;
+ assert.equal(after.counts.fullBody.awaitingReview,1);
+ assert.equal(after.counts.fullBody.remainingToApprove,12);
+ assert.equal(after.counts.fullBody.unfilledAfterPending,11);
+ assert.equal((await (await handleAppearanceApi(request("GET","/api/appearance/catalog",undefined,false),env)).json()).assets.length,0);
+});
+test("all registered AP IDs, including future IDs, appear with unknown rather than guessed targets",async()=>{
+ const {env}=setup();await identity(env);
+ for(const id of ["AP001","AP020","AP021","AP10000"]){
+  const p=JSON.stringify({gender:"여성",ageMin:20,ageMax:29,profileSha256:profile,
+    portraitAnchorSha256:portrait,fullBodyAnchorSha256:body,qaSource:"reviewed_official_reservation"});
+  assert.equal((await handleAppearanceApi(request("PUT","/api/appearance/identities/"+id,p),env)).status,201);
+ }
+ const res=await handleAppearanceApi(request("GET","/api/appearance/admin/inventory"),env);
+ assert.equal(res.status,200);
+ const payload=await res.json();
+ assert.equal(payload.officialDatabaseIncluded,false);
+ assert.equal(payload.totalIdentities,5);
+ assert.deepEqual(payload.inventory.map(i=>i.appearanceId),["AP001","AP008","AP020","AP021","AP10000"]);
+ assert.equal(payload.inventory.find(i=>i.appearanceId==="AP10000").counts.fullBody.targetCount,null);
+ assert.equal((await handleAppearanceApi(request("GET","/api/appearance/admin/inventory/AP999"),env)).status,404);
+});
+test("profile locked target updates reject fabricated or obsolete reservation metadata",async()=>{
+ const {env,db}=setup();await identity(env);
+ const endpoint="/api/appearance/identities/AP008/targets";
+ const valid={slot:"fullBody",targetCount:12,source:"verified_official_reservation",profileSha256:profile};
+ assert.equal((await handleAppearanceApi(request("PUT",endpoint,JSON.stringify({...valid,profileSha256:body})),env)).status,409);
+ assert.equal((await handleAppearanceApi(request("PUT",endpoint,JSON.stringify({...valid,targetCount:-1})),env)).status,400);
+ assert.equal((await handleAppearanceApi(request("PUT",endpoint,JSON.stringify({...valid,targetCount:"12"})),env)).status,400);
+ assert.equal((await handleAppearanceApi(request("PUT",endpoint,JSON.stringify({...valid,source:"unverified_ai_guess"})),env)).status,400);
+ assert.equal(db.targets.size,0);
+ assert.equal((await handleAppearanceApi(request("PUT",endpoint,JSON.stringify(valid)),env)).status,201);
+ assert.equal((await handleAppearanceApi(request("PUT",endpoint,JSON.stringify({...valid,targetCount:14})),env)).status,200);
+ assert.equal(db.targets.get("AP008:fullBody").target_count,14);
+ assert.equal(db.targetAudit.length,2);
 });
