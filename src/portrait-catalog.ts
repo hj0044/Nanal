@@ -83,7 +83,7 @@ export function importApprovedRemoteCatalog(payload: unknown): number {
   for (const raw of assets) {
     if (!raw || typeof raw !== "object") continue;
     const a=raw as Record<string, unknown>;
-    if (a.status!=="approved" || a.runtimeEligible!==true ||
+    if (a.status!=="approved" || a.runtimeEligible!==true || a.slot!=="portrait" ||
         typeof a.assetId!=="string" || !/^[a-f0-9-]{36}$/.test(a.assetId) ||
         typeof a.characterId!=="string" || !/^AP\d{3,5}$/.test(a.characterId) ||
         (a.gender!=="남성" && a.gender!=="여성") ||
