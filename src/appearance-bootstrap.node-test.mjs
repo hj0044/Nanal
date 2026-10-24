@@ -18,7 +18,10 @@ class DB {
    first:async()=>{
      if(sql.includes("FROM appearance_identities"))return this.ids.get(args[0])??null;
      if(sql.includes("WHERE request_key"))return [...this.assets.values()].find(a=>a.request_key===args[0])??null;
-     if(sql.includes("FROM appearance_variants"))return this.assets.get(args[0])??null;
+     if(sql.includes("FROM appearance_variants")){
+       const row=this.assets.get(args[0]);
+       return sql.includes("status = 'approved'")&&row?.status!=="approved"?null:row??null;
+     }
      return null;
    },
    all:async()=>{
