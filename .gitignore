@@ -3,3 +3,7 @@ dist/
 coverage/
 *.tsbuildinfo
 .DS_Store
+
+# Original images, optimized candidates and catalog transaction lock
+.nanal-private/
+src/assets/character-portraits/catalog.json.lock

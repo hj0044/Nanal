@@ -7,6 +7,7 @@ import {
 } from "./game";
 import "./style.css";
 import { choosePortraitId, getPortrait, getPortraitIdentityId, importApprovedRemoteCatalog } from "./portrait-catalog";
+import { portraitUrl } from "./portrait-image";
 import { rewriteNarrative } from "./narrative-rewrite";
 
 const SAVE_KEY = "nanal-save-v1";
@@ -354,11 +355,12 @@ function LifeView({ game, onAdvance, onAction, onChoice, onNextWeek, onSelectPer
 }
 function CharacterAvatar({ name, className = "", portraitId }: { name: string; className?: string; portraitId?: string }) {
   const [failed, setFailed] = useState(false);
-  const imageUrl = getPortrait(portraitId)?.imageUrl;
+  const imageUrl = portraitUrl(portraitId, 160);
+  const imageUrl2x = portraitUrl(portraitId, 320);
   useEffect(() => setFailed(false), [portraitId, imageUrl]);
   return <span className={`character-avatar ${className}`} aria-hidden="true">
     {imageUrl && !failed
-      ? <img src={imageUrl} alt="" loading="lazy" onError={() => setFailed(true)} />
+      ? <img src={imageUrl} srcSet={`${imageUrl} 1x, ${imageUrl2x} 2x`} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
       : name.trim().slice(0, 1) || "?"}
   </span>;
 }
