@@ -34,6 +34,10 @@ function fetchMock(responseStatus=201){
   const fetch=async(url,options={})=>{
     seen.push({url,method:options.method,body:options.body});
     assert.equal(options.headers.authorization,"Bearer "+key);
+    if(options.method==="PUT" && String(url).includes("/derivatives/")) {
+      assert.equal(options.headers["Content-Type"],"image/webp");
+      return Response.json({status:"stored"});
+    }
     if(options.method==="PUT"){
       const metadata=JSON.parse(options.body);
       assert.equal(metadata.profileSha256,hash);
@@ -60,7 +64,7 @@ test("model-provided PNG bytes import hands off without user file selection",asy
   },{gameApiOrigin:"https://nanal.example",adminToken:key},{fetch});
   assert.equal(result.status,"awaiting_review");
   assert.equal(result.characterId,"AP008");
-  assert.equal(seen.length,2);
+  assert.equal(seen.length,6);
   const names=await readdir(path.join(root,"original-backup","originals","AP008"));
   assert.equal(names.length,1);
   assert.match(names[0],/AP008-portrait-002-/);
