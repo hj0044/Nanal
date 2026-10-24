@@ -6,7 +6,7 @@ import {
   type SensitiveTopic, type Tab,
 } from "./game";
 import "./style.css";
-import { choosePortraitId, getPortrait, getPortraitIdentityId, importApprovedRemoteCatalog } from "./portrait-catalog";
+import { choosePortraitId, getPortrait, getPortraitIdentityId, importApprovedRemoteCatalog, importOfficialIdentityCatalog } from "./portrait-catalog";
 import { fullBodyUrl, portraitUrl } from "./portrait-image";
 import { rewriteNarrative } from "./narrative-rewrite";
 import { parseSave } from "./save";
@@ -114,9 +114,11 @@ function App() {
       running=true;
       try {
         const r=await fetch("/api/appearance/catalog",{credentials:"same-origin",signal:controller.signal,cache:"no-store"});
-        if (!r.ok) return;
-        const data=await r.json();
-        if (!controller.signal.aborted && importApprovedRemoteCatalog(data)>0)
+        let added=0;
+        if (r.ok) added=importApprovedRemoteCatalog(await r.json());
+        const official=await fetch("/api/appearance-catalog",{credentials:"same-origin",signal:controller.signal,cache:"no-store"});
+        if (official.ok) added+=importOfficialIdentityCatalog(await official.json());
+        if (!controller.signal.aborted && added>0)
           setGame(current=>current?normalizeSave(current):current);
       } catch { /* DB optional; existing gameplay stays available. */ }
       finally { running=false; }
