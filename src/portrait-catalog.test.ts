@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getApprovedAppearanceSet, getPortrait, portraitCatalog, trustedPortraitUrl, importApprovedRemoteCatalog } from "./portrait-catalog";
+import { getApprovedAppearanceSet, getPortrait, portraitCatalog, trustedPortraitUrl, importApprovedRemoteCatalog, importOfficialIdentityCatalog } from "./portrait-catalog";
 import { fullBodyUrl } from "./portrait-image";
 
 describe("approved portrait delivery", () => {
@@ -41,5 +41,16 @@ describe("approved portrait delivery", () => {
     expect(fullBodyUrl(portrait, 170, 52, 320)).toBeUndefined();
     expect(importApprovedRemoteCatalog({ assets: [asset("e4ac2f55-238c-41c2-9077-5ab44cf382a4", "AP011", "fullBody", "awaiting_review")] })).toBe(0);
     expect(getApprovedAppearanceSet(portrait)?.fullBody?.id).toBe(body);
+  });
+  it("keeps official AP IDs and rejects unapproved or foreign portrait paths", () => {
+    const base={id:"AP043",gender:"female",ageBand:"30s",runtimeEligible:true,heightCm:165,weightKg:57};
+    expect(importOfficialIdentityCatalog({identities:[
+      {...base,id:"AP044",runtimeEligible:false,portrait:"assets/AP044_face.png"},
+      {...base,id:"AP045",portrait:"https://other.example/AP045_face.png"},
+      {...base,portrait:"assets/AP043_face.png"},
+    ]})).toBe(1);
+    expect(getPortrait("AP043")?.imageUrl).toBe("/assets/AP043_face.png");
+    expect(getPortrait("AP044")).toBeUndefined();
+    expect(importOfficialIdentityCatalog({identities:[{...base,portrait:"assets/AP043_face.png"}]})).toBe(0);
   });
 });

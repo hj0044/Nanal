@@ -119,6 +119,37 @@ export function importApprovedRemoteCatalog(payload: unknown): number {
   return added;
 }
 
+/** Read only approved identities from the existing Nanal Sites catalog. */
+export function importOfficialIdentityCatalog(payload: unknown): number {
+  if (!payload || typeof payload !== "object" || !("identities" in payload)) return 0;
+  const identities = (payload as { identities?: unknown }).identities;
+  if (!Array.isArray(identities)) return 0;
+  let added = 0;
+  for (const raw of identities) {
+    if (!raw || typeof raw !== "object") continue;
+    const row = raw as Record<string, unknown>;
+    if (typeof row.id !== "string" || !/^AP\d{3,5}$/.test(row.id) || row.runtimeEligible !== true ||
+      !["female", "male"].includes(String(row.gender)) || typeof row.ageBand !== "string" ||
+      !/^[2345]0s$/.test(row.ageBand) || typeof row.portrait !== "string") continue;
+    const path = row.portrait.startsWith("/") ? row.portrait : "/" + row.portrait;
+    if (path !== `/assets/${row.id}_face.png` &&
+      !/^\/api\/appearance-files\/[a-zA-Z0-9_-]+\/face\.png$/.test(path)) continue;
+    if (portraitVariantCatalog.some((entry) => entry.characterId === row.id)) continue;
+    const min = Number(row.ageBand.slice(0, 2));
+    const item: PortraitRecord = {
+      id: row.id, characterId: row.id, gender: row.gender === "female" ? "여성" : "남성",
+      age: min + 5, ageMin: min, ageMax: min + 9, ageBand: `${min}–${min + 9}세`,
+      source: "single", imageUrl: path,
+      heightCm: typeof row.heightCm === "number" ? row.heightCm : undefined,
+      weightKg: typeof row.weightKg === "number" ? row.weightKg : undefined,
+    };
+    portraitVariantCatalog.push(item);
+    portraitCatalog.push(item);
+    added++;
+  }
+  return added;
+}
+
 /** Never pair pictures by display name or array order. AP ID and approved age/gender must agree. */
 export function getApprovedAppearanceSet(portraitId?: string): { portrait: PortraitRecord; fullBody?: PortraitRecord; physicalVerified: boolean } | undefined {
   const portrait = getPortrait(portraitId);
