@@ -19,7 +19,7 @@
 
 ## 반드시 지킬 생성 흐름
 1. `appearance_pending_requests`로 최근 큐를 확인하고, 해당 ID의 `appearance_get_reservation`을 조회한다.
-2. 신규 첫 정본 예약: 승인된 중앙 원장과 예약 스냅샷/잠금 프롬프트를 대조한 ID만 `appearance_generate_reserved_batch`에 명시한다.
+2. **기본 생성 경로는 ChatGPT Images**: 공식 예약 원장·잠금 프롬프트를 확인하고 ChatGPT 이미지 생성 기능으로 첫 얼굴/전신 쌍을 만든다. 실제 이미지 바이트가 확보되면 `appearance_submit_reserved_images`로 같은 AP 예약에 즉시 제출한다. `appearance_generate_reserved_batch`는 사용자가 서버 생성 경로를 별도 요청하지 않는 한 기본 경로로 사용하지 않는다.
 3. 검증되지 않은 타 게임 요청이 섞여 있는 대기열에 `appearance_process_next`를 절대로 호출하지 않는다.
 4. 같은 ID 추가 이미지: 기준 초상화·전신의 실제 앵커/해시, 원본 프로필, 얼굴·키/스케일·체형 QA 증거가 준비되어야 한다. 품질 검수 없이 자동 승인하지 않는다.
 5. 검수에 통과한 이미지만 공식 등록한다. 카탈로그 `src/assets/character-portraits/catalog.json`의 `approved && runtimeEligible` 조건은 유지한다.
@@ -34,3 +34,10 @@
 - 외부 공급자 권한·크레딧·정책 제한을 우회하지 않는다. 임시 429만 Retry-After와 백오프로 재시도하고, 지불/모델 접근 오류는 별도 보류한다. 무분별한 재시도로 비용을 늘리지 않는다.
 - 신규 이미지 결과는 정본 이미지와 신체 통계가 검수될 때까지 후보로 두고, 게임 이미지 등록은 기존 승인 기준을 유지한다.
 - 새 이미지 서버를 운영환경에 배포하려면 제공자 키, ImageKit 비밀키, 영속 DB와 신뢰할 수 있는 상시 워커가 필요하다. 무료 Render 서비스나 30일 만료 무료 DB를 영구 운영용으로 간주하지 않는다.
+
+## ChatGPT Images 직접 DB 제출 기본 정책 (2026-10-24)
+- `server/chatgpt-import/bridge.mjs`와 `docs/chatgpt-image-direct-import.md`가 신규 예약 쌍의 공식 DB 제출 규약이다. 이 경로는 추가 유료 이미지 API 및 앱 자체의 일일 2건 제한을 사용하지 않는다.
+- ChatGPT 이미지 생성의 **플랫폼 자체 사용량 제한/정책은 준수**한다. 원격 공식 나날 생성 서버의 `dailyJobLimit:2`가 해제된 것으로 주장하지 않는다.
+- 생성 이미지 바이트와 도구 제출 성공 응답을 확보하지 못했으면 ‘자동 등록 완료’라고 말하지 않는다. 제출은 `awaiting_review` 단계이며 얼굴·체형 시각 QA와 게임 표시를 별도 확인한다.
+- 기존 AP ID에 여러 장을 추가하는 공식 등록 API는 아직 노출되지 않았다. 신규 첫 쌍 전용 도구로 기존 ID 변형을 등록한 척하지 않는다.
+- 게임 카탈로그는 승인된 ImageKit 자산의 `cdnUrl`만 사용하며 승인 조건 `approved && runtimeEligible`를 유지한다.
