@@ -47,3 +47,19 @@ test("pixel-level alpha QA rejects fully opaque images",async()=>{
  const info=await preflightPng(sample,"portrait");
  assert.equal(info.width,1024);
 });
+
+test("official existing-ID upload is never silently sent to game DB",async()=>{
+ const payload={mode:"official-existing-variant",appearanceId:"AP008",kind:"portrait",
+   index:3,png:png(1024,1024),referenceAnchorSha256:"f".repeat(64)};
+ await assert.rejects(()=>handoffGeneratedArtifact(payload,{
+   submitGameVariant:async()=>{throw Error("must never use game DB");}
+ }),/official_variant_submission_action_not_exposed/);
+ let received;
+ const result=await handoffGeneratedArtifact({...payload,requestKey:"AP008-portrait-003"},{
+   submitOfficialVariant:async p=>{received=p;return {status:"awaiting_review",assetId:"official-variant-3"};}
+ });
+ assert.equal(result.destination,"official_nanal_plugin");
+ assert.equal(received.appearanceId,"AP008");
+ assert.ok(received.pngBase64.length>100);
+ assert.equal(result.status,"awaiting_review");
+});
