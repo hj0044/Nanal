@@ -107,6 +107,20 @@ export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv)
     const origin=req.headers.get("origin");
     if (origin && new URL(origin).origin !== url.origin) return err("origin_not_allowed",403);
     const identity=path.match(/^\/api\/appearance\/identities\/(AP\d{3,5})$/);
+    // Server-side upload bridge can resolve official locked hashes by AP ID.
+    // This route is behind the same owner token as all appearance admin actions.
+    if (identity && req.method==="GET") {
+      const row=await db.prepare("SELECT * FROM appearance_identities WHERE appearance_id = ?").bind(identity[1]).first<Row>();
+      if (!row) return err("canonical_identity_missing",404);
+      return json({
+        appearanceId:row.appearance_id,gender:row.gender,
+        ageMin:row.age_min,ageMax:row.age_max,
+        profileSha256:row.profile_sha256,
+        portraitAnchorSha256:row.portrait_anchor_sha256,
+        fullBodyAnchorSha256:row.full_body_anchor_sha256,
+        source:row.source
+      });
+    }
     if (identity && req.method==="PUT") {
       const p=await parseJson(req);p.appearanceId=identity[1];
       if (!validIdentity(p)) return err("canonical_profile_invalid");
