@@ -73,9 +73,12 @@ test("missing host bytes and bad identity fail before network",async()=>{
 });
 test("unremoved background and wrong canvas are blocked",async()=>{
  const {calls,fetcher}=stub();
- await assert.rejects(()=>autoSubmitGeneratedImage({appearanceId:"AP008",slot:"portrait",pngBytes:await image("portrait","opaque")},{baseUrl:root,ownerToken:token,fetcher}),/Transparent background/);
- await assert.rejects(()=>autoSubmitGeneratedImage({appearanceId:"AP008",slot:"portrait",pngBytes:await image("portrait","magenta")},{baseUrl:root,ownerToken:token,fetcher}),/magenta/);
- await assert.rejects(()=>autoSubmitGeneratedImage({appearanceId:"AP008",slot:"portrait",pngBytes:await image("fullBody")},{baseUrl:root,ownerToken:token,fetcher}),/1024x1024/);
+ const opaque=await image("portrait","opaque");
+ const magenta=await image("portrait","magenta");
+ const wrongSize=await image("fullBody");
+ await assert.rejects(()=>autoSubmitGeneratedImage({appearanceId:"AP008",slot:"portrait",pngBytes:opaque},{baseUrl:root,ownerToken:token,fetcher}),/Transparent background/);
+ await assert.rejects(()=>autoSubmitGeneratedImage({appearanceId:"AP008",slot:"portrait",pngBytes:magenta},{baseUrl:root,ownerToken:token,fetcher}),/magenta/);
+ await assert.rejects(()=>autoSubmitGeneratedImage({appearanceId:"AP008",slot:"portrait",pngBytes:wrongSize},{baseUrl:root,ownerToken:token,fetcher}),/1024x1024/);
  assert.equal(calls.length,0);
 });
 test("unverified profile, server unavailable and missing upload acknowledgement do not claim success",async()=>{
