@@ -4,7 +4,7 @@ const env = {};
 const page = await worker.fetch(new Request("https://nanal.test/"), env);
 if (page.status !== 200) throw new Error(`Homepage returned ${page.status}`);
 const html = await page.text();
-const assetPaths = [...html.matchAll(/(?:src|href)="([^"]+\\.(?:js|css))"/g)].map((match) => match[1]);
+const assetPaths = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)].map((match) => match[1]);
 if (!assetPaths.some((asset) => asset.endsWith(".js")) || !assetPaths.some((asset) => asset.endsWith(".css"))) {
   throw new Error("Homepage does not reference both a JavaScript and CSS bundle");
 }
