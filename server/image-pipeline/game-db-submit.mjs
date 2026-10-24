@@ -29,6 +29,19 @@ async function checkedJson(res,label){
   }
   return res.json();
 }
+export async function createResponsiveWebp(sourcePng,kind) {
+  const {default:sharp}=await import("sharp");
+  const widths=[160,320,640,1024];
+  const quality=kind==="portrait"?82:86;
+  const result=[];
+  for(const width of widths){
+    const bytes=await sharp(sourcePng,{failOn:"error"}).resize({width,withoutEnlargement:true})
+      .webp({quality,effort:5}).toBuffer();
+    result.push({width,bytes});
+  }
+  return result;
+}
+
 /** Actual PNG bytes must already exist. Never claim that ChatGPT ImageGen exports them automatically. */
 export async function submitChatGptFile(spec,config={},adapters={}) {
   const {characterId,kind,filePath,profile}=spec;
@@ -67,6 +80,22 @@ export async function submitChatGptFile(spec,config={},adapters={}) {
   const result=await checkedJson(await fetchFn(profileUrl+"/variants",{method:"POST",headers,body:form}),"Game DB variant");
   if(!result.assetId||!["awaiting_review","approved","blocked"].includes(result.status))
     throw Error("Game DB upload did not acknowledge a real variant");
+  if(result.status==="blocked") throw Error("Blocked asset cannot receive optimized images");
+  const optimizedWidths=[];
+  if(spec.optimize!==false){
+    const derivatives=await (adapters.optimize??createResponsiveWebp)(bytes,kind);
+    for(const variant of derivatives){
+      if(![160,320,640,1024].includes(variant.width)||!Buffer.isBuffer(variant.bytes))
+        throw Error("Invalid responsive WebP derivative");
+      const response=await checkedJson(await fetchFn(
+        endpoint+"/api/appearance/variants/"+result.assetId+"/derivatives/"+variant.width,
+        {method:"PUT",headers:{...headers,"Content-Type":"image/webp","x-source-sha256":hash},
+          body:variant.bytes}),"Game DB optimized WebP");
+      if(!["stored","existing"].includes(response.status))
+        throw Error("Responsive WebP was not acknowledged");
+      optimizedWidths.push(variant.width);
+    }
+  }
   return {characterId,slot,assetId:result.assetId,status:result.status,duplicate:result.duplicate===true,
-    driveFileId:driveId,fileSha256:hash};
+    driveFileId:driveId,fileSha256:hash,optimizedWidths};
 }
