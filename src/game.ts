@@ -103,6 +103,13 @@ export interface Contact {
   portraitAgeBand?: import("./portrait-catalog").PortraitAgeBand;
   appearanceHistory?: AppearanceSnapshot[];
   occupation?: string;
+  employmentStatus?: "employed" | "seeking";
+  savings?: number;
+  weeklyIncome?: number;
+  nextAppointmentWeek?: number;
+  lastLifeWeek?: number;
+  relationshipStatus?: "single" | "dating" | "family";
+  romanticPartnerId?: string;
   personality?: string;
   goal?: string;
   goalProgress?: number;
@@ -162,6 +169,7 @@ export interface LifeEvent {
   eyebrow: string;
   body: string;
   topic?: SensitiveTopic;
+  worldFactId?: string;
   personalStory?: { contactId: string; stage: number };
   reunion?: { contactId: string };
   npcPair?: { linkId: string; kind: "bond" | "conflict" | "reconciliation" | "romance"; contactAId: string; contactBId: string; speakerId: string };
@@ -196,6 +204,9 @@ export interface GameState {
   npcStoryChoices?: Record<string, string>;
   /** Open-ended story routes; history is bounded while stage can keep growing. */
   eventThreads?: Record<string, { route: string; stage: number; nextWeek: number; contactId?: string; history?: string[]; lastChoiceTitle?: string; lastOutcome?: string }>;
+  storyArcs?: Record<string, { contactId?: string; stage: number; nextWeek: number; lastOutcome: string; status: "active" | "completed" }>;
+  worldFacts?: Array<{ id: string; week: number; contactId: string; kind: "career" | "money" | "relationship"; text: string; dueWeek: number; resolved?: boolean }>;
+  playerRelationships?: Record<string, { kind: "family" | "friend" | "dating"; sinceWeek: number }>;
   weeklyCashflow?: WeeklyCashflow;
   playerGoals?: PlayerGoal[];
   stats: Stats;
@@ -207,6 +218,8 @@ export interface GameState {
   log: string[];
   pendingEvent?: LifeEvent;
   lastChoice?: string;
+  lastChoiceCause?: string;
+  lastChoiceNextWeek?: number;
   lastChoiceEffect?: Effect;
   favoriteContactIds?: string[];
   /** NPCs directly involved in the latest player action or event choice. */
@@ -356,7 +369,7 @@ export function generateContacts(background: Background, seed: number, playerAge
     const portraitId = choosePortraitId(gender, age, next, usedPortraits);
     if (portraitId) usedPortraits.push(portraitId);
     const body = generateBodyMetrics(gender, next ^ createSeed(`${role}:${age}`));
-    return { id: `person-${i + 1}`, name, role, gender, age, ...body, affiliation: getContactAffiliation(role, background), portraitId, portraitAgeBand: getPortrait(portraitId)?.ageBand, occupation: occupations[background][Math.floor(jobRoll * occupations[background].length)], personality: traits[Math.floor(traitRoll * traits.length)], goal: goals[Math.floor(goalRoll * goals.length)], goalProgress: Math.floor(goalRoll * 3), goalSupport: 0, goalStage: ["계획 세우기", "한 걸음 진행", "기회 기다리기"][Math.floor(goalRoll * 3)], mood: "평소와 같음", lastAutonomousAction: "이번 주 계획을 생각하는 중", memories: [], warmth: 46 + Math.floor(value * 23), note: i < 2 ? "최근 연락이 이어지고 있다" : "아직 자세히 알지 못한다" };
+    return { id: `person-${i + 1}`, name, role, gender, age, ...body, affiliation: getContactAffiliation(role, background), portraitId, portraitAgeBand: getPortrait(portraitId)?.ageBand, occupation: occupations[background][Math.floor(jobRoll * occupations[background].length)], employmentStatus: background === "jobseeker" && jobRoll < 0.2 ? "seeking" as const : "employed" as const, savings: 500_000 + Math.floor(value * 3_000_000), weeklyIncome: 350_000 + Math.floor(jobRoll * 200_000), nextAppointmentWeek: 2, relationshipStatus: /가족|형제|자매/.test(role) ? "family" as const : "single" as const, personality: traits[Math.floor(traitRoll * traits.length)], goal: goals[Math.floor(goalRoll * goals.length)], goalProgress: Math.floor(goalRoll * 3), goalSupport: 0, goalStage: ["계획 세우기", "한 걸음 진행", "기회 기다리기"][Math.floor(goalRoll * 3)], mood: "평소와 같음", lastAutonomousAction: "이번 주 계획을 생각하는 중", memories: [], warmth: 46 + Math.floor(value * 23), note: i < 2 ? "최근 연락이 이어지고 있다" : "아직 자세히 알지 못한다" };
   });
 }
 function relationshipKind(a: Contact, b: Contact): NPCRelationship["kind"] {
@@ -409,7 +422,7 @@ export function createGame(character: Character, seed = createSeed(`${character.
   return {
     version: 3, character: player, week: 1, day: 1, phase: "playing", seed, economy: initialEconomy(character),
     evaluatedDays: [], seenEvents: [], npcStoryStages: {}, npcStoryLastWeek: {}, npcStoryChoices: {},
-    playerGoals: [],
+    playerGoals: [], storyArcs: {}, worldFacts: [], playerRelationships: Object.fromEntries(contacts.filter((person) => getRelationshipProfile(person.role).type === "family").map((person) => [person.id, { kind: "family", sinceWeek: 1 }])),
     stats: { money, energy: 72, stress: 24, mood: 61, focus: 52 },
     contacts, archivedContacts: [], relationshipRecords: [], npcRelationships: createInitialNPCRelationships(contacts, seed), nextContactNumber: 13,
     log: [`${character.year}년, ${character.name}의 새로운 생활이 시작됐다.`],
@@ -730,11 +743,26 @@ export function personalizeAuthoredEvent(event: LifeEvent, state: GameState): Li
     choices,
   };
 }
+export function getWorldFactEvents(state: GameState): LifeEvent[] {
+  return (state.worldFacts ?? []).filter((fact) => !fact.resolved && fact.dueWeek <= state.week)
+    .sort((a, b) => a.dueWeek - b.dueWeek || a.id.localeCompare(b.id)).slice(0, 3).flatMap((fact) => {
+      const person = state.contacts.find((contact) => contact.id === fact.contactId);
+      if (!person) return [];
+      return [{
+        id: `world-${fact.id}`, worldFactId: fact.id, eyebrow: "주변 인물 · 이어지는 변화", title: `${person.name}의 근황`,
+        body: `${fact.text} 이 소식이 관계와 다음 만남에 영향을 줄 수 있다.`,
+        choices: [
+          { id: "world-check-in", title: "안부를 묻고 이야기를 듣는다", detail: "상황을 기억하고 다음 만남을 약속한다", result: `${person.name}의 변화를 직접 듣고 다음 주에 다시 연락하기로 했다.`, effect: { relationship: 4, mood: 1 }, contactId: person.id },
+          { id: "world-give-space", title: "스스로 정리할 시간을 준다", detail: "멀리서 지켜보며 생활을 이어간다", result: `${person.name}에게 여유를 주되 소식을 기억해두기로 했다.`, effect: { focus: 1 }, contactId: person.id },
+        ],
+      }];
+    });
+}
 function nextEligibleEvent(state: GameState): [LifeEvent | undefined, number] {
   const recent = state.recentEventIds ?? [];
   const lastSeen = state.eventLastSeenWeek ?? {};
   const familyLastSeen = state.eventFamilyLastSeenWeek ?? {};
-  const eligible = [...eventLibrary[state.character.background], ...commonEventLibrary, ...getPersonalStoryEvents(state), ...getNpcReunionEvents(state), ...getNpcRelationshipEvents(state), ...getEventThreadEvents(state)]
+  const eligible = [...eventLibrary[state.character.background], ...commonEventLibrary, ...getPersonalStoryEvents(state), ...getNpcReunionEvents(state), ...getNpcRelationshipEvents(state), ...getEventThreadEvents(state), ...getWorldFactEvents(state)]
     .filter((event) => !state.seenEvents.includes(event.id) && (!event.topic || state.settings.topics[event.topic]))
     .map((event) => personalizeAuthoredEvent(event, state));
   const notRecentlyPlayed = eligible.filter((event) => !recent.includes(event.id));
@@ -751,7 +779,7 @@ function nextEligibleEvent(state: GameState): [LifeEvent | undefined, number] {
   const [afterSelect, indexRoll] = nextRandom(afterRoll);
   const eventWeight = (event: LifeEvent) => {
     const family = getEventFamily(event);
-    let weight = event.thread && event.thread.stage > 0 ? 8 : event.npcPair ? 10 : event.reunion ? 14 : event.personalStory ? 12 : event.thread?.stage === 0 ? 2.5 : 1;
+    let weight = event.worldFactId ? 16 : event.thread && event.thread.stage > 0 ? 8 : event.npcPair ? 10 : event.reunion ? 14 : event.personalStory ? 12 : event.thread?.stage === 0 ? 2.5 : 1;
     if (family === "money") weight *= state.stats.money < 180_000 ? 3 : state.stats.money < 450_000 ? 1.7 : 1;
     if (family === "health") weight *= state.stats.energy < 45 || state.stats.stress > 65 ? 2.2 : 1;
     if ((family === "friendship" || family === "romance") && state.contacts.length > 0 && state.contacts.reduce((sum, contact) => sum + contact.warmth, 0) / state.contacts.length < 38) weight *= 1.7;
@@ -793,6 +821,7 @@ export function advanceDay(state: GameState): GameState {
       archivedContacts: npcTurn.archivedContacts,
       relationshipRecords: npcTurn.relationshipRecords,
       npcRelationships: npcTurn.npcRelationships,
+      worldFacts: npcTurn.worldFacts,
       nextContactNumber: npcTurn.nextContactNumber,
       npcReunionIds: npcTurn.reunionIds,
       log: [...npcTurn.logs, ...settled.log],
@@ -841,6 +870,11 @@ export function takeDailyAction(state: GameState, action: DailyAction, targetCon
     lastChoiceContactIds: selectedContactIndex !== undefined && selectedContactIndex >= 0
       ? [state.contacts[selectedContactIndex].id]
       : [],
+    playerRelationships: selectedContactIndex !== undefined && selectedContactIndex >= 0 &&
+      state.contacts[selectedContactIndex].warmth + (selected.effect.relationship ?? 0) >= 75 &&
+      !state.playerRelationships?.[state.contacts[selectedContactIndex].id]
+      ? { ...(state.playerRelationships ?? {}), [state.contacts[selectedContactIndex].id]: { kind: "friend", sinceWeek: state.week } }
+      : state.playerRelationships,
     actionDays: [...(state.actionDays ?? []), actionDay],
     weeklyActions: { ...(state.weeklyActions ?? {}), [action]: ((state.weeklyActions ?? {})[action] ?? 0) + 1 },
     weeklyEarnedIncome: (state.weeklyEarnedIncome ?? 0) + (action === "earn" ? selected.effect.money ?? 0 : 0),
@@ -867,7 +901,17 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
   const choice = state.pendingEvent.choices.find((item) => item.id === choiceId);
   if (!choice) return state;
   const effect = choice.effect;
+  const threadId = state.pendingEvent.thread?.id;
+  const updatedThreads = updateEventThreads(state, choice);
+  const arcId = threadId ? `thread:${threadId}` : state.pendingEvent.personalStory ? `person:${state.pendingEvent.personalStory.contactId}` : undefined;
+  const updatedArc = arcId ? {
+    contactId: state.pendingEvent.personalStory?.contactId ?? updatedThreads?.[threadId ?? ""]?.contactId,
+    stage: state.pendingEvent.thread?.stage ?? state.pendingEvent.personalStory?.stage ?? 0,
+    nextWeek: state.week + 1, lastOutcome: choice.result, status: (threadId && !updatedThreads?.[threadId]) || state.pendingEvent.personalStory?.stage === 2 ? "completed" as const : "active" as const,
+  } : undefined;
   const pairMeta = state.pendingEvent.npcPair;
+  const romanceId = state.pendingEvent.thread?.id === "romance-route" && (state.pendingEvent.thread.stage ?? 0) >= 2
+    ? choice.contactId ?? state.eventThreads?.["romance-route"]?.contactId : undefined;
   const involvedContactIds = pairMeta
     ? [pairMeta.contactAId, pairMeta.contactBId]
     : state.pendingEvent.personalStory?.contactId || state.pendingEvent.reunion?.contactId
@@ -878,17 +922,23 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
           ? [state.contacts[choice.contactIndex].id]
           : [];
   const npcRelationships = pairMeta ? (state.npcRelationships ?? []).map((link) => link.id === pairMeta.linkId
-    ? { ...link, warmth: clamp(link.warmth + (effect.npcRelationship ?? 0)), lastInteractionWeek: state.week, ...(pairMeta.kind === "romance" ? { romanceStatus: "dating" as const } : {}) }
+    ? { ...link, warmth: clamp(link.warmth + (effect.npcRelationship ?? 0)), lastInteractionWeek: state.week, ...(pairMeta.kind === "romance" && (effect.npcRelationship ?? 0) > 0 ? { romanceStatus: "dating" as const } : {}) }
     : link) : state.npcRelationships;
   const pairResult = pairMeta ? state.contacts.map((contact) => contact.id === pairMeta.contactAId || contact.id === pairMeta.contactBId
-    ? { ...contact, note: choice.result, memories: addNpcMemory(contact, choice.result, state.week) }
+    ? { ...contact, note: choice.result, memories: addNpcMemory(contact, choice.result, state.week), ...(pairMeta.kind === "romance" && (effect.npcRelationship ?? 0) > 0 ? { relationshipStatus: "dating" as const, romanticPartnerId: contact.id === pairMeta.contactAId ? pairMeta.contactBId : pairMeta.contactAId } : {}) }
     : contact) : state.contacts;
+  const relationshipFact = pairMeta?.kind === "romance" && (effect.npcRelationship ?? 0) > 0
+    ? { id: `npc-pair-${pairMeta.linkId}-${state.week}`, week: state.week, contactId: pairMeta.contactAId, kind: "relationship" as const,
+        text: `${state.contacts.find((contact) => contact.id === pairMeta.contactAId)?.name}과 ${state.contacts.find((contact) => contact.id === pairMeta.contactBId)?.name}이 만나기 시작했다.`, dueWeek: state.week + 1 }
+    : undefined;
   const next: GameState = {
     ...state,
     lastChoiceContactIds: involvedContactIds,
     phase: "playing",
     pendingEvent: undefined,
     lastChoice: choice.result,
+    lastChoiceCause: state.pendingEvent.title,
+    lastChoiceNextWeek: state.pendingEvent.thread || state.pendingEvent.worldFactId ? state.week + 1 : undefined,
     lastChoiceEffect: effect,
     economy: state.economy && effect.money ? { ...state.economy, transactions: [...state.economy.transactions, { id: `event:${state.week}:${state.pendingEvent.id}`, week: state.week, category: "event", amount: effect.money, label: state.pendingEvent.title }] } : state.economy,
     seenEvents: [...state.seenEvents, state.pendingEvent.id],
@@ -909,7 +959,10 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
     npcStoryChoices: state.pendingEvent.personalStory ? {
       ...(state.npcStoryChoices ?? {}), [state.pendingEvent.personalStory.contactId]: choice.id,
     } : state.npcStoryChoices,
-    eventThreads: updateEventThreads(state, choice),
+    eventThreads: updatedThreads,
+    storyArcs: arcId && updatedArc ? { ...(state.storyArcs ?? {}), [arcId]: updatedArc } : state.storyArcs,
+    playerRelationships: romanceId ? { ...(state.playerRelationships ?? {}), [romanceId]: { kind: "dating", sinceWeek: state.week } } : state.playerRelationships,
+    worldFacts: [...(state.worldFacts ?? []).map((fact) => fact.id === state.pendingEvent?.worldFactId ? { ...fact, resolved: true } : fact), ...(relationshipFact ? [relationshipFact] : [])].slice(-200),
     npcRelationships,
     stats: {
       money: Math.max(0, state.stats.money + (effect.money ?? 0)),
@@ -930,6 +983,7 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
         lastInteractionWeek: state.week,
         goalSupport: clamp((contact.goalSupport ?? 0) + (effect.goalSupport ?? 0), 0, 3),
         note: choice.result,
+        nextAppointmentWeek: state.pendingEvent?.worldFactId && choice.id === "world-check-in" ? state.week + 1 : contact.nextAppointmentWeek,
         memories: addNpcMemory(contact, choice.result, state.week),
       };
     }),
@@ -997,6 +1051,26 @@ function addNpcMemory(contact: Contact, text: string, week: number): NPCMemory[]
   ].slice(0, 8);
 }
 
+function evolveNpcLife(contact: Contact, week: number): Contact {
+  // Nearby NPCs move each week; distant NPCs settle the same elapsed weeks in batches.
+  if (contact.warmth < 55 && week % 4 !== 0) return contact;
+  const elapsed = Math.max(1, week - (contact.lastLifeWeek ?? 0));
+  const priorSavings = contact.savings ?? 600_000;
+  const income = contact.weeklyIncome ?? 400_000;
+  const seeking = contact.employmentStatus === "seeking";
+  const hired = seeking && createSeed(`${contact.id}:hire:${week}`) % 4 === 0;
+  const promoted = !seeking && week % 26 === 0 && createSeed(`${contact.id}:promotion:${week}`) % 3 === 0;
+  const employmentStatus = hired ? "employed" : (contact.employmentStatus ?? "employed");
+  const weeklyIncome = hired ? 350_000 : promoted ? income + 20_000 : income;
+  const savings = Math.max(0, priorSavings + (seeking ? 0 : income) * elapsed - 280_000 * elapsed);
+  const strained = savings === 0 && priorSavings > 0;
+  const action = hired ? "새 직장을 구해 다음 급여를 기다리고 있다." : promoted ? "업무 성과를 인정받아 급여가 올랐다." : strained ? "생활비가 빠듯해 지출 계획을 다시 세웠다." : contact.lastAutonomousAction;
+  return { ...contact, employmentStatus, weeklyIncome, savings, lastLifeWeek: week,
+    nextAppointmentWeek: contact.nextAppointmentWeek && contact.nextAppointmentWeek > week ? contact.nextAppointmentWeek : week + (contact.warmth >= 55 ? 1 : 4),
+    lastAutonomousAction: action, mood: strained ? "생활비가 걱정되는 중" : contact.mood,
+    memories: action && action !== contact.lastAutonomousAction ? addNpcMemory(contact, action, week) : contact.memories };
+}
+
 export type RelationshipType = "family" | "friend" | "work" | "acquaintance";
 export function getRelationshipProfile(role: string): { type: RelationshipType; graceWeeks: number; warmthDrift: number; departureMultiplier: number } {
   if (/가족|부모|사촌|친척|형제|자매/.test(role)) return { type: "family", graceWeeks: 12, warmthDrift: 0.18, departureMultiplier: 0.48 };
@@ -1005,7 +1079,7 @@ export function getRelationshipProfile(role: string): { type: RelationshipType; 
   return { type: "acquaintance", graceWeeks: 6, warmthDrift: 0.58, departureMultiplier: 1.15 };
 }
 
-function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedContacts: Contact[]; relationshipRecords: RelationshipRecord[]; npcRelationships: NPCRelationship[]; nextContactNumber: number; reunionIds: string[]; seed: number; logs: string[] } {
+function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedContacts: Contact[]; relationshipRecords: RelationshipRecord[]; npcRelationships: NPCRelationship[]; worldFacts: NonNullable<GameState["worldFacts"]>; nextContactNumber: number; reunionIds: string[]; seed: number; logs: string[] } {
   let seed = state.seed;
   const logs: string[] = [];
   const records = [...(state.relationshipRecords ?? [])];
@@ -1075,7 +1149,18 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
       };
     }
     return { ...contact, goal, goalProgress, goalStage, mood, lastAutonomousAction, goalSupport: Math.max(0, playerSupport - 1), memories };
+  }).map((contact) => evolveNpcLife(contact, state.week));
+  const before = new Map(state.contacts.map((contact) => [contact.id, contact]));
+  const newFacts: NonNullable<GameState["worldFacts"]> = contacts.flatMap((contact) => {
+    const old = before.get(contact.id);
+    if (!old) return [];
+    const kind = old.employmentStatus === "seeking" && contact.employmentStatus === "employed" || (contact.weeklyIncome ?? 0) > (old.weeklyIncome ?? 0) ? "career"
+      : (old.savings ?? 1) > 0 && contact.savings === 0 ? "money" : undefined;
+    if (!kind) return [];
+    return [{ id: `npc-${contact.id}-${kind}-${state.week}`, week: state.week, contactId: contact.id, kind,
+      text: kind === "career" ? `${contact.name}의 일이 바뀌어 수입과 이번 주 계획이 달라졌다.` : `${contact.name}의 생활비가 부족해져 당분간 지출을 줄이고 있다.`, dueWeek: state.week + 1 }];
   });
+  const worldFacts = [...(state.worldFacts ?? []), ...newFacts].slice(-200);
   for (let index = archived.length - 1; index >= 0; index -= 1) {
     const old = archived[index];
     const weeksAway = state.week - (old.archivedWeek ?? state.week);
@@ -1121,7 +1206,7 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
     records.push({ id: `arrival-${person.id}-${state.week}`, week: state.week, kind: "arrival", contactId: person.id, contactName: person.name, text });
   }
   npcRelationships = evolveNPCRelationships(contacts, npcRelationships, state.week, state.seed);
-  return { contacts, archivedContacts: archived, relationshipRecords: records, npcRelationships, nextContactNumber, reunionIds, seed, logs };
+  return { contacts, archivedContacts: archived, relationshipRecords: records, npcRelationships, worldFacts, nextContactNumber, reunionIds, seed, logs };
 }
 
 export function startNextWeek(state: GameState): GameState {
@@ -1151,7 +1236,7 @@ export function startNextWeek(state: GameState): GameState {
   return {
     ...state, character: agedCharacter, contacts: agedContacts, archivedContacts: agedArchived, economy, week, day: 1, phase: "playing",
     playerGoals,
-    evaluatedDays: [], actionDays: [], weeklyActions: {}, weeklyEarnedIncome: 0, weeklyMeetingMomentum: 0, weeklyMeetingContext: undefined, seenEvents: [], lastChoice: undefined, lastChoiceEffect: undefined,
+    evaluatedDays: [], actionDays: [], weeklyActions: {}, weeklyEarnedIncome: 0, weeklyMeetingMomentum: 0, weeklyMeetingContext: undefined, seenEvents: [], lastChoice: undefined, lastChoiceCause: undefined, lastChoiceNextWeek: undefined, lastChoiceEffect: undefined,
     stats: { ...state.stats, energy: clamp(state.stats.energy + 12), stress: clamp(state.stats.stress - 7) },
     log: [...notableAgeChanges, `${week}주차가 시작됐다. 지난주의 경험이 생활에 남아 있다.`, ...state.log],
   };
