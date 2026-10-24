@@ -18,5 +18,6 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+      - run: node --test server/image-queue/policy.node-test.mjs
       - run: npm test
       - run: npm run build
