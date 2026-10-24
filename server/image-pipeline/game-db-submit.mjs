@@ -31,6 +31,36 @@ async function checkedJson(res,label){
   }
   return res.json();
 }
+export async function preflightPng(source,kind) {
+  const image=sharp(source,{failOn:"error",limitInputPixels:2_000_000});
+  const m=await image.metadata();
+  if(m.format!=="png"||m.width!==1024||m.height!==(kind==="portrait"?1024:1536)||!m.hasAlpha)
+    throw Error("Expected native RGBA PNG with canonical dimensions");
+  const {data,info}=await image.raw().toBuffer({resolveWithObject:true});
+  if(info.channels!==4)throw Error("RGBA PNG pixels required");
+  let transparent=0,magenta=0,opaque=0;
+  for(let i=0;i<data.length;i+=4){
+    if(data[i+3]<=8)transparent++;
+    if(data[i+3]>=250){
+      opaque++;
+      if(data[i]>=244&&data[i+1]<=14&&data[i+2]>=244)magenta++;
+    }
+  }
+  const total=info.width*info.height;
+  if(transparent/total<0.005)throw Error("Transparent background required");
+  if(opaque/total<0.01)throw Error("Opaque character foreground missing");
+  if(magenta/total>0.003)throw Error("Unremoved magenta technical background");
+  return {width:info.width,height:info.height,hasAlpha:true};
+}
+export async function createResponsiveWebp(sourcePng,kind) {
+  const result=[];
+  for(const width of [160,320,640,1024]){
+    const bytes=await sharp(sourcePng,{failOn:"error"}).resize({width,withoutEnlargement:true})
+      .webp({quality:kind==="portrait"?82:86,effort:5}).toBuffer();
+    result.push({width,bytes});
+  }
+  return result;
+}
 /** Actual PNG bytes must already exist. Never claim that ChatGPT ImageGen exports them automatically. */
 export async function submitChatGptFile(spec,config={},adapters={}) {
   const {characterId,kind,filePath,profile}=spec;
@@ -41,6 +71,7 @@ export async function submitChatGptFile(spec,config={},adapters={}) {
   const anchorHash=kind==="fullbody"?profile.fullBodyAnchorSha256:profile.portraitAnchorSha256;
   const bytes=await readFile(filePath);
   inspectPngBase64(bytes.toString("base64"),kind==="fullbody"?{width:1024,height:1536}:{width:1024,height:1024});
+  await (adapters.preflight??preflightPng)(bytes,kind);
   const hash=digest(bytes);
   if(spec.index===1&&hash!==anchorHash)throw Error("First image does not match official verified master anchor");
   if(!Number.isInteger(spec.index)||spec.index<1||spec.index>999)throw Error("Invalid index");
@@ -69,8 +100,23 @@ export async function submitChatGptFile(spec,config={},adapters={}) {
   const result=await checkedJson(await fetchFn(profileUrl+"/variants",{method:"POST",headers,body:form}),"Game DB variant");
   if(!result.assetId||!["awaiting_review","approved","blocked"].includes(result.status))
     throw Error("Game DB upload did not acknowledge a real variant");
+  if(result.status==="blocked")throw Error("Blocked image cannot receive derivatives");
+  const optimizedWidths=[];
+  if(spec.optimize!==false){
+    const derivatives=await (adapters.optimize??createResponsiveWebp)(bytes,kind);
+    for(const variant of derivatives){
+      if(![160,320,640,1024].includes(variant.width)||!Buffer.isBuffer(variant.bytes))
+        throw Error("Invalid optimized WebP variant");
+      const response=await checkedJson(await fetchFn(
+        endpoint+"/api/appearance/variants/"+result.assetId+"/derivatives/"+variant.width,
+        {method:"PUT",headers:{...headers,"Content-Type":"image/webp","x-source-sha256":hash},
+          body:variant.bytes}),"Game DB optimized WebP");
+      if(!["stored","existing"].includes(response.status))throw Error("WebP derivative upload not acknowledged");
+      optimizedWidths.push(variant.width);
+    }
+  }
   return {characterId,slot,assetId:result.assetId,status:result.status,duplicate:result.duplicate===true,
-    driveFileId:driveId,fileSha256:hash};
+    driveFileId:driveId,fileSha256:hash,optimizedWidths};
 }
 
 
@@ -93,21 +139,7 @@ export async function submitChatGptBytes(spec, config={}, adapters={}) {
     throw Error("Locked AP ID, portrait/fullbody kind and image index required");
   const bytes=Buffer.from(raw);
   inspectPngBase64(bytes.toString("base64"),kind==="portrait"?{width:1024,height:1024}:{width:1024,height:1536});
-  const {data,info}=await sharp(bytes,{failOn:"error",limitInputPixels:2_000_000})
-    .raw().toBuffer({resolveWithObject:true});
-  if(info.channels!==4)throw Error("RGBA PNG pixels required");
-  let transparent=0, magenta=0,opaque=0;
-  for(let i=0;i<data.length;i+=4) {
-    if(data[i+3]<=8)transparent++;
-    if(data[i+3]>=250) {
-      opaque++;
-      if(data[i]>=244&&data[i+1]<=14&&data[i+2]>=244)magenta++;
-    }
-  }
-  const total=info.width*info.height;
-  if(transparent/total<0.005)throw Error("Transparent background required");
-  if(opaque/total<0.01)throw Error("Opaque character foreground missing");
-  if(magenta/total>0.003)throw Error("Unremoved magenta technical background");
+  await (adapters.preflight??preflightPng)(bytes,kind);
   const temp=await mkdtemp(path.join(os.tmpdir(),"nanal-chatgpt-image-"));
   const filepath=path.join(temp,characterId+"-"+kind+"-"+index+".png");
   try {
