@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Nanal · 이미지 원본 등록 및 검수</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;color:#e6e9ee;background:#0f141c}
+*{box-sizing:border-box}body{max-width:1120px;margin:auto;padding:20px 14px 60px}
+h1{font-size:1.6rem;margin:0 0 8px}h2{font-size:1.2rem;margin:4px 0 14px}
+p{line-height:1.6;color:#b5c0cc}.muted,small{color:#9ba9b7}
+section{border:1px solid #334052;background:#192231;padding:18px;border-radius:14px;margin:16px 0}
+form{display:grid;gap:12px}.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:12px}
+label{display:flex;flex-direction:column;font-size:.89rem;gap:5px;min-width:0}
+input,select,textarea,button{font:inherit;border-radius:9px;padding:10px;color:#f0f4f8}
+input,select,textarea{background:#101824;border:1px solid #47566d;width:100%}
+input[type=checkbox]{width:auto}input[type=file]{padding:8px}textarea{min-height:85px;resize:vertical}
+button{background:#78aeff;color:#111c2b;border:0;cursor:pointer;font-weight:700}
+button.secondary{background:#34445b;color:#fff}button:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #ffce6d}
+.warn{background:#302719;border-left:3px solid #e3aa56;padding:10px;border-radius:5px;color:#f1dcb5}
+#status{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;border-radius:8px;background:#0b121b;min-height:2.7rem}
+#queue-items{display:grid;gap:10px}
+.item{background:#0f1825;border:1px solid #33435a;border-radius:10px;padding:12px;display:grid;gap:8px}
+.item .headline{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.pair figure{margin:0;background:repeating-conic-gradient(#323c4b 0 25%,#202b39 0 50%) 50%/22px 22px;min-height:160px;border:1px solid #384759}
+.pair img{display:block;width:100%;max-height:400px;object-fit:contain}
+.pair figcaption{background:#111a25;font-size:.83rem;padding:8px}
+.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px}
+.checks label,.confirm{flex-direction:row;align-items:center}
+.hidden{display:none!important}
+@media(max-width:540px){.pair{grid-template-columns:1fr}.fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+<script src="/appearance-admin.js" defer></script>
+</head>
+<body>
+<header>
+<h1>나날 · 캐릭터 이미지 관리</h1>
+<p>공식 예약 기준을 확인한 정본 얼굴·전신을 보관하고, 추가 이미지의 검수 및 게임 표시 여부를 관리합니다.</p>
+<p class="warn">이 화면은 게임 측 데이터베이스를 관리합니다. 별도의 「Nanal 플레이 테스트」 연결 도구 DB와 자동 동기화되지 않습니다. 기존 승인 이미지가 변경되지 않도록 정본 해시를 잠급니다.</p>
+</header>
+<section aria-labelledby="auth-heading">
+<h2 id="auth-heading">1. 운영자 인증</h2>
+<form id="auth-form">
+<label>관리자 API 토큰 (이 페이지에서는 메모리에만 보관)
+<input id="token" autocomplete="off" type="password" minlength="32" required placeholder="Cloudflare Worker의 관리자 토큰"></label>
+<button type="submit">서버 연결·검수 목록 갱신</button>
+</form>
+<p id="status" role="status" aria-live="polite">토큰을 입력하고 연결 상태를 확인하세요.</p>
+</section>
+<section aria-labelledby="bootstrap-heading">
+<h2 id="bootstrap-heading">2. 기존 캐릭터 정본 등록</h2>
+<p>이미 공식적으로 검수한 원본 얼굴·전신 PNG만 사용하세요. 새 디자인으로 정본을 대체하지 마세요.</p>
+<form id="bootstrap-form">
+<div class="fields">
+<label>캐릭터 ID<input name="appearanceId" required pattern="AP[0-9]{3,5}" placeholder="AP008"></label>
+<label>성별<select name="gender"><option>여성</option><option>남성</option></select></label>
+<label>최소 나이<input name="ageMin" type="number" value="20" min="20" max="59" required></label>
+<label>최대 나이<input name="ageMax" type="number" value="29" min="20" max="59" required></label>
+<label>기준 키(cm)<input name="heightCm" type="number" min="130" max="220" step=".1" required></label>
+<label>기준 체중(kg)<input name="weightKg" type="number" min="30" max="200" step=".1" required></label>
+<label>기준 얼굴 PNG (1024×1024)<input name="portrait" type="file" accept="image/png" required></label>
+<label>기준 전신 PNG (1024×1536)<input name="fullBody" type="file" accept="image/png" required></label>
+</div>
+<label>원본 비교·공식 예약 확인 근거 (30자 이상)<textarea name="reviewNotes" minlength="30" required placeholder="공식 예약 정보와 키·체중·얼굴·전신을 실제 원본과 대조한 근거"></textarea></label>
+<label class="confirm"><input name="ownerConfirmed" type="checkbox" required> 공식 AP 예약 및 승인된 원본을 직접 확인했으며 새로운 신원을 임의로 지정하지 않았습니다.</label>
+<button type="submit">정본 원본 2장 잠금 등록</button>
+</form>
+</section>
+<section aria-labelledby="candidate-heading">
+<h2 id="candidate-heading">3. 추가 이미지 검수 대기 제출</h2>
+<form id="candidate-form">
+<div class="fields">
+<label>기존 승인 캐릭터<select name="appearanceId" id="candidate-id" required></select></label>
+<label>사진 유형<select name="slot"><option value="portrait">얼굴</option><option value="fullBody">전신</option></select></label>
+<label>새 이미지 PNG<input name="image" type="file" accept="image/png" required></label>
+</div>
+<button type="submit">원본 해시 검증 후 비공개 접수</button>
+</form>
+</section>
+<section aria-labelledby="queue-heading">
+<h2 id="queue-heading">4. 검수 대기 이미지</h2>
+<button type="button" id="refresh" class="secondary">대기 목록 새로고침</button>
+<p>후보와 공식 기준 원본을 나란히 보고 실제로 검증해야 합니다. 체크 표시만으로 동일 얼굴·체형이 자동 확인되지는 않습니다.</p>
+<div id="queue-items"></div>
+<div id="review-area" class="hidden">
+<h2 id="review-title">이미지 원본 비교</h2>
+<div class="pair">
+<figure><img id="reference-img" alt="승인된 기준 원본"><figcaption>기준 원본 (잠긴 SHA-256)</figcaption></figure>
+<figure><img id="candidate-img" alt="검수 중인 추가 이미지"><figcaption>추가 이미지 후보 (아직 비공개)</figcaption></figure>
+</div>
+<form id="review-form">
+<div class="checks">
+<label><input type="checkbox" name="face"> 얼굴 신원·얼굴형 일치</label>
+<label><input type="checkbox" name="body"> 신체 골격·체형 일치</label>
+<label><input type="checkbox" name="heightScale"> 키와 비례 일치</label>
+<label><input type="checkbox" name="chestSilhouette"> 흉부/실루엣 일관성</label>
+<label><input type="checkbox" name="transparentBackground"> 투명 배경 검증</label>
+<label><input type="checkbox" name="matchesCanonicalAnchor"> 정본 원본 직접 비교 확인</label>
+</div>
+<label>근거 및 검수 메모 (30자 이상)<textarea name="notes" minlength="30" maxlength="2000" required></textarea></label>
+<div class="fields"><button name="decision" type="submit" value="approved">모든 항목 통과 시 승인</button>
+<button name="decision" type="submit" value="blocked" class="secondary">차단</button></div>
+</form>
+</div>
+</section>
+</body>
+</html>

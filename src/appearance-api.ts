@@ -90,6 +90,44 @@ const validIdentity = (p: Row): boolean =>
 export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv, fetcher: typeof fetch = fetch): Promise<Response | undefined> {
   const url=new URL(req.url), path=url.pathname;
   if (!path.startsWith("/api/appearance/")) return undefined;
+  // The deployed Worker is the ONLY supported GPT Action host. Derive its
+  // schema from this real origin rather than hard-code an imaginary server.
+  if(path==="/api/appearance/actions/openapi.json" && req.method==="GET"){
+    const fileRefSchema={type:"array",minItems:1,maxItems:1,items:{type:"string"},
+      description:"Exactly ONE REAL file in this Custom GPT conversation. ChatGPT populates openaiFileIdRefs as {name,id,mime_type,download_link} objects at runtime. Never invent a URL."};
+    return json({openapi:"3.0.3",
+      info:{title:"Nanal Game Image Review Import",version:"2.0.0",
+        description:"Game-side D1/R2 intake only. Does not update a separate Nanal plugin database. Never auto-approve."},
+      servers:[{url:url.origin}],
+      components:{securitySchemes:{OwnerBearer:{type:"http",scheme:"bearer"}}},
+      security:[{OwnerBearer:[]}],
+      paths:{
+        "/api/appearance/admin/status":{get:{
+          operationId:"checkNanalGameImageReady",
+          summary:"Confirm deployed Nanal image review database is provisioned",
+          responses:{"200":{description:"Ready"},"401":{description:"Unauthorized"},
+            "503":{description:"Database missing or migrations not applied"}}
+        }},
+        "/api/appearance/actions/ingest":{post:{
+          operationId:"submitNanalGeneratedImage",
+          summary:"Submit an actual generated image to private review for a verified AP identity",
+          description:"Submit immediately after creating a real PNG from the current GPT conversation. A verified AP character must already be bootstrapped on the game server. The image never automatically becomes approved.",
+          requestBody:{required:true,content:{"application/json":{schema:{
+            type:"object",required:["appearanceId","slot","openaiFileIdRefs"],
+            properties:{appearanceId:{type:"string",pattern:"^AP[0-9]{3,5}$"},
+              slot:{type:"string",enum:["portrait","fullBody"]},
+              openaiFileIdRefs:fileRefSchema}
+          }}}},
+          responses:{"200":{description:"Existing same-source image"},
+            "201":{description:"Private awaiting_review candidate stored"},
+            "401":{description:"Owner API bearer token missing/invalid"},
+            "409":{description:"AP verified canonical anchor not registered"},
+            "422":{description:"Signed source or PNG format is invalid"},
+            "503":{description:"Game image storage unavailable"}}
+        }}
+      }
+    });
+  }
   const db=env.NANAL_APPEARANCE_DB, storage=env.NANAL_APPEARANCE_IMAGES;
   if (!db || !storage) return err("asset_database_not_configured",503);
   try {
@@ -116,11 +154,134 @@ export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv,
       });
     }
     if (!await authorized(req,env)) return err("unauthorized",401);
-    if (path==="/api/appearance/admin/status" && req.method==="GET")
-      return json({ready:true,source:"chatgpt_upload_only",appDailyCap:null,remoteNanalPluginCap:"not_modified"});
+    if (path==="/api/appearance/admin/status" && req.method==="GET"){
+      try {
+        await db.prepare("SELECT COUNT(*) AS total FROM appearance_identities").bind().first<Row>();
+        await db.prepare("SELECT COUNT(*) AS total FROM appearance_variants").bind().first<Row>();
+      } catch {
+        return err("asset_database_migration_missing",503);
+      }
+      return json({ready:true,source:"game_cloudflare_d1_r2",ownerBootstrap:true,
+        reviewConsole:"/appearance-admin.html",appDailyCap:null,
+        remoteNanalPluginCap:"independent_not_modified"});
+    }
     const origin=req.headers.get("origin");
     if (origin && new URL(origin).origin !== url.origin) return err("origin_not_allowed",403);
 
+    // Bootstrap the game-side authoritative, immutable AP image anchors directly
+    // from ORIGINAL REVIEWED PNGs. No separate or hypothetical plugin server.
+    // The owner must first verify the official reservation and original pixels.
+    const bootstrap=path.match(/^\/api\/appearance\/identities\/(AP[0-9]{3,5})\/bootstrap$/);
+    if(bootstrap && req.method==="POST"){
+      if(Number(req.headers.get("content-length")||0)>2*MAX_BYTES+16_384)
+        return err("body_too_large",413);
+      const form=await req.formData();
+      const id=bootstrap[1],gender=form.get("gender"),ageMin=Number(form.get("ageMin")),
+        ageMax=Number(form.get("ageMax")),heightCm=Number(form.get("heightCm")),
+        weightKg=Number(form.get("weightKg")),reservation=form.get("reservationId"),
+        notes=form.get("reviewNotes");
+      if(!["여성","남성"].includes(String(gender))||
+         !Number.isInteger(ageMin)||!Number.isInteger(ageMax)||ageMin<20||ageMax>59||ageMax<ageMin||
+         !Number.isFinite(heightCm)||heightCm<130||heightCm>220||
+         !Number.isFinite(weightKg)||weightKg<30||weightKg>200||
+         reservation!=="reserve:"+id||form.get("ownerConfirmed")!=="true"||
+         typeof notes!=="string"||notes.trim().length<30||notes.length>2000)
+        return err("reviewed_reservation_proof_required",422);
+      const portrait=form.get("portrait"),fullBody=form.get("fullBody");
+      if(!(portrait instanceof File)||!(fullBody instanceof File)||
+         portrait.size>MAX_BYTES||fullBody.size>MAX_BYTES||
+         portrait.size<70||fullBody.size<70) return err("original_pair_invalid",422);
+      const portraitBytes=new Uint8Array(await portrait.arrayBuffer());
+      const fullBodyBytes=new Uint8Array(await fullBody.arrayBuffer());
+      inspectAppearancePng(portraitBytes,"portrait");
+      inspectAppearancePng(fullBodyBytes,"fullBody");
+      const [portraitHash,fullBodyHash]=await Promise.all([digest(portraitBytes),digest(fullBodyBytes)]);
+      if(portraitHash===fullBodyHash)return err("canonical_pair_invalid",422);
+      const locked={
+        appearanceId:id,reservationId:reservation,gender,ageMin,ageMax,heightCm,weightKg,
+        portraitAnchorSha256:portraitHash,fullBodyAnchorSha256:fullBodyHash,
+        qaSource:"reviewed_official_reservation"
+      };
+      const profileSha256=await digest(new TextEncoder().encode(JSON.stringify(locked)));
+      const previous=await db.prepare("SELECT * FROM appearance_identities WHERE appearance_id = ?")
+        .bind(id).first<Row>();
+      if(previous){
+        const same=previous.profile_sha256===profileSha256&&
+          previous.portrait_anchor_sha256===portraitHash&&
+          previous.full_body_anchor_sha256===fullBodyHash&&
+          previous.gender===gender&&previous.age_min===ageMin&&previous.age_max===ageMax;
+        if(!same)return err("identity_locked",409);
+      }
+      // Immutable content-addressed reference objects; never overwrite an
+      // existing AP master with a new image, even after a client retry.
+      const masterKey=(role:string,checksum:string)=>"nanal/canonical/"+id+"/"+role+"/"+checksum+".png";
+      const masters=[{key:masterKey("portrait",portraitHash),bytes:portraitBytes},
+                     {key:masterKey("fullBody",fullBodyHash),bytes:fullBodyBytes}];
+      for(const original of masters){
+        const stored=await storage.get(original.key);
+        if(stored){
+          const oldHash=await digest(new Uint8Array(await stored.arrayBuffer()));
+          const incomingHash=await digest(original.bytes);
+          if(oldHash!==incomingHash)return err("canonical_storage_conflict",409);
+        } else await storage.put(original.key,original.bytes,{httpMetadata:{contentType:"image/png"}});
+      }
+      if(!previous){
+        try{
+          await db.prepare("INSERT INTO appearance_identities(appearance_id,gender,age_min,age_max,profile_sha256,portrait_anchor_sha256,full_body_anchor_sha256,source) VALUES(?,?,?,?,?,?,?,?)")
+            .bind(id,gender,ageMin,ageMax,profileSha256,portraitHash,fullBodyHash,"reviewed_official_reservation").run();
+        }catch{
+          const concurrent=await db.prepare("SELECT * FROM appearance_identities WHERE appearance_id = ?").bind(id).first<Row>();
+          if(!concurrent||concurrent.profile_sha256!==profileSha256)
+            return err("identity_locked",409);
+        }
+      }
+      // Private append-only owner QA evidence, keyed by profile checksum.
+      const auditKey="nanal/canonical/"+id+"/reviews/"+profileSha256+".json";
+      const audit=JSON.stringify({schemaVersion:1,locked,profileSha256,reviewNotes:notes.trim(),
+        verifiedBy:"authorized_owner",registeredAt:new Date().toISOString(),
+        scope:"Owner attestation; image identity still needs visual comparison for each variant."});
+      if(!(await storage.get(auditKey)))
+        await storage.put(auditKey,new TextEncoder().encode(audit),{httpMetadata:{contentType:"application/json"}});
+      return json({appearanceId:id,status:previous?"existing":"registered",profileSha256,
+        portraitAnchorSha256:portraitHash,fullBodyAnchorSha256:fullBodyHash,
+        originalsStored:true,gameDatabaseOnly:true},previous?200:201);
+    }
+    // Private review console APIs: never leak candidate or canonical images
+    // to public users before explicit owner approval.
+    if(path==="/api/appearance/admin/queue" && req.method==="GET"){
+      const status=url.searchParams.get("status")??"awaiting_review";
+      if(!["awaiting_review","approved","blocked"].includes(status))
+        return err("invalid_queue_status",400);
+      const rows=await db.prepare("SELECT asset_id,appearance_id,slot,status,file_sha256,anchor_sha256,created_at,review_note FROM appearance_variants WHERE status = ? ORDER BY created_at DESC LIMIT 200")
+        .bind(status).all<Row>();
+      return json({status,assets:rows.results.map(r=>({
+        assetId:r.asset_id,appearanceId:r.appearance_id,slot:r.slot,
+        status:r.status,fileSha256:r.file_sha256,referenceSha256:r.anchor_sha256,
+        createdAt:r.created_at??null,reviewNote:r.review_note??null
+      }))});
+    }
+    if(path==="/api/appearance/admin/identities" && req.method==="GET"){
+      const rows=await db.prepare("SELECT appearance_id,gender,age_min,age_max,profile_sha256,portrait_anchor_sha256,full_body_anchor_sha256 FROM appearance_identities ORDER BY appearance_id LIMIT 500")
+        .bind().all<Row>();
+      return json({identities:rows.results.map(r=>({
+        appearanceId:r.appearance_id,gender:r.gender,
+        ageMin:r.age_min,ageMax:r.age_max,profileSha256:r.profile_sha256,
+        portraitAnchorSha256:r.portrait_anchor_sha256,
+        fullBodyAnchorSha256:r.full_body_anchor_sha256
+      }))});
+    }
+    const refImage=path.match(/^\/api\/appearance\/admin\/references\/(AP[0-9]{3,5})\/(portrait|fullBody)$/);
+    if(refImage && ["GET","HEAD"].includes(req.method)){
+      const identityRow=await db.prepare("SELECT portrait_anchor_sha256,full_body_anchor_sha256 FROM appearance_identities WHERE appearance_id = ?")
+        .bind(refImage[1]).first<Row>();
+      if(!identityRow)return err("canonical_identity_missing",404);
+      const checksum=refImage[2]==="portrait"?identityRow.portrait_anchor_sha256:identityRow.full_body_anchor_sha256;
+      const file=await storage.get("nanal/canonical/"+refImage[1]+"/"+refImage[2]+"/"+checksum+".png");
+      if(!file)return err("canonical_original_not_stored",404);
+      return new Response(req.method==="HEAD"?null:await file.arrayBuffer(),
+        {headers:{"content-type":"image/png","cache-control":"no-store",
+          "x-content-type-options":"nosniff"}});
+    }
     // A Custom GPT Action can hand the current conversation's file references
     // to an authenticated HTTPS endpoint without the user downloading PNGs.
     // It never creates images or accesses ChatGPT Library without a supplied

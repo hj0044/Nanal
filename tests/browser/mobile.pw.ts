@@ -60,3 +60,15 @@ test("first three days show an event, choice result and state change", async ({ 
   await expect(page.getByRole("heading", { name: "선택 결과" })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("result-390.png"), fullPage: true });
 });
+
+test("owner image console stays usable on 320px mobile without persisting credentials", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto("/appearance-admin.html");
+  await expect(page.getByRole("heading", { name: "나날 · 캐릭터 이미지 관리" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "2. 기존 캐릭터 정본 등록" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "정본 원본 2장 잠금 등록" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "대기 목록 새로고침" })).toBeVisible();
+  await expect(page.getByLabel(/관리자 API 토큰/)).toHaveAttribute("type", "password");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  expect(await page.evaluate(() => localStorage.length)).toBe(0);
+});
