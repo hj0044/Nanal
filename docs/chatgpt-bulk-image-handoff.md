@@ -89,3 +89,34 @@ npm run images:batch -- --source .nanal-private/inbox --registry .nanal-private/
 - 앱 자체 일일 장수 제한을 추가하지 않는다. 공급자의 실제 제한/서비스 요금은 별도다.
 - 기존 공식 DB의 전체 목록 및 원본 다운로드 API가 없으므로 **원본 파일을 확보하지 않은 기존 이미지는 원격 일괄 백업되었다고 볼 수 없다**. 현재 GitHub 이미지 카탈로그도 비어 있어 이 명령이 원본을 자동 발견하지는 못한다.
 - ChatGPT 이미지 생성 완료 시 PNG 파일을 안전하게 수집해 이 로컬 인박스에 넣는 **호스트 전달 어댑터**가 노출되어야 사용자 입력 없이 완전 자동화할 수 있다. 이 GitHub 코드 변경만으로 ChatGPT 앱 내부 훅을 설치할 수 없다.
+
+
+## ChatGPT 생성 이미지 원본 바이트 직접 인계(파일 저장 클릭 없이)
+
+`server/image-pipeline/game-db-submit.mjs`의 `submitChatGptBytes`는 **모델 호스트가 실제 PNG 바이트를 제공하는 경우** 파일 다운로드·선택 작업을 요청하지 않고 기존 백업 우선 등록 경로를 호출한다.
+
+```js
+import { submitChatGptBytes } from "./server/image-pipeline/game-db-submit.mjs";
+
+// 이 코드는 실제 이미지를 얻을 권한이 있는 ChatGPT 실행 호스트 내부에서 호출해야 한다.
+// ChatGPT 앱에서 이미지가 화면에 보이는 것만으로 pngBytes를 읽을 수 있지는 않다.
+const result = await submitChatGptBytes({
+  characterId: "AP008", kind: "portrait", index: 2,
+  pngBytes: actualImageToolOutputBytes,
+  profile: verifiedOfficialIdentityProfile,
+  privateRoot: "/private/nanal-backup"
+}, {
+  gameApiOrigin: process.env.NANAL_GAME_API_ORIGIN,
+  adminToken: process.env.NANAL_APPEARANCE_ADMIN_TOKEN,
+  googleFolderId: process.env.GOOGLE_DRIVE_BACKUP_FOLDER_ID,
+  googleRefreshToken: process.env.GOOGLE_DRIVE_REFRESH_TOKEN,
+  googleClientId: process.env.GOOGLE_OAUTH_CLIENT_ID,
+  googleClientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET
+});
+```
+
+실제 원본이 전달되면 PNG CRC·RGBA 규격·1024×1024 또는 1024×1536 캔버스·투명 픽셀·마젠타 잔존 배경을 확인한다. 승인된 AP 통계·마스터 앵커가 없으면 등록 불가. 정상 결과는 로컬 불변 원본 백업 → (기본) 개인 Google Drive 원본 백업 → 게임 D1/R2 후보 등록(`awaiting_review`)으로 진행한다. 동일 PNG 제출은 기존 내용 기반 멱등키로 보호한다.
+
+**중요: 이 메서드는 GPT 이미지를 만들거나 ChatGPT 이미지 보관함에서 몰래 가져오는 기능이 아니다.** 2026-10-24 현재 이 프로젝트에서 실제 생성된 이미지는 보관함 목록에 보이지만 `files.materialize`가 `This Project file does not have an authorized raw-byte materialization path`를 반환했다. 호스트의 이미지 생성 완료 바이트를 연결 도구에 전달하는 권한 또는 원본 파일 핸들이 제공되지 않아, 이 단계의 완전한 무인 운영은 아직 확인할 수 없다. 공식 Nanal 플러그인 DB와 게임 측 D1 DB 또한 별개다.
+
+`npm test`에서 모의 원본 바이트로 자동 인계/백업/후보 등록/호출 실패를 검증하지만, 실제 ChatGPT ImageGen 결과가 Nanal 운영 DB로 자동 업로드되는 라이브 E2E는 별도 인증·배포·호스트 기능이 필요하다.

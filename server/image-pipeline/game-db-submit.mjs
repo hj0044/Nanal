@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile, mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import sharp from "sharp";
 import path from "node:path";
 import { inspectPngBase64 } from "../chatgpt-import/validation.mjs";
 import { immutableWrite, driveBackup } from "./import.mjs";
@@ -69,4 +71,49 @@ export async function submitChatGptFile(spec,config={},adapters={}) {
     throw Error("Game DB upload did not acknowledge a real variant");
   return {characterId,slot,assetId:result.assetId,status:result.status,duplicate:result.duplicate===true,
     driveFileId:driveId,fileSha256:hash};
+}
+
+
+/**
+ * Model-host byte handoff: accepts actual PNG bytes directly without asking
+ * the user to save or select a file. It does not generate images or retrieve
+ * protected ChatGPT Images assets from their UI. The host must deliver bytes.
+ *
+ * This deliberately reuses submitChatGptFile, keeping its immutable local
+ * original + independent Google Drive backup + owner-authenticated game DB
+ * registration + exactly-once requestKey behavior intact.
+ */
+export async function submitChatGptBytes(spec, config={}, adapters={}) {
+  const raw=spec?.pngBytes;
+  if (!(raw instanceof Uint8Array) || raw.byteLength<70 || raw.byteLength>16*1024*1024)
+    throw Error("ChatGPT generated image bytes unavailable to the host");
+  const {characterId,kind,index}=spec;
+  if(!ap.test(characterId)||!["portrait","fullbody"].includes(kind) ||
+      !Number.isInteger(index)||index<1||index>999)
+    throw Error("Locked AP ID, portrait/fullbody kind and image index required");
+  const bytes=Buffer.from(raw);
+  inspectPngBase64(bytes.toString("base64"),kind==="portrait"?{width:1024,height:1024}:{width:1024,height:1536});
+  const {data,info}=await sharp(bytes,{failOn:"error",limitInputPixels:2_000_000})
+    .raw().toBuffer({resolveWithObject:true});
+  if(info.channels!==4)throw Error("RGBA PNG pixels required");
+  let transparent=0, magenta=0,opaque=0;
+  for(let i=0;i<data.length;i+=4) {
+    if(data[i+3]<=8)transparent++;
+    if(data[i+3]>=250) {
+      opaque++;
+      if(data[i]>=244&&data[i+1]<=14&&data[i+2]>=244)magenta++;
+    }
+  }
+  const total=info.width*info.height;
+  if(transparent/total<0.005)throw Error("Transparent background required");
+  if(opaque/total<0.01)throw Error("Opaque character foreground missing");
+  if(magenta/total>0.003)throw Error("Unremoved magenta technical background");
+  const temp=await mkdtemp(path.join(os.tmpdir(),"nanal-chatgpt-image-"));
+  const filepath=path.join(temp,characterId+"-"+kind+"-"+index+".png");
+  try {
+    await writeFile(filepath,bytes,{mode:0o600});
+    return await submitChatGptFile({...spec,filePath:filepath},config,adapters);
+  } finally {
+    await rm(temp,{recursive:true,force:true});
+  }
 }
