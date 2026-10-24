@@ -58,7 +58,7 @@ async function driveFind(fetchFn,token,q) {
   const data=await r.json();
   return data.files??[];
 }
-async function driveBackup(fetchFn,c,original,filename,characterId,digest) {
+export async function driveBackup(fetchFn,c,original,filename,characterId,digest) {
   if(!c.googleFolderId)throw Error("Drive backup root folder required");
   const token=await getToken(c,fetchFn);
   const folderMatches=await driveFind(fetchFn,token,
@@ -107,7 +107,7 @@ async function imagekitUpload(fetchFn,c,optimized,assetId,characterId) {
     throw Error("Untrusted ImageKit response");
   return result;
 }
-async function immutableWrite(file,bytes) {
+export async function immutableWrite(file,bytes) {
   await mkdir(path.dirname(file),{recursive:true});
   try{
     const f=await open(file,"wx",0o600);
