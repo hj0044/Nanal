@@ -1,3 +1,5 @@
+import { withKoreanParticle } from "./korean";
+
 export type Background = "student" | "jobseeker" | "worker";
 export type Palette = "clean" | "warm" | "dark";
 export type SensitiveTopic = "affair" | "illness" | "pregnancy";
@@ -44,6 +46,8 @@ export interface WeeklyCashflow {
   expenses: number;
   unpaidExpenses: number;
   endingBalance: number;
+  /** Carried obligations after this week's income is applied. */
+  openingUnpaidExpenses?: number;
 }
 export interface WeeklyCashflowPlan {
   income: number;
@@ -168,7 +172,7 @@ export interface LifeEvent {
   choices: EventChoice[];
 }
 export interface GameState {
-  version: 1;
+  version: 2;
   character: Character;
   week: number;
   day: number;
@@ -399,7 +403,7 @@ export function createGame(character: Character, seed = createSeed(`${character.
   const player = { ...character, ...body, weightKg: character.weightKg ?? body.weightKg, affiliation: getPlayerAffiliation(character), portraitId: getPortrait(character.portraitId)?.id ?? choosePortraitId(character.gender, character.age, seed) };
   const contacts = generateContacts(character.background, seed, character.age, player.portraitId ? [player.portraitId] : []).map((person) => ({ ...person, firstMetWeek: 1, lastInteractionWeek: 1, returnCount: 0 }));
   return {
-    version: 1, character: player, week: 1, day: 1, phase: "playing", seed,
+    version: 2, character: player, week: 1, day: 1, phase: "playing", seed,
     evaluatedDays: [], seenEvents: [], npcStoryStages: {}, npcStoryLastWeek: {}, npcStoryChoices: {},
     playerGoals: [],
     stats: { money, energy: 72, stress: 24, mood: 61, focus: 52 },
@@ -430,10 +434,12 @@ function settleWeeklyCashflow(state: GameState): GameState {
   if (state.weeklyCashflow?.week === state.week) return state;
   const plan = getWeeklyCashflowPlan(state.character);
   const available = state.stats.money + plan.income;
-  const unpaidExpenses = Math.max(0, plan.expenses - available);
-  const endingBalance = Math.max(0, available - plan.expenses);
+  const openingUnpaidExpenses = state.weeklyCashflow?.unpaidExpenses ?? 0;
+  const due = plan.expenses + openingUnpaidExpenses;
+  const unpaidExpenses = Math.max(0, due - available);
+  const endingBalance = Math.max(0, available - due);
   const cashflow: WeeklyCashflow = {
-    week: state.week, income: plan.income + (state.weeklyEarnedIncome ?? 0), expenses: plan.expenses, unpaidExpenses, endingBalance,
+    week: state.week, income: plan.income + (state.weeklyEarnedIncome ?? 0), expenses: plan.expenses, openingUnpaidExpenses, unpaidExpenses, endingBalance,
   };
   const line = unpaidExpenses > 0
     ? `${state.week}주차 정산 · 수입 +${plan.income.toLocaleString("ko-KR")}원 / 지출 ${plan.expenses.toLocaleString("ko-KR")}원 · 미납 ${unpaidExpenses.toLocaleString("ko-KR")}원`
@@ -561,14 +567,6 @@ function dialogueFor(contact: Contact, kind: "bond" | "conflict" | "reconciliati
   if (/독립|주관|경쟁|추진/.test(trait)) return kind === "conflict" ? `내 입장도 분명히 말하고 싶어. 그렇다고 사이를 끊고 싶은 건 아니야.` : `서로 다른 점은 그대로 두고, 같이 해볼 일을 찾아보면 좋겠어.`;
   if (/즉흥|유쾌|호기심/.test(trait)) return kind === "conflict" ? `잠깐, 내가 너무 앞서갔지? 다음엔 먼저 물어볼게.` : `다음엔 우리 둘 다 좋아하는 걸 해보자. 얘기하다 보니 생각보다 잘 맞네.`;
   return kind === "conflict" ? `조금 어색해졌지만 그냥 넘기고 싶지는 않아. 차분히 얘기해보자.` : `“${goal}” 얘기도 나누고 싶었어. 너랑 있으면 편하게 말할 수 있어.`;
-}
-function withKoreanParticle(name: string, kind: "and" | "subject" | "topic"): string {
-  const code = name.charCodeAt(name.length - 1);
-  const hasFinal = code >= 0xac00 && code <= 0xd7a3 && (code - 0xac00) % 28 !== 0;
-  const particle = kind === "and" ? (hasFinal ? "과" : "와")
-    : kind === "subject" ? (hasFinal ? "이" : "가")
-      : hasFinal ? "은" : "는";
-  return name + particle;
 }
 export function getNpcRelationshipEvents(state: GameState): LifeEvent[] {
   const active = new Map(state.contacts.map((contact) => [contact.id, contact]));
@@ -836,6 +834,7 @@ export function takeDailyAction(state: GameState, action: DailyAction, targetCon
 }
 export function chooseEvent(state: GameState, choiceId: string): GameState {
   if (state.phase !== "event" || !state.pendingEvent) return state;
+  if (state.seenEvents.includes(state.pendingEvent.id)) return state;
   const choice = state.pendingEvent.choices.find((item) => item.id === choiceId);
   if (!choice) return state;
   const effect = choice.effect;
@@ -917,10 +916,12 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
 
 export function addPlayerGoal(state: GameState, templateId: string): GameState {
   const template = playerGoalTemplates.find((item) => item.id === templateId);
-  if (!template || (state.playerGoals ?? []).some((goal) => goal.id === template.id)) return state;
+  if (!template || (state.playerGoals ?? []).some((goal) => (goal.id === template.id || goal.id.startsWith(`${template.id}-cycle-`)) && goal.status !== "completed")) return state;
   const activeGoals = (state.playerGoals ?? []).filter((goal) => goal.status === "active");
   if (activeGoals.length >= 3 || activeGoals.some((goal) => goal.category === template.category)) return state;
-  const goal: PlayerGoal = { ...template, progress: 0, status: "active", createdWeek: state.week, weeklyProgress: 0, cycleNumber: 1 };
+  const prior = (state.playerGoals ?? []).filter((item) => item.id === template.id || item.id.startsWith(`${template.id}-cycle-`));
+  const cycleNumber = prior.length + 1;
+  const goal: PlayerGoal = { ...template, id: cycleNumber === 1 ? template.id : `${template.id}-cycle-${cycleNumber}`, progress: 0, status: "active", createdWeek: state.week, weeklyProgress: 0, cycleNumber };
   return { ...state, playerGoals: [...(state.playerGoals ?? []), goal], log: [`새 목표를 정했다: ${goal.title}`, ...state.log] };
 }
 

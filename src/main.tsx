@@ -9,29 +9,28 @@ import "./style.css";
 import { choosePortraitId, getPortrait, getPortraitIdentityId, importApprovedRemoteCatalog } from "./portrait-catalog";
 import { portraitUrl } from "./portrait-image";
 import { rewriteNarrative } from "./narrative-rewrite";
+import { parseSave } from "./save";
+import { lifeDate } from "./korean";
 
 const SAVE_KEY = "nanal-save-v1";
 const backgroundChoices: Background[] = ["student", "jobseeker", "worker"];
 const regions = ["서울", "인천", "경기", "부산", "대구"];
 const housingChoices = ["가족과 동거", "자취", "기숙사", "전세·월세 동거"];
 const emptyDraft: CharacterDraft = { name: "", age: "", year: "", background: "", gender: "", heightCm: "", weightKg: "", affiliation: "", region: "", housing: "", education: "", family: "", startingMoney: "", portraitId: "" };
-function readSave(): GameState | null {
+function readSave(): { game: GameState | null; error: string } {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as GameState;
-    if (parsed.version !== 1 || !parsed.character || !parsed.stats || !Array.isArray(parsed.contacts)) return null;
-    return normalizeSave(parsed);
-  } catch { return null; }
+    if (!raw) return { game: null, error: "" };
+    return { game: normalizeSave(parseSave(JSON.parse(raw))), error: "" };
+  } catch (error) {
+    console.error("Nanal save load failed", error);
+    return { game: null, error: "저장 데이터를 읽지 못했어요. 원본 파일을 보관한 뒤 다시 시작할 수 있어요." };
+  }
 }
+const initialSave = readSave();
 function normalizeSave(parsed: GameState): GameState {
-  const keepApprovedHistory = <T extends { appearanceHistory?: { portraitId: string }[] }>(person: T) => ({
-    ...person,
-    appearanceHistory: person.appearanceHistory?.filter((entry) => getPortrait(entry.portraitId)),
-  });
   const savedPlayerPortraitId = parsed.character.portraitId;
-  const playerPortraitId = savedPlayerPortraitId && getPortrait(savedPlayerPortraitId)?.gender === parsed.character.gender
-    ? savedPlayerPortraitId : undefined;
+  const playerPortraitId = savedPlayerPortraitId;
   const generated = generateContacts(parsed.character.background, parsed.seed, parsed.character.age, playerPortraitId ? [playerPortraitId] : []);
   const playerBody = generateBodyMetrics(parsed.character.gender, createSeed(`${parsed.seed}:${parsed.character.name}:body`), parsed.character.heightCm);
   const usedPortraitIds = playerPortraitId ? [getPortraitIdentityId(playerPortraitId) ?? playerPortraitId] : [];
@@ -40,17 +39,17 @@ function normalizeSave(parsed: GameState): GameState {
     const age = person.age ?? parsed.character.age;
     const body = generateBodyMetrics(gender, createSeed(`${parsed.seed}:${person.id}:body`), person.heightCm);
     let portraitId = person.portraitId;
-    if (!portraitId || usedPortraitIds.includes(getPortraitIdentityId(portraitId) ?? portraitId) || getPortrait(portraitId)?.gender !== gender) {
+    if (!portraitId) {
       portraitId = choosePortraitId(gender, age, createSeed(`${parsed.seed}:${person.id}`), usedPortraitIds);
     }
     if (portraitId) usedPortraitIds.push(getPortraitIdentityId(portraitId) ?? portraitId);
-    return { ...keepApprovedHistory(person), gender, age, ...body, weightKg: person.weightKg ?? body.weightKg, affiliation: person.affiliation ?? getContactAffiliation(person.role, parsed.character.background), portraitId, portraitAgeBand: getPortrait(portraitId)?.ageBand };
+    return { ...person, gender, age, ...body, weightKg: person.weightKg ?? body.weightKg, affiliation: person.affiliation ?? getContactAffiliation(person.role, parsed.character.background), portraitId, portraitAgeBand: getPortrait(portraitId)?.ageBand ?? person.portraitAgeBand };
   });
   return {
     ...parsed,
     playerGoals: parsed.playerGoals ?? [],
     character: {
-      ...keepApprovedHistory(parsed.character), ...playerBody, weightKg: parsed.character.weightKg ?? playerBody.weightKg,
+      ...parsed.character, ...playerBody, weightKg: parsed.character.weightKg ?? playerBody.weightKg,
       affiliation: getPlayerAffiliation(parsed.character), portraitId: playerPortraitId,
     },
     recentEventIds: parsed.recentEventIds ?? [],
@@ -65,14 +64,14 @@ function normalizeSave(parsed: GameState): GameState {
       const gender = person.gender ?? generated[index]?.gender ?? (createSeed(`${parsed.seed}:${person.id}:gender`) % 2 === 0 ? "여성" : "남성");
       const body = generateBodyMetrics(gender, createSeed(`${parsed.seed}:${person.id}:body`), person.heightCm);
       let portraitId = person.portraitId;
-      if (!portraitId || usedPortraitIds.includes(getPortraitIdentityId(portraitId) ?? portraitId) || getPortrait(portraitId)?.gender !== gender) {
+      if (!portraitId) {
         portraitId = choosePortraitId(gender, age, createSeed(`${parsed.seed}:${merged.id}`), usedPortraitIds);
       }
       if (portraitId) usedPortraitIds.push(getPortraitIdentityId(portraitId) ?? portraitId);
       return {
-        ...keepApprovedHistory(merged), name: normalizeContactName(merged.name, gender, createSeed(`${parsed.seed}:${merged.id}:name`)), age, gender,
+        ...merged, name: person.name ?? normalizeContactName(merged.name, gender, createSeed(`${parsed.seed}:${merged.id}:name`)), age, gender,
         ...body, weightKg: person.weightKg ?? body.weightKg, affiliation: person.affiliation ?? getContactAffiliation(person.role, parsed.character.background), portraitId,
-        portraitAgeBand: getPortrait(portraitId)?.ageBand,
+        portraitAgeBand: getPortrait(portraitId)?.ageBand ?? person.portraitAgeBand,
         occupation: person.occupation ?? generated[index]?.occupation,
         personality: person.personality ?? generated[index]?.personality,
         goal: person.goal ?? generated[index]?.goal,
@@ -84,14 +83,15 @@ function normalizeSave(parsed: GameState): GameState {
   };
 }
 function App() {
-  const [game, setGame] = useState<GameState | null>(() => readSave());
+  const [game, setGame] = useState<GameState | null>(() => initialSave.game);
   const [draft, setDraft] = useState<CharacterDraft>(emptyDraft);
   const [tab, setTab] = useState<Tab>("life");
   const [showSettings, setShowSettings] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState<Contact | null>(null);
   const [showPlayerProfile, setShowPlayerProfile] = useState(false);
-  const [showCreator, setShowCreator] = useState(!readSave());
-  const [importMessage, setImportMessage] = useState("");
+  const [showCreator, setShowCreator] = useState(!initialSave.game);
+  const [importMessage, setImportMessage] = useState(initialSave.error);
+  const [saveStatus, setSaveStatus] = useState<"saved" | "failed" | "quota">("saved");
   const [nightNow, setNightNow] = useState(false);
   const [narrativeAvailable, setNarrativeAvailable] = useState(false);
   const narrativeRequests = useRef(new Set<string>());
@@ -174,7 +174,11 @@ function App() {
     if (!game) return;
     const scheduled = game.settings.nightMode !== "off" && nightNow;
     document.documentElement.dataset.palette = scheduled ? "dark" : game.settings.palette;
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(game)); } catch { /* storage quota is surfaced on manual export */ }
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(game)); setSaveStatus("saved"); }
+    catch (error) {
+      console.error("Nanal autosave failed", error);
+      setSaveStatus(error instanceof DOMException && error.name === "QuotaExceededError" ? "quota" : "failed");
+    }
   }, [game, nightNow]);
 
   const updateGame = (fn: (current: GameState) => GameState) => setGame((current) => current ? fn(current) : current);
@@ -218,14 +222,13 @@ function App() {
   const handleImport = async (file?: File) => {
     if (!file) return;
     try {
-      const parsed = JSON.parse(await file.text()) as GameState;
-      if (parsed.version !== 1 || !parsed.character || !parsed.stats || !Array.isArray(parsed.contacts)) throw new Error("다른 형식의 저장 파일입니다.");
+      const parsed = parseSave(JSON.parse(await file.text()));
       setGame(normalizeSave(parsed)); setShowCreator(false); setImportMessage("저장 파일을 불러왔어요.");
     } catch (error) { setImportMessage(error instanceof Error ? error.message : "파일을 읽지 못했어요."); }
   };
 
   if (!game || showCreator) {
-    return <Creator draft={draft} setDraft={setDraft} canStart={canStart} randomize={randomize} start={start} onImport={handleImport} importMessage={importMessage} hasSave={Boolean(game)} onContinue={() => setShowCreator(false)} />;
+    return <Creator draft={draft} setDraft={setDraft} canStart={canStart} randomize={randomize} start={start} onImport={handleImport} importMessage={importMessage} hasSave={Boolean(game)} onContinue={() => setShowCreator(false)} onExportRaw={() => exportRawSave()} />;
   }
 
   return (
@@ -233,10 +236,11 @@ function App() {
       <header className="topbar">
         <div className="brand"><span className="brand-mark">n</span><span>Nanal</span></div>
         <div className="topbar-actions">
-          <span className="save-indicator"><i /> 자동 저장</span>
+          <span className={`save-indicator ${saveStatus}`} role="status"><i /> {saveStatus === "saved" ? "자동 저장됨" : saveStatus === "quota" ? "저장 공간 부족" : "저장 실패"}</span>
           <button className="icon-button" aria-label="설정 열기" onClick={() => setShowSettings(true)}>⚙</button>
         </div>
       </header>
+      {saveStatus !== "saved" && <div className="save-warning" role="alert">변경 사항이 저장되지 않았어요. 저장 파일을 내보내고 브라우저 저장 공간을 확인해 주세요. <button onClick={() => exportSave(game)}>파일 내보내기</button></div>}
       <main className="main-content">
         {tab === "life" && <LifeView game={game} onAdvance={(days) => updateGame((current) => advanceDays(current, days))} onAction={(action, targetContactId) => updateGame((current) => takeDailyAction(current, action, targetContactId))} onChoice={(id) => updateGame((current) => chooseEvent(current, id))} onNextWeek={() => updateGame(startNextWeek)} onSelectPerson={setSelectedPerson} />}
         {tab === "people" && <PeopleView game={game} onSelectPerson={setSelectedPerson} onSelectPlayer={() => setShowPlayerProfile(true)} onContactArchived={(id) => { updateGame((current) => contactArchivedNpc(current, id)); setTab("life"); }} />}
@@ -262,9 +266,9 @@ function App() {
   );
 }
 
-function Creator({ draft, setDraft, canStart, randomize, start, onImport, importMessage, hasSave, onContinue }: {
+function Creator({ draft, setDraft, canStart, randomize, start, onImport, importMessage, hasSave, onContinue, onExportRaw }: {
   draft: CharacterDraft; setDraft: React.Dispatch<React.SetStateAction<CharacterDraft>>; canStart: boolean;
-  randomize: () => void; start: () => void; onImport: (file?: File) => void; importMessage: string; hasSave: boolean; onContinue: () => void;
+  randomize: () => void; start: () => void; onImport: (file?: File) => void; importMessage: string; hasSave: boolean; onContinue: () => void; onExportRaw: () => void;
 }) {
   const set = (key: keyof CharacterDraft, value: string) => setDraft((current) => ({ ...current, [key]: key === "age" || key === "year" || key === "heightCm" || key === "weightKg" ? (value ? Number(value) : "") : value } as CharacterDraft));
   const select = (label: string, key: keyof CharacterDraft, values: string[], placeholder: string) => (
@@ -309,6 +313,7 @@ function Creator({ draft, setDraft, canStart, randomize, start, onImport, import
           {hasSave && <button className="secondary-button full" onClick={onContinue}>저장된 생활 이어하기</button>}
           <label className="upload-link">저장 파일 불러오기<input type="file" accept="application/json,.json" onChange={(event) => onImport(event.target.files?.[0])} /></label>
           {importMessage && <p className="inline-message">{importMessage}</p>}
+          {initialSave.error && <button className="secondary-button full" onClick={onExportRaw}>기존 저장 원본 내려받기</button>}
         </div>
         <div className="creator-footnote">Nanal은 현재 프로토타입이에요. 게임 속 수치와 확률은 플레이 테스트용 임시 값입니다.</div>
       </div>
@@ -319,7 +324,7 @@ function Creator({ draft, setDraft, canStart, randomize, start, onImport, import
 function LifeView({ game, onAdvance, onAction, onChoice, onNextWeek, onSelectPerson }: { game: GameState; onAdvance: (days: 1 | 3 | 7) => void; onAction: (action: DailyAction, targetContactId?: string) => void; onChoice: (id: string) => void; onNextWeek: () => void; onSelectPerson: (person: Contact) => void }) {
   const [showResult, setShowResult] = useState(false);
   const [socialTargetId, setSocialTargetId] = useState(game.contacts[1]?.id ?? game.contacts[0]?.id ?? "");
-  const date = new Date(game.character.year, 0, (game.week - 1) * 7 + game.day);
+  const date = lifeDate(game.character.year, game.week, game.day);
   const dateLabel = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric" }).format(date);
   const weekday = new Intl.DateTimeFormat("ko-KR", { weekday: "short" }).format(date);
   const featured = game.lastChoiceContactIds?.map((id) => game.contacts.find((person) => person.id === id)).find(Boolean) ?? game.contacts[0];
@@ -336,7 +341,7 @@ function LifeView({ game, onAdvance, onAction, onChoice, onNextWeek, onSelectPer
   return (
     <>
       <section className="home-hero">
-        <div className="home-hero-copy"><span className="home-date">{dateLabel} ({weekday}) · {game.week}주차</span><h1>오늘도 좋은 하루예요!</h1><p>{game.character.name}님, 지금도 충분히 잘하고 있어요.</p><div className="home-profile-tags"><span>{game.character.age}세</span><span>{game.character.region}</span><span>{backgroundLabels[game.character.background]}</span></div></div>
+        <div className="home-hero-copy"><span className="home-date">{date.getFullYear()}년 {dateLabel} ({weekday}) · {game.week}주차</span><h1>오늘도 좋은 하루예요!</h1><p>{game.character.name}님, 지금도 충분히 잘하고 있어요.</p><div className="home-profile-tags"><span>{game.character.age}세</span><span>{game.character.region}</span><span>{backgroundLabels[game.character.background]}</span></div></div>
         <CharacterAvatar name={game.character.name} portraitId={game.character.portraitId} className="home-portrait" />
       </section>
       <section className="stats-grid home-stats" aria-label="오늘의 생활 요약">
@@ -409,7 +414,7 @@ function WorkView({ game }: { game: GameState }) {
 function GoalsView({ game, onAdd, onStatus }: { game: GameState; onAdd: (id: string) => void; onStatus: (id: string, status: "active" | "paused") => void }) {
   const goals = game.playerGoals ?? [];
   const active = goals.filter((goal) => goal.status === "active");
-  const available = playerGoalTemplates.filter((template) => !goals.some((goal) => goal.id === template.id) && !active.some((goal) => goal.category === template.category));
+  const available = playerGoalTemplates.filter((template) => !goals.some((goal) => (goal.id === template.id || goal.id.startsWith(`${template.id}-cycle-`)) && goal.status !== "completed") && !active.some((goal) => goal.category === template.category));
   const [selectedTemplate, setSelectedTemplate] = useState(available[0]?.id ?? "");
   useEffect(() => { if (!available.some((goal) => goal.id === selectedTemplate)) setSelectedTemplate(available[0]?.id ?? ""); }, [available, selectedTemplate]);
   const categoryLabel: Record<string, string> = { career: "일·진로", learning: "학습", relationship: "관계", health: "건강", finance: "경제", personal: "생활" };
@@ -425,7 +430,13 @@ function GoalsView({ game, onAdd, onStatus }: { game: GameState; onAdd: (id: str
 }
 function RecordView({ game }: { game: GameState }) {
   const history = [...(game.relationshipRecords ?? [])].reverse();
-  return <><PageTitle kicker="LIFE RECORD" title="나의 생애기록" subtitle="중요한 선택과 변화가 시간순으로 쌓입니다." /><div className="timeline">{history.map((record) => <div className="timeline-row" key={record.id}><span className="timeline-dot" /><div><small>{game.character.year}년 · {record.week}주차 · {record.contactName}</small><p>{record.text}</p></div></div>)}{[...game.log].reverse().map((line, index) => <div className="timeline-row" key={`${line}-${index}`}><span className="timeline-dot" /><div><small>{game.character.year}년 · 생활 기록</small><p>{line}</p></div></div>)}</div></>;
+  return <><PageTitle kicker="LIFE RECORD" title="나의 생애기록" subtitle="중요한 선택과 변화가 시간순으로 쌓입니다." /><div className="timeline">{history.map((record) => <div className="timeline-row" key={record.id}><span className="timeline-dot" /><div><small>{lifeDate(game.character.year, record.week).getFullYear()}년 · {record.week}주차 · {record.contactName}</small><p>{record.text}</p></div></div>)}{[...game.log].reverse().map((line, index) => <div className="timeline-row" key={`${line}-${index}`}><span className="timeline-dot" /><div><small>{recordYear(game.character.year, line)} · 생활 기록</small><p>{line}</p></div></div>)}</div></>;
+}
+function recordYear(startYear: number, line: string): string {
+  const year = line.match(/^(\d{4})년/);
+  if (year) return `${year[1]}년`;
+  const week = line.match(/^(\d+)주차/);
+  return week ? `${lifeDate(startYear, Number(week[1])).getFullYear()}년` : "연도 미상";
 }
 function PageTitle({ kicker, title, subtitle }: { kicker: string; title: string; subtitle: string }) {
   return <div className="page-title"><span className="section-kicker">{kicker}</span><h1>{title}</h1><p>{subtitle}</p></div>;
@@ -442,5 +453,22 @@ function exportSave(game: GameState) {
   const url = URL.createObjectURL(blob); const link = document.createElement("a");
   link.href = url; link.download = `nanal-${game.character.name}-week${game.week}.json`; link.click(); URL.revokeObjectURL(url);
 }
-createRoot(document.getElementById("root")!).render(<React.StrictMode><App /></React.StrictMode>);
+function exportRawSave() {
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (!raw) return;
+  const url = URL.createObjectURL(new Blob([raw], { type: "application/json" }));
+  const link = document.createElement("a");
+  link.href = url; link.download = "nanal-original-save.json"; link.click(); URL.revokeObjectURL(url);
+}
+
+class GameErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: boolean }> {
+  state = { error: false };
+  static getDerivedStateFromError() { return { error: true }; }
+  componentDidCatch(error: Error, info: React.ErrorInfo) { console.error("Nanal render failed", error, info.componentStack); }
+  render() {
+    if (this.state.error) return <div className="recovery-screen" role="alert"><h1>화면을 표시하지 못했어요</h1><p>저장된 생활을 보관한 뒤 화면을 새로고침해 주세요.</p><button onClick={exportRawSave}>저장 원본 내려받기</button><button onClick={() => location.reload()}>새로고침</button></div>;
+    return this.props.children;
+  }
+}
+createRoot(document.getElementById("root")!).render(<React.StrictMode><GameErrorBoundary><App /></GameErrorBoundary></React.StrictMode>);
 
