@@ -90,6 +90,44 @@ const validIdentity = (p: Row): boolean =>
 export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv, fetcher: typeof fetch = fetch): Promise<Response | undefined> {
   const url=new URL(req.url), path=url.pathname;
   if (!path.startsWith("/api/appearance/")) return undefined;
+  // The deployed Worker is the ONLY supported GPT Action host. Derive its
+  // schema from this real origin rather than hard-code an imaginary server.
+  if(path==="/api/appearance/actions/openapi.json" && req.method==="GET"){
+    const fileRefSchema={type:"array",minItems:1,maxItems:1,items:{type:"string"},
+      description:"Exactly ONE REAL file in this Custom GPT conversation. ChatGPT populates openaiFileIdRefs as {name,id,mime_type,download_link} objects at runtime. Never invent a URL."};
+    return json({openapi:"3.0.3",
+      info:{title:"Nanal Game Image Review Import",version:"2.0.0",
+        description:"Game-side D1/R2 intake only. Does not update a separate Nanal plugin database. Never auto-approve."},
+      servers:[{url:url.origin}],
+      components:{securitySchemes:{OwnerBearer:{type:"http",scheme:"bearer"}}},
+      security:[{OwnerBearer:[]}],
+      paths:{
+        "/api/appearance/admin/status":{get:{
+          operationId:"checkNanalGameImageReady",
+          summary:"Confirm deployed Nanal image review database is provisioned",
+          responses:{"200":{description:"Ready"},"401":{description:"Unauthorized"},
+            "503":{description:"Database missing or migrations not applied"}}
+        }},
+        "/api/appearance/actions/ingest":{post:{
+          operationId:"submitNanalGeneratedImage",
+          summary:"Submit an actual generated image to private review for a verified AP identity",
+          description:"Submit immediately after creating a real PNG from the current GPT conversation. A verified AP character must already be bootstrapped on the game server. The image never automatically becomes approved.",
+          requestBody:{required:true,content:{"application/json":{schema:{
+            type:"object",required:["appearanceId","slot","openaiFileIdRefs"],
+            properties:{appearanceId:{type:"string",pattern:"^AP[0-9]{3,5}$"},
+              slot:{type:"string",enum:["portrait","fullBody"]},
+              openaiFileIdRefs:fileRefSchema}
+          }}}},
+          responses:{"200":{description:"Existing same-source image"},
+            "201":{description:"Private awaiting_review candidate stored"},
+            "401":{description:"Owner API bearer token missing/invalid"},
+            "409":{description:"AP verified canonical anchor not registered"},
+            "422":{description:"Signed source or PNG format is invalid"},
+            "503":{description:"Game image storage unavailable"}}
+        }}
+      }
+    });
+  }
   const db=env.NANAL_APPEARANCE_DB, storage=env.NANAL_APPEARANCE_IMAGES;
   if (!db || !storage) return err("asset_database_not_configured",503);
   try {
