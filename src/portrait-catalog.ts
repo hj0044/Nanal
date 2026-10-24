@@ -13,6 +13,7 @@ export interface PortraitRecord {
   ageBand: PortraitAgeBand;
   source: "single";
   filename?: string;
+  imageUrl?: string;
 }
 
 type SourceAsset = {
@@ -21,12 +22,31 @@ type SourceAsset = {
   gender: PersonGender;
   ageEstimate: { min: number; max: number };
   filename: string;
+  cdnUrl?: string;
   status?: string;
   runtimeEligible: boolean;
 };
 
 const ageBand = (min: number, max: number) => `${min}–${max}세`;
-// Keep portrait IDs as save metadata; no artwork is bundled or requested at runtime.
+
+// Only explicitly approved assets from our public ImageKit delivery path can be rendered.
+// This does not grant asset approval or trust arbitrary user-provided URLs.
+export function trustedPortraitUrl(url: string | undefined, endpoint: string | undefined): string | undefined {
+  if (!url || !endpoint) return undefined;
+  try {
+    const asset = new URL(url);
+    const trusted = new URL(endpoint);
+    const prefix = trusted.pathname.replace(/\/+$/, "");
+    return asset.protocol === "https:" && trusted.protocol === "https:" &&
+      asset.origin === trusted.origin &&
+      (asset.pathname === prefix || asset.pathname.startsWith(prefix + "/"))
+      ? asset.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+const imagekitEndpoint = import.meta.env.VITE_IMAGEKIT_URL_ENDPOINT as string | undefined;
+// Only sourceManifest-approved metadata is eligible for display.
 const eligiblePortraits: PortraitRecord[] = (sourceManifest.assets as unknown as SourceAsset[])
   .filter((asset) => asset.status === "approved" && asset.runtimeEligible === true)
   .map((asset) => ({
@@ -38,6 +58,7 @@ const eligiblePortraits: PortraitRecord[] = (sourceManifest.assets as unknown as
     ageMax: asset.ageEstimate.max,
     ageBand: ageBand(asset.ageEstimate.min, asset.ageEstimate.max),
     filename: asset.filename.split("/").pop(),
+    imageUrl: trustedPortraitUrl(asset.cdnUrl, imagekitEndpoint),
     source: "single",
   }));
 
