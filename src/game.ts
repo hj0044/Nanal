@@ -513,7 +513,7 @@ export function getPersonalStoryEvents(state: GameState): LifeEvent[] {
   const goal = contact.goal ?? "자기만의 방향을 찾는 일";
   const previousChoice = (state.npcStoryChoices ?? {})[contact.id];
   const context = kind === "family" ? "가족의 돌봄과 생활비 문제" : kind === "work" ? "업무 변화와 앞으로의 진로" : kind === "friendship" ? "가까운 관계와 자신의 생활" : goal;
-  const npcUpdate = `${name}은(는) “${goal}”에 신경 쓰고 있고, 요즘 ${contact.mood ?? "평소와 같은 상태"}라고 한다.${(contact.goalSupport ?? 0) >= 1 ? " 네가 건넨 응원이 다음 걸음을 고민하는 데 도움이 됐다고 한다." : ""}`;
+  const npcUpdate = `${withKoreanParticle(name, "topic")} “${goal}”에 신경 쓰고 있고, 요즘 ${contact.mood ?? "평소와 같은 상태"}라고 한다.${(contact.goalSupport ?? 0) >= 1 ? " 네가 건넨 응원이 다음 걸음을 고민하는 데 도움이 됐다고 한다." : ""}`;
   const stageCopy = stage === 0
     ? `${name}이 평소보다 진지한 표정으로 이야기를 꺼냈다. ${npcUpdate} 요즘 ${context} 때문에 고민이 있지만, 누구에게 어떻게 말해야 할지 몰랐다고 한다.`
     : stage === 1
@@ -552,7 +552,7 @@ export function getNpcReunionEvents(state: GameState): LifeEvent[] {
       id: `npc-reunion-${contact.id}-${contact.returnCount ?? 1}`,
       title: `${contact.name}과 다시 마주쳤다`,
       eyebrow: `${contact.role} · 다시 이어진 인연`,
-      body: `${contact.name}과(와) 다시 만나 반갑게 인사를 나눴다. ${memoryLine} 예전처럼 바로 가까워지기보다, 지금의 서로를 알아가는 시간이 필요해 보인다.`,
+      body: `${withKoreanParticle(contact.name, "and")} 다시 만나 반갑게 인사를 나눴다. ${memoryLine} 예전처럼 바로 가까워지기보다, 지금의 서로를 알아가는 시간이 필요해 보인다.`,
       reunion: { contactId },
       choices: [
         { id: "reunion-memory", title: "희미한 기억을 같이 되짚어본다", detail: "기억이 완전하지 않아도 함께 웃었던 순간을 나눈다", result: `${contact.name}과 예전 일을 천천히 떠올렸다. 기억은 흐릿했지만 함께 웃으며 다시 대화를 이어갈 수 있었다.`, effect: { mood: 3, relationship: 5 }, contactIndex: index },
@@ -703,18 +703,18 @@ function eventDialogue(contact: Contact, family: EventFamily): string {
 function eventChoiceReaction(contact: Contact, effect: Effect): string {
   const trait = contact.personality ?? "";
   if ((effect.relationship ?? 0) > 0) {
-    if (/낯은 가리|조용|말수는 적/.test(trait)) return `${contact.name}은(는) 바로 표현하진 않았지만 다음에도 편하게 이야기하자고 했다.`;
-    if (/현실적|계획적|책임감/.test(trait)) return `${contact.name}은(는) 다음에 어떻게 할지 구체적으로 정리해보자고 했다.`;
-    if (/다정|공감|세심/.test(trait)) return `${contact.name}은(는) 네가 자기 마음을 살펴준 점을 고마워했다.`;
-    return `${contact.name}은(는) 네 말을 기억해두겠다고 했다.`;
+    if (/낯은 가리|조용|말수는 적/.test(trait)) return `${withKoreanParticle(contact.name, "topic")} 바로 표현하진 않았지만 다음에도 편하게 이야기하자고 했다.`;
+    if (/현실적|계획적|책임감/.test(trait)) return `${withKoreanParticle(contact.name, "topic")} 다음에 어떻게 할지 구체적으로 정리해보자고 했다.`;
+    if (/다정|공감|세심/.test(trait)) return `${withKoreanParticle(contact.name, "topic")} 네가 자기 마음을 살펴준 점을 고마워했다.`;
+    return `${withKoreanParticle(contact.name, "topic")} 네 말을 기억해두겠다고 했다.`;
   }
   if ((effect.relationship ?? 0) < 0) {
-    if (/독립|주관/.test(trait)) return `${contact.name}은(는) 자기 입장도 존중해달라고 조심스럽게 말했다.`;
-    if (/걱정|공감|세심/.test(trait)) return `${contact.name}은(는) 괜찮다고 했지만 당분간 생각할 시간이 필요해 보였다.`;
-    return `${contact.name}은(는) 답을 서두르지 않고 조금 거리를 두기로 했다.`;
+    if (/독립|주관/.test(trait)) return `${withKoreanParticle(contact.name, "topic")} 자기 입장도 존중해달라고 조심스럽게 말했다.`;
+    if (/걱정|공감|세심/.test(trait)) return `${withKoreanParticle(contact.name, "topic")} 괜찮다고 했지만 당분간 생각할 시간이 필요해 보였다.`;
+    return `${withKoreanParticle(contact.name, "topic")} 답을 서두르지 않고 조금 거리를 두기로 했다.`;
   }
-  if (/계획|현실|책임감/.test(trait)) return `${contact.name}은(는) 다음 행동을 정리해두고 연락하기로 했다.`;
-  return `${contact.name}은(는) 그날의 대화를 기억해두겠다고 했다.`;
+  if (/계획|현실|책임감/.test(trait)) return `${withKoreanParticle(contact.name, "topic")} 다음 행동을 정리해두고 연락하기로 했다.`;
+  return `${withKoreanParticle(contact.name, "topic")} 그날의 대화를 기억해두겠다고 했다.`;
 }
 export function personalizeAuthoredEvent(event: LifeEvent, state: GameState): LifeEvent {
   if (event.npcPair || event.personalStory || event.reunion) return event;
@@ -739,7 +739,7 @@ export function personalizeAuthoredEvent(event: LifeEvent, state: GameState): Li
   });
   return {
     ...event,
-    body: `${event.body} ${primary.name}도 요즘 “${primary.goal ?? "자기만의 방향"}”을(를) 생각하고 있어, 이 선택을 눈여겨보고 있다.`,
+    body: `${event.body} ${primary.name}도 요즘 ${withKoreanParticle(`“${primary.goal ?? "자기만의 방향"}”`, "object")} 생각하고 있어, 이 선택을 눈여겨보고 있다.`,
     npcDialogue: { speakerName: primary.name, line: eventDialogue(primary, family) },
     choices,
   };
@@ -1105,7 +1105,7 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
     if (departureChance > 0 && departureRoll < departureChance) {
     const departed = { ...contact, archivedWeek: state.week, historicalBond: contact.historicalBond ?? contact.warmth, note: "서로의 생활이 달라져 한동안 연락이 뜸해졌다." };
       archived.push(departed);
-      const text = `${contact.name}과(와) 연락이 뜸해져 각자의 생활을 이어가게 됐다. 함께한 기억은 생애기록에 남아 있다.`;
+      const text = `${withKoreanParticle(contact.name, "and")} 연락이 뜸해져 각자의 생활을 이어가게 됐다. 함께한 기억은 생애기록에 남아 있다.`;
       logs.push(text);
       records.push({ id: `departure-${contact.id}-${state.week}`, week: state.week, kind: "departure", contactId: contact.id, contactName: contact.name, text });
       continue;
@@ -1131,7 +1131,7 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
       : contact.goalStage ?? "기회 기다리기";
     let mood = advanced ? "자기 일에 집중하는 중" : "일정이 조금 꼬임";
     let lastAutonomousAction = advanced
-      ? playerSupport > 0 ? `“${goal}”을(를) 이어갔어요. 네가 건넨 응원이 도움이 됐어요.` : `“${goal}”을(를) 이어갔어요.`
+      ? playerSupport > 0 ? `${withKoreanParticle(`“${goal}”`, "object")} 이어갔어요. 네가 건넨 응원이 도움이 됐어요.` : `${withKoreanParticle(`“${goal}”`, "object")} 이어갔어요.`
       : playerSupport > 0 ? `네가 건넨 응원을 생각하며 “${goal}” 다음 단계를 준비하고 있어요.` : "갑작스러운 일정 때문에 계획을 미뤘어요.";
     if (goalProgress >= 3) {
       const [goalSeed, goalRoll] = nextRandom(seed ^ createSeed(`${contact.id}:${state.week}:next-goal`));
@@ -1144,7 +1144,7 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
       lastAutonomousAction = playerSupport > 0
         ? `“${oldGoal}”의 한 단계를 마쳤어요. 네가 곁에서 도와준 것도 힘이 됐어요.`
         : `“${oldGoal}”의 한 단계를 마치고 다음 목표를 찾기 시작했어요.`;
-      logs.push(`${contact.name}이(가) “${oldGoal}”에서 한 단계를 마쳤어요.`);
+      logs.push(`${withKoreanParticle(contact.name, "subject")} “${oldGoal}”에서 한 단계를 마쳤어요.`);
       return {
         ...contact, goal, goalProgress, goalStage, mood, lastAutonomousAction, goalSupport: Math.max(0, playerSupport - 1),
         memories: addNpcMemory({ ...contact, memories }, lastAutonomousAction, state.week),
@@ -1176,7 +1176,7 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
     const returned = { ...old, archivedWeek: undefined, warmth: reunionWarmth, goalSupport: 0, memories: (old.memories ?? []).map((memory) => ({ ...memory, vividness: Math.min(memory.vividness, 0.28), emotionalTrace: Math.max(memory.emotionalTrace ?? 0.35, 0.4) })), lastInteractionWeek: state.week, returnCount: (old.returnCount ?? 0) + 1, note: "우연히 다시 만나 어색하지만 반가웠다. 예전의 정은 남아 있지만, 지금의 서로를 다시 알아갈 시간이 필요하다." };
     contacts.push(returned);
     reunionIds.push(returned.id);
-    const text = `${old.name}과(와) 우연히 다시 만났다. 예전만큼 가깝지는 않지만, 서로의 근황을 나누며 새롭게 관계를 이어가기 시작했다.`;
+    const text = `${withKoreanParticle(old.name, "and")} 우연히 다시 만났다. 예전만큼 가깝지는 않지만, 서로의 근황을 나누며 새롭게 관계를 이어가기 시작했다.`;
     logs.push(text);
     records.push({ id: `reunion-${old.id}-${state.week}`, week: state.week, kind: "reunion", contactId: old.id, contactName: old.name, text });
   }
@@ -1203,7 +1203,7 @@ function simulateNpcWeek(state: GameState): { contacts: Contact[]; archivedConta
       .sort((a, b) => a.score - b.score)
       .slice(0, Math.min(2, contacts.length - 1));
     for (const { candidate } of newTies) npcRelationships.push(makeNPCRelationship(person, candidate, 28 + createSeed(`${person.id}:${candidate.id}`) % 28, state.week));
-    const text = `${meetingContext}에서 ${person.name}을(를) 새롭게 알게 됐다. ${person.role}로 만나 가볍게 인사를 나눴다.`;
+    const text = `${meetingContext}에서 ${withKoreanParticle(person.name, "object")} 새롭게 알게 됐다. ${person.role}로 만나 가볍게 인사를 나눴다.`;
     logs.push(text);
     records.push({ id: `arrival-${person.id}-${state.week}`, week: state.week, kind: "arrival", contactId: person.id, contactName: person.name, text });
   }

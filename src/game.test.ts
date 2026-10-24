@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { addPlayerGoal, advanceDay, advanceDays, chooseEvent, contactArchivedNpc, createGame, createInitialNPCRelationships, generateBodyMetrics, generateContacts, getContactAffiliation, getEventFamily, getNpcRelationshipEvents, getNpcReunionEvents, getPersonalStoryEvents, getPlayerAffiliation, getRelationshipProfile, getWeeklyCashflowPlan, normalizeContactName, personalizeAuthoredEvent, setPlayerGoalStatus, startNextWeek, takeDailyAction, type Character, type LifeEvent } from "./game";
 import { commonEventLibrary, eventLibrary } from "./scenarios";
 import { validateGeneratedEvent } from "./event-generation";
+import { withKoreanParticle } from "./korean";
 import { applyNarrativeRewrite, buildNarrativeRewriteRequest } from "./narrative-rewrite";
 import { getEventThreadEvents } from "./event-threads";
 import { getPortrait, getPortraitCandidates, getPortraitIdentityId, portraitCatalog } from "./portrait-catalog";
@@ -761,7 +762,7 @@ describe("first week simulation", () => {
       if (person) completed = { name: person.name, goal: base.contacts.find((contact) => contact.id === person.id)!.goal!, result };
     }
     expect(completed).toBeDefined();
-    const line = `${completed!.name}이(가) “${completed!.goal}”에서 한 단계를 마쳤어요.`;
+    const line = `${withKoreanParticle(completed!.name, "subject")} “${completed!.goal}”에서 한 단계를 마쳤어요.`;
     expect(completed!.result.log.filter((entry) => entry === line)).toHaveLength(1);
     const following = finishWeek({ ...completed!.result, phase: "playing", day: 7, evaluatedDays: [7], week: 2 });
     expect(following.log.filter((entry) => entry === line)).toHaveLength(1);
