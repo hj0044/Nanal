@@ -21,6 +21,14 @@ const json = (body: object, status = 200) => new Response(JSON.stringify(body), 
   status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
 });
 const err = (code: string, status = 400) => json({ error: code }, status);
+function crc32(bytes: Uint8Array): number {
+  let crc=0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit=0; bit<8; bit++) crc=(crc>>>1)^(crc&1?0xedb88320:0);
+  }
+  return (crc^0xffffffff)>>>0;
+}
 const uint = (bytes: Uint8Array, offset: number) =>
   new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(offset, false);
 
@@ -36,6 +44,7 @@ export function inspectAppearancePng(bytes: Uint8Array, slot: string): void {
     const size=uint(bytes,i);
     if (size > MAX_BYTES || i + 12 + size > bytes.length) throw Error("png_truncated");
     const tag=String.fromCharCode(...bytes.slice(i+4,i+8));
+    if (crc32(bytes.subarray(i+4,i+8+size)) !== uint(bytes,i+8+size)) throw Error("png_crc_invalid");
     if (tag === "IDAT") idat=true;
     i += size + 12;
     if (tag === "IEND") { ended=i===bytes.length && size===0; break; }
@@ -157,7 +166,7 @@ export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv)
     return err("not_found",404);
   } catch(e) {
     const message=e instanceof Error?e.message:"server_error";
-    if (["png_invalid","png_dimensions_invalid","rgba_required","png_truncated","png_incomplete","invalid_json","body_too_large"].includes(message))
+    if (["png_invalid","png_dimensions_invalid","rgba_required","png_truncated","png_incomplete","png_crc_invalid","invalid_json","body_too_large"].includes(message))
       return err(message,400);
     return err("server_error",500);
   }
