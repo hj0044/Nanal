@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile, mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { inspectPngBase64 } from "../chatgpt-import/validation.mjs";
 import { immutableWrite, driveBackup } from "./import.mjs";
@@ -29,6 +30,18 @@ async function checkedJson(res,label){
   }
   return res.json();
 }
+export async function preflightPng(source,kind) {
+  const {default:sharp}=await import("sharp");
+  const img=sharp(source,{failOn:"error",limitInputPixels:10_000_000});
+  const meta=await img.metadata();
+  const target=kind==="portrait"?[1024,1024]:[1024,1536];
+  if(meta.format!=="png"||meta.width!==target[0]||meta.height!==target[1]||!meta.hasAlpha)
+    throw Error("Expected native RGBA PNG with canonical dimensions");
+  const alpha=await img.extractChannel("alpha").stats();
+  if(alpha.channels[0].min===255||alpha.channels[0].max===0)
+    throw Error("Transparent background and visible opaque figure required");
+  return {width:meta.width,height:meta.height,hasAlpha:true};
+}
 export async function createResponsiveWebp(sourcePng,kind) {
   const {default:sharp}=await import("sharp");
   const widths=[160,320,640,1024];
@@ -52,6 +65,7 @@ export async function submitChatGptFile(spec,config={},adapters={}) {
   const anchorHash=kind==="fullbody"?profile.fullBodyAnchorSha256:profile.portraitAnchorSha256;
   const bytes=await readFile(filePath);
   inspectPngBase64(bytes.toString("base64"),kind==="fullbody"?{width:1024,height:1536}:{width:1024,height:1024});
+  await (adapters.preflight??preflightPng)(bytes,kind);
   const hash=digest(bytes);
   if(spec.index===1&&hash!==anchorHash)throw Error("First image does not match official verified master anchor");
   if(!Number.isInteger(spec.index)||spec.index<1||spec.index>999)throw Error("Invalid index");
@@ -98,4 +112,18 @@ export async function submitChatGptFile(spec,config={},adapters={}) {
   }
   return {characterId,slot,assetId:result.assetId,status:result.status,duplicate:result.duplicate===true,
     driveFileId:driveId,fileSha256:hash,optimizedWidths};
+}
+
+/**
+ * Privileged host callback: accepts a real PNG Buffer, bypassing manual inbox staging.
+ * The host must actually provide the image bytes; this is not an image-generation hook.
+ */
+export async function submitChatGptPngBytes({png,...spec},config={},adapters={}) {
+  if(!Buffer.isBuffer(png)||png.length===0)throw Error("Host must supply real generated PNG bytes");
+  const temporary=await mkdtemp(path.join(os.tmpdir(),"nanal-chatgpt-"));
+  try {
+    const filePath=path.join(temporary,"image.png");
+    await writeFile(filePath,png,{mode:0o600});
+    return await submitChatGptFile({...spec,filePath},config,adapters);
+  }finally{await rm(temporary,{recursive:true,force:true});}
 }
