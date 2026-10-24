@@ -94,3 +94,69 @@ test("101 valid distinct submissions accepted without local two-per-day quota",a
  }
  assert.equal(db.assets.size,101);
 });
+
+
+test("GPT Action signed image file reference auto-imports without a manual image download",async()=>{
+  const {env,db}=setup();await identity(env);
+  const bytes=png(1024,1024);
+  const link="https://files.oaiusercontent.com/file-EXAMPLE123456789?se=2099-01-01T00%3A00%3A00Z&sig=fakesignature";
+  let fetches=0;
+  const fetcher=async(url,init)=>{
+    fetches++;assert.equal(url,link);
+    assert.equal(init.redirect,"error");
+    assert.equal(init.credentials,"omit");
+    return new Response(bytes,{status:200,headers:{"content-type":"image/png","content-length":String(bytes.length)}});
+  };
+  const payload=JSON.stringify({appearanceId:"AP008",slot:"portrait",
+    openaiFileIdRefs:[{id:"file-EXAMPLE123456789",name:"generated.png",mime_type:"image/png",download_link:link}]});
+  const first=await handleAppearanceApi(request("POST","/api/appearance/actions/ingest",payload),env,fetcher);
+  assert.equal(first.status,201);
+  const a=await first.json();
+  assert.equal(a.status,"awaiting_review");assert.ok(a.assetId);
+  assert.equal(db.assets.size,1);
+  const repeat=await handleAppearanceApi(request("POST","/api/appearance/actions/ingest",payload),env,fetcher);
+  assert.equal(repeat.status,200);
+  assert.equal((await repeat.json()).duplicate,true);
+  assert.equal(fetches,2);
+  const pending=await handleAppearanceApi(request("GET","/api/appearance/assets/"+a.assetId,undefined,false),env);
+  assert.equal(pending.status,404);
+  const privateView=await handleAppearanceApi(request("GET","/api/appearance/admin/assets/"+a.assetId),env);
+  assert.equal(privateView.status,200);
+  assert.equal(privateView.headers.get("cache-control"),"no-store");
+});
+test("GPT Action source URL is host-restricted and does not follow redirects",async()=>{
+  const {env}=setup();await identity(env);
+  let reads=0;
+  const badSources=[
+    "https://example.net/private",
+    "http://files.oaiusercontent.com/file-EXAMPLE123456789",
+    "https://files.oaiusercontent.com.evil.invalid/file-EXAMPLE123456789",
+    "https://files.oaiusercontent.com@evil.invalid/file-EXAMPLE123456789",
+    "https://files.oaiusercontent.com/file-EXAMPLE123456789?se=2020-01-01T00:00:00Z"
+  ];
+  for(const link of badSources) {
+    const payload=JSON.stringify({appearanceId:"AP008",slot:"portrait",
+      openaiFileIdRefs:[{id:"file-EXAMPLE123456789",download_link:link}]});
+    const res=await handleAppearanceApi(request("POST","/api/appearance/actions/ingest",payload),env,async()=>{reads++;throw Error("SSRF")});
+    assert.equal(res.status,422);
+  }
+  assert.equal(reads,0);
+});
+test("GPT Action refuses unauthenticated file references",async()=>{
+  const {env}=setup();
+  const response=await handleAppearanceApi(request("POST","/api/appearance/actions/ingest",JSON.stringify({
+    appearanceId:"AP008",slot:"portrait",openaiFileIdRefs:[{id:"file-EXAMPLE123456789",
+      download_link:"https://files.oaiusercontent.com/file-EXAMPLE123456789"}]
+  }),false),env,async()=>{throw Error("must not download")});
+  assert.equal(response.status,401);
+});
+test("GPT Action cannot claim success when signed link has invalid image bytes",async()=>{
+  const {env,db}=setup();await identity(env);
+  const payload=JSON.stringify({appearanceId:"AP008",slot:"portrait",
+    openaiFileIdRefs:[{id:"file-EXAMPLE123456789",download_link:"https://files.oaiusercontent.com/file-EXAMPLE123456789"}]});
+  const response=await handleAppearanceApi(request("POST","/api/appearance/actions/ingest",payload),env,
+    async()=>new Response("webp-not-a-png",{status:200}));
+  assert.equal(response.status,422);
+  assert.equal((await response.json()).error,"image_format_invalid");
+  assert.equal(db.assets.size,0);
+});
