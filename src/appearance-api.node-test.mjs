@@ -266,3 +266,18 @@ test("profile locked target updates reject fabricated or obsolete reservation me
  assert.equal(db.targets.get("AP008:fullBody").target_count,14);
  assert.equal(db.targetAudit.length,2);
 });
+
+
+test("verified identity metadata available only to owner sync worker",async()=>{
+ const {env}=setup();await identity(env);
+ const path="/api/appearance/admin/identities/AP008";
+ assert.equal((await handleAppearanceApi(request("GET",path,undefined,false),env)).status,401);
+ const response=await handleAppearanceApi(request("GET",path),env);
+ assert.equal(response.status,200);
+ const meta=await response.json();
+ assert.equal(meta.appearanceId,"AP008");
+ assert.equal(meta.reviewedOfficialReservation,true);
+ assert.equal(meta.profileSha256,profile);
+ assert.equal(meta.fullBodyAnchorSha256,body);
+ assert.equal((await handleAppearanceApi(request("GET","/api/appearance/admin/identities/AP999"),env)).status,404);
+});
