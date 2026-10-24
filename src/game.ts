@@ -205,6 +205,8 @@ export interface GameState {
   log: string[];
   pendingEvent?: LifeEvent;
   lastChoice?: string;
+  lastChoiceEffect?: Effect;
+  favoriteContactIds?: string[];
   /** NPCs directly involved in the latest player action or event choice. */
   lastChoiceContactIds?: string[];
   settings: {
@@ -860,6 +862,7 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
     phase: "playing",
     pendingEvent: undefined,
     lastChoice: choice.result,
+    lastChoiceEffect: effect,
     seenEvents: [...state.seenEvents, state.pendingEvent.id],
     recentEventIds: [...(state.recentEventIds ?? []), state.pendingEvent.id].slice(-8),
     eventLastSeenWeek: { ...(state.eventLastSeenWeek ?? {}), [state.pendingEvent.id]: state.week },
@@ -1119,7 +1122,7 @@ export function startNextWeek(state: GameState): GameState {
   return {
     ...state, character: agedCharacter, contacts: agedContacts, archivedContacts: agedArchived, week, day: 1, phase: "playing",
     playerGoals,
-    evaluatedDays: [], actionDays: [], weeklyActions: {}, weeklyEarnedIncome: 0, weeklyMeetingMomentum: 0, weeklyMeetingContext: undefined, seenEvents: [], lastChoice: undefined,
+    evaluatedDays: [], actionDays: [], weeklyActions: {}, weeklyEarnedIncome: 0, weeklyMeetingMomentum: 0, weeklyMeetingContext: undefined, seenEvents: [], lastChoice: undefined, lastChoiceEffect: undefined,
     stats: { ...state.stats, energy: clamp(state.stats.energy + 12), stress: clamp(state.stats.stress - 7) },
     log: [...notableAgeChanges, `${week}주차가 시작됐다. 지난주의 경험이 생활에 남아 있다.`, ...state.log],
   };

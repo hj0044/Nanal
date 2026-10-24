@@ -48,6 +48,7 @@ function normalizeSave(parsed: GameState): GameState {
   return {
     ...parsed,
     playerGoals: parsed.playerGoals ?? [],
+    favoriteContactIds: parsed.favoriteContactIds ?? [],
     character: {
       ...parsed.character, ...playerBody, weightKg: parsed.character.weightKg ?? playerBody.weightKg,
       affiliation: getPlayerAffiliation(parsed.character), portraitId: playerPortraitId,
@@ -95,6 +96,12 @@ function App() {
   const [nightNow, setNightNow] = useState(false);
   const [narrativeAvailable, setNarrativeAvailable] = useState(false);
   const narrativeRequests = useRef(new Set<string>());
+  const scrollPositions = useRef<Record<Tab, number>>({ life: 0, people: 0, work: 0, goals: 0, record: 0 });
+  const changeTab = (next: Tab) => {
+    scrollPositions.current[tab] = window.scrollY;
+    setTab(next);
+    requestAnimationFrame(() => window.scrollTo(0, scrollPositions.current[next]));
+  };
 
   useEffect(() => {
     const controller=new AbortController();
@@ -234,7 +241,7 @@ function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand"><span className="brand-mark">n</span><span>Nanal</span></div>
+        <button className="brand home-button" onClick={() => changeTab("life")} aria-label="홈으로"><span className="brand-mark">n</span><span>Nanal</span></button>
         <div className="topbar-actions">
           <span className={`save-indicator ${saveStatus}`} role="status"><i /> {saveStatus === "saved" ? "자동 저장됨" : saveStatus === "quota" ? "저장 공간 부족" : "저장 실패"}</span>
           <button className="icon-button" aria-label="설정 열기" onClick={() => setShowSettings(true)}>⚙</button>
@@ -243,7 +250,7 @@ function App() {
       {saveStatus !== "saved" && <div className="save-warning" role="alert">변경 사항이 저장되지 않았어요. 저장 파일을 내보내고 브라우저 저장 공간을 확인해 주세요. <button onClick={() => exportSave(game)}>파일 내보내기</button></div>}
       <main className="main-content">
         {tab === "life" && <LifeView game={game} onAdvance={(days) => updateGame((current) => advanceDays(current, days))} onAction={(action, targetContactId) => updateGame((current) => takeDailyAction(current, action, targetContactId))} onChoice={(id) => updateGame((current) => chooseEvent(current, id))} onNextWeek={() => updateGame(startNextWeek)} onSelectPerson={setSelectedPerson} />}
-        {tab === "people" && <PeopleView game={game} onSelectPerson={setSelectedPerson} onSelectPlayer={() => setShowPlayerProfile(true)} onContactArchived={(id) => { updateGame((current) => contactArchivedNpc(current, id)); setTab("life"); }} />}
+        {tab === "people" && <PeopleView game={game} onSelectPerson={setSelectedPerson} onSelectPlayer={() => setShowPlayerProfile(true)} onContactArchived={(id) => { updateGame((current) => contactArchivedNpc(current, id)); changeTab("life"); }} onFavorite={(id) => updateGame((current) => ({ ...current, favoriteContactIds: (current.favoriteContactIds ?? []).includes(id) ? (current.favoriteContactIds ?? []).filter((item) => item !== id) : [...(current.favoriteContactIds ?? []), id] }))} />}
         {tab === "work" && <WorkView game={game} />}
         {tab === "goals" && <GoalsView game={game} onAdd={(id) => updateGame((current) => addPlayerGoal(current, id))} onStatus={(id, status) => updateGame((current) => setPlayerGoalStatus(current, id, status))} />}
         {tab === "record" && <RecordView game={game} />}
@@ -252,7 +259,7 @@ function App() {
         {([
           ["life", "⌂", "생활"], ["people", "♡", "인물"], ["work", "▣", "일·경제"], ["goals", "✳", "목표"], ["record", "≡", "기록"],
         ] as [Tab, string, string][]).map(([key, icon, label]) => (
-          <button key={key} className={tab === key ? "nav-item active" : "nav-item"} onClick={() => setTab(key)} aria-current={tab === key ? "page" : undefined}>
+          <button key={key} className={tab === key ? "nav-item active" : "nav-item"} onClick={() => changeTab(key)} aria-current={tab === key ? "page" : undefined}>
             <span className="nav-icon">{icon}</span><span>{label}</span>
           </button>
         ))}
@@ -260,7 +267,7 @@ function App() {
       {showSettings && <Settings game={game} onClose={() => setShowSettings(false)} onPalette={setPalette}
         onUpdate={(patch) => updateGame((current) => ({ ...current, settings: { ...current.settings, ...patch } }))}
         onExport={() => exportSave(game)} onImport={handleImport} importMessage={importMessage} />}
-      {selectedPerson && <PersonDetails person={game.contacts.find((person) => person.id === selectedPerson.id) ?? selectedPerson} onClose={() => setSelectedPerson(null)} />}
+      {selectedPerson && <PersonDetails person={game.contacts.find((person) => person.id === selectedPerson.id) ?? selectedPerson} records={game.relationshipRecords ?? []} onClose={() => setSelectedPerson(null)} />}
       {showPlayerProfile && <PlayerDetails character={game.character} onClose={() => setShowPlayerProfile(false)} />}
     </div>
   );
@@ -348,6 +355,9 @@ function LifeView({ game, onAdvance, onAction, onChoice, onNextWeek, onSelectPer
         <StatCard label="소지금" value={formatMoney(game.stats.money)} detail="현재 보유 자금" tone="blue" />
         <StatCard label="건강 상태" value={energyLabel} detail={`컨디션 ${game.stats.energy}%`} tone="rose" />
         <StatCard label="오늘 일정" value={scheduleLabel} detail={`${game.day}일째 · ${game.phase === "playing" ? "하루 진행 가능" : "확인 필요"}`} tone="violet" />
+        <StatCard label="일·진로" value={getPlayerAffiliation(game.character)} detail={backgroundLabels[game.character.background]} tone="blue" />
+        <StatCard label="가까운 관계" value={`${averageWarmth(game.contacts) ?? 0}점`} detail={`주요 인물 ${game.contacts.length}명`} tone="rose" />
+        <StatCard label="진행 목표" value={`${(game.playerGoals ?? []).filter((goal) => goal.status === "active").length}개`} detail={(game.playerGoals ?? []).find((goal) => goal.status === "active")?.title ?? "새 목표를 정해 보세요"} tone="violet" />
       </section>
       {game.phase === "event" && game.pendingEvent && <EventPanel event={game.pendingEvent} onChoice={onChoice} />}
       {game.phase === "summary" && <section className="panel summary-panel"><div className="section-kicker">WEEKLY REVIEW</div><h2>이번 주를 돌아봤어요</h2><p>선택과 일정이 생활에 남았어요. 결과는 한 번의 성공이나 실패로 단정되지 않고 다음 주로 이어집니다.</p>{notableNpc && <p className="npc-weekly-note"><strong>{notableNpc.name}의 한 주</strong> · {notableNpc.lastAutonomousAction ?? notableNpc.note} 지금은 “{notableNpc.goal ?? "자기만의 방향 찾기"}” 목표를 {notableNpc.goalStage ?? "살펴보는 중"}이고, {notableNpc.mood ?? "평소와 같은 상태"}예요.</p>}{game.weeklyCashflow?.week === game.week && <div className="weekly-cashflow-summary"><strong>이번 주 생활비 정산</strong><span>수입 +{formatMoney(game.weeklyCashflow.income)} · 지출 −{formatMoney(game.weeklyCashflow.expenses)} · 잔액 {formatMoney(game.weeklyCashflow.endingBalance)}</span>{game.weeklyCashflow.unpaidExpenses > 0 && <small>미납 {formatMoney(game.weeklyCashflow.unpaidExpenses)} · 스트레스가 증가했어요.</small>}</div>}{(game.playerGoals ?? []).some((goal) => goal.status === "active" || goal.lastProgressWeek === game.week) && <section className="weekly-goal-checkin"><strong>4주 목표 · 이번 주 체크인</strong>{(game.playerGoals ?? []).filter((goal) => goal.status === "active" || goal.lastProgressWeek === game.week).map((goal) => <div className="weekly-goal-row" key={goal.id}><span>{goal.title}<small>{Math.min(4, Math.max(1, game.week - goal.createdWeek + 1))}/4주 · 이번 주 {goal.weeklyProgress ?? 0}/2 · 누적 {goal.progress}/{goal.target}</small></span>{goal.status === "completed" && <b>완료</b>}</div>)}</section>}<div className="summary-chips"><span>에너지 {game.stats.energy}%</span><span>기분 {game.stats.mood}%</span><span>관계 {averageWarmth(game.contacts) ?? "—"} 평균</span></div><button className="primary-button" onClick={onNextWeek}>다음 주 시작 <span>→</span></button></section>}
@@ -362,7 +372,7 @@ function LifeView({ game, onAdvance, onAction, onChoice, onNextWeek, onSelectPer
           ] as [DailyAction, string, string][]).map(([action, title, detail]) => <div className="daily-action-wrap" key={action}><button className="daily-action" disabled={actionUsed || (action === "earn" && earnLimitReached)} onClick={() => { setShowResult(false); onAction(action, action === "social" ? socialTargetId : undefined); }}><strong>{title}</strong><small>{actionUsed ? "오늘 행동을 이미 선택했어요" : action === "earn" && earnLimitReached ? "이번 주 단기 근무 한도를 채웠어요" : detail}</small></button>{action === "social" && <label className="social-target-field"><span>함께 보낼 사람</span><select aria-label="함께 시간을 보낼 사람" value={socialTargetId} disabled={actionUsed} onChange={(event) => setSocialTargetId(event.target.value)}>{game.contacts.map((person) => <option key={person.id} value={person.id}>{person.name} · {person.role}</option>)}</select></label>}</div>)}</div><div className="advance-options"><span className="fast-forward-label">그냥 진행</span>{([1, 3, 7] as const).map((days) => <button className="advance-button secondary-advance" key={days} onClick={() => { setShowResult(false); onAdvance(days); }}><span>{days === 1 ? "하루" : `${days}일`}</span><span className="arrow">→</span></button>)}</div></div>
         </section>
       )}
-      {showResult && game.lastChoice && <div className="toast-result"><span className="toast-check">✓</span><span>{game.lastChoice}</span><button onClick={() => setShowResult(false)} aria-label="닫기">×</button></div>}
+      {showResult && game.lastChoice && <section className="choice-result" aria-live="polite"><div className="section-heading"><h2>선택 결과</h2><button onClick={() => setShowResult(false)} aria-label="결과 닫기">×</button></div><p>{game.lastChoice}</p><strong>달라진 점</strong><p>{effectSummary(game.lastChoiceEffect)}</p><small>다음 일정 · {game.phase === "summary" ? "이번 주 정산 확인" : "생활에서 다음 행동 선택"}</small></section>}
       {featured && <section className="feed-section"><div className="section-heading"><div><span className="section-kicker">PEOPLE AROUND YOU</span><h2>이번 생활의 인물</h2></div><span className="quiet-label">누르면 상세 정보</span></div><button className="featured-person" onClick={() => onSelectPerson(featured)}><CharacterAvatar name={featured.name} portraitId={featured.portraitId} className="featured-portrait" /><span className="featured-copy"><strong>{featured.name} · {featured.role}</strong><span>{featured.note}</span><small>관계 온도 {featured.warmth} · 자세히 보기</small></span><span className="featured-arrow">›</span></button><div className="recent-log"><div className="section-heading"><h2>최근 이야기</h2><span className="quiet-label">이번 생의 흐름</span></div>{game.log.slice(0, 2).map((line, i) => <div className="feed-item" key={`${line}-${i}`}><span className={i === 0 ? "feed-marker current" : "feed-marker"} /><p>{line}</p><span className="feed-time">{i === 0 ? "방금" : "이전"}</span></div>)}</div></section>}
     </>
   );
@@ -382,25 +392,52 @@ function StatCard({ label, value, detail, tone }: { label: string; value: string
   return <div className={`stat-card ${tone}`}><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>;
 }
 function formatMoney(amount: number): string { return new Intl.NumberFormat("ko-KR").format(amount) + "원"; }
+function effectSummary(effect: GameState["lastChoiceEffect"]): string {
+  if (!effect) return "선택의 결과가 기록에 남았어요.";
+  const labels: [keyof typeof effect, string][] = [["money", "자금"], ["relationship", "관계"], ["energy", "에너지"], ["stress", "스트레스"], ["mood", "기분"], ["focus", "집중"]];
+  return labels.filter(([key]) => effect[key]).map(([key, label]) => `${label} ${Number(effect[key]) > 0 ? "+" : ""}${key === "money" ? formatMoney(Number(effect[key])) : effect[key]}`).join(" · ") || "현재 상태를 유지했어요.";
+}
 function averageWarmth(contacts: Contact[]): number | null {
   return contacts.length ? Math.round(contacts.reduce((sum, person) => sum + person.warmth, 0) / contacts.length) : null;
 }
 function EventPanel({ event, onChoice }: { event: NonNullable<GameState["pendingEvent"]>; onChoice: (id: string) => void }) {
   return <section className="event-panel"><div className="event-icon">✦</div><div className="event-content"><span className="section-kicker">{event.eyebrow}</span><h2>{event.title}</h2><p>{event.body}</p>{event.npcDialogue && <blockquote className="npc-dialogue"><strong>{event.npcDialogue.speakerName}</strong><span>“{event.npcDialogue.line}”</span></blockquote>}<div className="choice-list">{event.choices.map((choice, index) => <button className="choice-button" key={choice.id} onClick={() => onChoice(choice.id)}><span className="choice-number">0{index + 1}</span><span className="choice-main"><strong>{choice.title}</strong><small>{choice.detail}</small></span><span className="choice-arrow">→</span></button>)}</div><p className="microcopy">시제품 규칙으로 계산한 결과예요. 현실 통계 기반 확률은 자료를 연결하며 보강합니다.</p></div></section>;
 }
-function PeopleView({ game, onSelectPerson, onSelectPlayer, onContactArchived }: { game: GameState; onSelectPerson: (person: Contact) => void; onSelectPlayer: () => void; onContactArchived: (id: string) => void }) {
-  const average = averageWarmth(game.contacts);
-  const player = game.character;
+function PeopleView({ game, onSelectPerson, onSelectPlayer, onContactArchived, onFavorite }: { game: GameState; onSelectPerson: (person: Contact) => void; onSelectPlayer: () => void; onContactArchived: (id: string) => void; onFavorite: (id: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<"warmth" | "name" | "recent">("warmth");
+  const favorites = new Set(game.favoriteContactIds ?? []);
+  const visible = game.contacts.filter((person) => `${person.name} ${person.role} ${person.occupation ?? ""}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
+    .sort((a, b) => Number(favorites.has(b.id)) - Number(favorites.has(a.id)) ||
+      (sort === "name" ? a.name.localeCompare(b.name, "ko") : sort === "recent" ? (b.lastInteractionWeek ?? 0) - (a.lastInteractionWeek ?? 0) : b.warmth - a.warmth));
   const activePeople = new Map(game.contacts.map((person) => [person.id, person]));
-  const visibleLinks = (game.npcRelationships ?? []).filter((link) => activePeople.has(link.contactAId) && activePeople.has(link.contactBId)).sort((a, b) => b.warmth - a.warmth).slice(0, 6);
-  const linkNames = (link: NonNullable<GameState["npcRelationships"]>[number]) => `${activePeople.get(link.contactAId)?.name} · ${activePeople.get(link.contactBId)?.name}`;
-  return <><PageTitle kicker="PEOPLE & RELATIONSHIPS" title="내 주변 사람들" subtitle="주인공과 주변 사람의 프로필을 누르면 자세한 정보를 볼 수 있어요." /><button className="player-profile-card" onClick={onSelectPlayer}><CharacterAvatar name={player.name} portraitId={player.portraitId} className="player-profile-avatar" /><span className="player-profile-copy"><small>주인공 프로필</small><strong>{player.name}</strong><span>{player.gender} · {player.age}세 · {player.heightCm}cm · {player.weightKg}kg</span><span>{getPlayerAffiliation(player)}</span></span><b aria-hidden="true">›</b></button><div className="relationship-overview"><span className="overview-icon">♡</span><div><small>주요 인맥 {game.contacts.length}명</small><strong>관계 온도 평균 {average ?? "—"}</strong></div></div><section className="npc-network panel"><div className="section-heading"><div><span className="section-kicker">PEOPLE AROUND PEOPLE</span><h2>주변 사람들끼리의 관계</h2></div><small>매주 각자의 만남과 대화에 따라 달라져요</small></div>{visibleLinks.length ? <div className="npc-network-list">{visibleLinks.map((link) => <div className="npc-network-row" key={link.id}><span className="npc-network-names">{linkNames(link)}</span><span className="npc-network-kind">{link.romanceStatus === "dating" ? "연인" : link.kind === "family" ? "가족" : link.kind === "friend" ? "친구" : link.kind === "work" ? "일·모임" : "지인"}</span><span className="warmth-meter"><span style={{ width: `${link.warmth}%` }} /></span><small>{link.romanceStatus === "dating" ? "서로 알아가는 중" : link.warmth >= 70 ? "가까운 사이" : link.warmth >= 40 ? "알아가는 중" : "서먹한 사이"}</small></div>)}</div> : <p className="muted-copy">아직 서로 아는 사람이 많지 않아요. 새로운 만남이 쌓이면 관계도 생겨나요.</p>}</section><div className="people-grid">{game.contacts.map((person) => <button className="person-card" key={person.id} onClick={() => onSelectPerson(person)} aria-label={`${person.name} 상세 정보 열기`}><CharacterAvatar name={person.name} portraitId={person.portraitId} className="person-avatar" /><span className="person-info"><strong>{person.name}</strong><span>{person.role}</span><small className="person-demographics">{person.gender ?? "성별 미상"} · {person.age ?? "나이 미상"}세 · {person.heightCm ?? "—"}cm · {person.weightKg ?? "—"}kg</small><small className="person-affiliation">소속 · {person.affiliation ?? getContactAffiliation(person.role, player.background)}</small></span><span className="warmth-meter"><span style={{ width: `${person.warmth}%` }} /></span><span className="person-open-hint">상세 보기 <b>›</b></span></button>)}</div>{(game.archivedContacts?.length ?? 0) > 0 && <section className="panel muted-panel"><h2>한동안 만나지 못한 사람들</h2><p>지금은 연락이 뜸하지만, 함께한 이야기는 기록에 남아 있어요. 다시 마주칠 수도 있어요.</p><div className="archive-list">{[...game.archivedContacts!].reverse().map((person) => <div className="archive-row" key={person.id}><strong>{person.name}</strong><span>{person.role} · {person.gender} · {person.age}세 · {person.heightCm}cm · {person.weightKg}kg · {person.affiliation}</span><small>{person.memories?.find((memory) => memory.vividness >= 0.2)?.text ?? "함께 보낸 기억은 생애기록에 보관돼 있어요."}</small><button className="text-button" onClick={() => onContactArchived(person.id)}>먼저 안부 보내기</button></div>)}</div></section>}</>;
+  const links = (game.npcRelationships ?? []).filter((link) => activePeople.has(link.contactAId) && activePeople.has(link.contactBId))
+    .sort((a, b) => b.warmth - a.warmth).slice(0, 6);
+  return <>
+    <PageTitle kicker="PEOPLE & RELATIONSHIPS" title="내 주변 사람들" subtitle="관계와 지난 이야기를 살펴보세요." />
+    <button className="player-profile-card" onClick={onSelectPlayer}><CharacterAvatar name={game.character.name} portraitId={game.character.portraitId} className="player-profile-avatar" /><span className="player-profile-copy"><small>주인공 프로필</small><strong>{game.character.name}</strong><span>{game.character.age}세 · {getPlayerAffiliation(game.character)}</span></span><b aria-hidden="true">›</b></button>
+    <div className="people-toolbar"><label>인물 찾기<input type="search" value={query} placeholder="이름·관계·직업" onChange={(event) => setQuery(event.target.value)} /></label><label>정렬<select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}><option value="warmth">가까운 순</option><option value="recent">최근 만남</option><option value="name">이름순</option></select></label></div>
+    <p className="people-count">{visible.length}명 · 즐겨찾기 {favorites.size}명</p>
+    <div className="people-grid">{visible.map((person) => <div className="person-card-wrap" key={person.id}><button className="person-card" onClick={() => onSelectPerson(person)} aria-label={`${person.name} 상세 정보 열기`}><CharacterAvatar name={person.name} portraitId={person.portraitId} className="person-avatar" /><span className="person-info"><strong>{person.name}</strong><span>{person.role} · {person.occupation ?? "근황 미상"}</span><small>{person.age ?? "—"}세 · {person.heightCm ?? "—"}cm · {person.weightKg ?? "—"}kg</small></span><span className="warmth-meter"><span style={{ width: `${person.warmth}%` }} /></span><span className="person-open-hint">관계 온도 {person.warmth} · 상세 보기 ›</span></button><button className="favorite-button" onClick={() => onFavorite(person.id)} aria-label={`${person.name} ${favorites.has(person.id) ? "즐겨찾기 해제" : "즐겨찾기"}`} aria-pressed={favorites.has(person.id)}>{favorites.has(person.id) ? "★" : "☆"}</button></div>)}</div>
+    {visible.length === 0 && <p className="muted-copy">검색에 맞는 인물이 없어요.</p>}
+    <section className="npc-network panel"><div className="section-heading"><h2>주변 사람들끼리의 관계</h2></div>{links.length ? <div className="npc-network-list">{links.map((link) => <div className="npc-network-row" key={link.id}><span>{activePeople.get(link.contactAId)?.name} · {activePeople.get(link.contactBId)?.name}</span><strong>{link.romanceStatus === "dating" ? "연인" : link.kind === "friend" ? "친구" : link.kind === "family" ? "가족" : "지인"}</strong><span className="warmth-meter"><span style={{ width: `${link.warmth}%` }} /></span></div>)}</div> : <p>아직 이어진 인물 관계가 없어요.</p>}</section>
+    {(game.archivedContacts?.length ?? 0) > 0 && <section className="panel muted-panel"><h2>한동안 만나지 못한 사람들</h2><div className="archive-list">{[...(game.archivedContacts ?? [])].reverse().map((person) => <div className="archive-row" key={person.id}><strong>{person.name}</strong><span>{person.role} · {person.age}세</span><small>{person.memories?.[0]?.text ?? "함께 보낸 기억이 남아 있어요."}</small><button className="text-button" onClick={() => onContactArchived(person.id)}>먼저 안부 보내기</button></div>)}</div></section>}
+  </>;
 }
-function closenessLabel(warmth: number) { return warmth >= 75 ? "가까운 사이" : warmth >= 50 ? "알아가는 중" : warmth >= 25 ? "가벼운 인맥" : "아직 서먹함"; }
-function PersonDetails({ person, onClose }: { person: Contact; onClose: () => void }) {
-  return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="person-details-modal" role="dialog" aria-modal="true" aria-labelledby="person-details-title" onClick={(event) => event.stopPropagation()}><div className="person-detail-cover"><button className="icon-button person-detail-close" aria-label="상세 정보 닫기" onClick={onClose}>×</button><CharacterAvatar name={person.name} portraitId={person.portraitId} className="detail-portrait" /></div><div className="person-detail-body"><span className="section-kicker">RELATIONSHIP PROFILE</span><h2 id="person-details-title">{person.name}</h2><p className="person-detail-role">{person.role} · {person.gender ?? "성별 미상"}</p><div className="profile-facts"><div><small>나이</small><strong>{person.age ?? "미상"}세</strong></div><div><small>키 · 몸무게</small><strong>{person.heightCm ?? "미상"}cm · {person.weightKg ?? "미상"}kg</strong></div><div><small>소속</small><strong>{person.affiliation ?? "소속 정보 없음"}</strong></div><div><small>직업</small><strong>{person.occupation ?? "정보 없음"}</strong></div><div><small>성격</small><strong>{person.personality ?? "조금씩 알아가는 중"}</strong></div><div><small>요즘 목표</small><strong>{person.goal ?? "아직 알 수 없음"}</strong></div><div><small>목표 진행</small><strong>{person.goalStage ?? "진행 전"}</strong></div><div><small>요즘 상태</small><strong>{person.mood ?? "평소와 같음"}</strong></div></div><div className="relationship-score"><div><span>관계 온도</span><strong>{person.warmth}<small>/100</small></strong></div><b>{closenessLabel(person.warmth)}</b></div><div className="warmth-meter detail-meter"><span style={{ width: `${person.warmth}%` }} /></div><section className="memory-card"><span className="section-kicker">최근 기억</span><p>{person.memories?.[0]?.text ?? person.note}</p>{person.memories?.[0] && <small>기억 선명도 {Math.round(person.memories[0].vividness * 100)}% · {person.memories[0].week}주차</small>}<p className="memory-action">{person.lastAutonomousAction ?? "아직 최근 행동 기록이 없어요."}</p></section><p className="person-detail-footnote">인물의 성격과 목표는 관계와 사건을 거치며 더 구체적으로 드러나요.</p><button className="primary-button full" onClick={onClose}>확인</button></div></section></div>;
+function PersonDetails({ person, records, onClose }: { person: Contact; records: NonNullable<GameState["relationshipRecords"]>; onClose: () => void }) {
+  const history = [
+    ...records.filter((record) => record.contactId === person.id).map((record) => ({ id: record.id, week: record.week, text: record.text })),
+    ...(person.memories ?? []).map((memory) => ({ id: memory.id, week: memory.week, text: memory.text })),
+  ].sort((a, b) => b.week - a.week).slice(0, 12);
+  return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="person-details-modal" role="dialog" aria-modal="true" aria-labelledby="person-details-title" onClick={(event) => event.stopPropagation()}>
+    <div className="person-detail-cover"><button className="icon-button person-detail-close" aria-label="상세 정보 닫기" onClick={onClose}>×</button><CharacterAvatar name={person.name} portraitId={person.portraitId} className="detail-portrait" /></div>
+    <div className="person-detail-body"><span className="section-kicker">RELATIONSHIP PROFILE</span><h2 id="person-details-title">{person.name}</h2><p className="person-detail-role">{person.role} · {person.gender ?? "성별 미상"}</p>
+      <div className="profile-facts"><div><small>나이</small><strong>{person.age ?? "미상"}세</strong></div><div><small>키 · 몸무게</small><strong>{person.heightCm ?? "미상"}cm · {person.weightKg ?? "미상"}kg</strong></div><div><small>직업</small><strong>{person.occupation ?? "정보 없음"}</strong></div><div><small>요즘 목표</small><strong>{person.goal ?? "아직 알 수 없음"}</strong></div><div><small>상태</small><strong>{person.mood ?? "평소와 같음"}</strong></div></div>
+      <div className="relationship-score"><span>관계 온도</span><strong>{person.warmth}<small>/100</small></strong></div><div className="warmth-meter detail-meter"><span style={{ width: `${person.warmth}%` }} /></div>
+      <section className="relationship-timeline"><h3>함께한 이야기</h3>{history.length ? history.map((entry) => <div key={entry.id}><small>{entry.week}주차</small><p>{entry.text}</p></div>) : <p>아직 함께한 기록이 없어요.</p>}</section>
+      <button className="primary-button full" onClick={onClose}>확인</button>
+    </div></section></div>;
 }
-
 function PlayerDetails({ character, onClose }: { character: Character; onClose: () => void }) {
   return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="person-details-modal" role="dialog" aria-modal="true" aria-labelledby="player-details-title" onClick={(event) => event.stopPropagation()}><div className="person-detail-cover"><button className="icon-button person-detail-close" aria-label="주인공 정보 닫기" onClick={onClose}>×</button><CharacterAvatar name={character.name} portraitId={character.portraitId} className="detail-portrait" /></div><div className="person-detail-body"><span className="section-kicker">PLAYER PROFILE</span><h2 id="player-details-title">{character.name}</h2><p className="person-detail-role">주인공 · {character.gender} · {character.age}세</p><div className="profile-facts"><div><small>키 · 몸무게</small><strong>{character.heightCm ?? "미설정"}cm · {character.weightKg ?? "미설정"}kg</strong></div><div><small>소속</small><strong>{getPlayerAffiliation(character)}</strong></div><div><small>배경</small><strong>{backgroundLabels[character.background]}</strong></div><div><small>지역</small><strong>{character.region}</strong></div><div><small>주거 형태</small><strong>{character.housing}</strong></div><div><small>학력</small><strong>{character.education ?? "정보 미입력"}</strong></div><div><small>가족·동거</small><strong>{character.family ?? "정보 미입력"}</strong></div><div><small>시작 연도</small><strong>{character.year}년</strong></div></div><p className="person-detail-footnote">소속·키·몸무게는 새 생활을 만들 때 설정할 수 있고, 비워두면 게임이 추천값을 채워요.</p><button className="primary-button full" onClick={onClose}>확인</button></div></section></div>;
 }
