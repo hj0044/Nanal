@@ -1,0 +1,41 @@
+{
+  "name": "appearance_submit_variant",
+  "title": "Nanal Existing Character Image",
+  "description": "Submit one REAL current-chat PNG or transparent WebP for an already-approved adult fictional Nanal AP ID. The server verifies the official locked profile and reference, stores a private review-pending candidate, and never auto-approves. Do not invent a file reference. This descriptor must be installed in the actual official Nanal MCP server; storing it in GitHub does not register it.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "appearanceId": {"type":"string","pattern":"^AP[0-9]{3,5}$"},
+      "kind": {"type":"string","enum":["portrait","fullbody"]},
+      "index": {"type":"integer","minimum":2,"maximum":999},
+      "referenceAnchorSha256": {"type":"string","pattern":"^[a-fA-F0-9]{64}$"},
+      "file": {
+        "type":"object",
+        "properties":{
+          "download_url":{"type":"string","format":"uri"},
+          "file_id":{"type":"string"},
+          "mime_type":{"type":"string"},
+          "file_name":{"type":"string"}
+        },
+        "required":["download_url","file_id"],
+        "additionalProperties":false
+      }
+    },
+    "required":["appearanceId","kind","index","referenceAnchorSha256","file"],
+    "additionalProperties":false
+  },
+  "outputSchema":{
+    "type":"object",
+    "properties":{
+      "appearanceId":{"type":"string"},
+      "assetId":{"type":"string"},
+      "status":{"type":"string","enum":["awaiting_review"]},
+      "source":{"type":"string"},
+      "duplicate":{"type":"boolean"},
+      "fileSha256":{"type":"string"}
+    },
+    "required":["appearanceId","assetId","status","source"]
+  },
+  "annotations":{"readOnlyHint":false,"openWorldHint":false,"destructiveHint":false},
+  "_meta":{"openai/fileParams":["file"]}
+}
