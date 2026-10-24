@@ -39,10 +39,10 @@ test("pixel-level alpha QA rejects fully opaque images",async()=>{
  await assert.rejects(()=>preflightPng(opaque,"portrait"),/Transparent background/);
  const background=await sharp({create:{width:1024,height:1024,channels:4,
    background:{r:0,g:0,b:0,alpha:0}}}).png().toBuffer();
- await assert.rejects(()=>preflightPng(background,"portrait"),/opaque figure/);
+ await assert.rejects(()=>preflightPng(background,"portrait"),/Opaque character foreground/);
  const sample=await sharp({create:{width:1024,height:1024,channels:4,
    background:{r:0,g:0,b:0,alpha:0}}}).composite([{
-     input:{create:{width:10,height:10,channels:4,background:{r:255,g:255,b:255,alpha:1}}},
+     input:{create:{width:200,height:200,channels:4,background:{r:255,g:255,b:255,alpha:1}}},
      left:300,top:300}]).png().toBuffer();
  const info=await preflightPng(sample,"portrait");
  assert.equal(info.width,1024);
