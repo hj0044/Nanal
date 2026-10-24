@@ -63,12 +63,12 @@ test("wrong anchor, missing canonical record, invalid image and fake request key
   await assert.rejects(()=>submitExistingOfficialVariant({...base,requestKey:"guess"},db.backend),/request_key/);
   await assert.rejects(()=>submitExistingOfficialVariant(base,{...db.backend,getApprovedCanonical:async()=>null}),/identity_missing/);
   const wrong=await makeImage("fullbody");
-  await assert.rejects(()=>submitExistingOfficialVariant({...base,pngBytes:wrong},db.backend),/canonical_dimensions/);
+  await assert.rejects(()=>submitExistingOfficialVariant({...base,pngBytes:wrong},db.backend),/canonical dimensions/);
   assert.equal(db.getWrites(),0);
 });
 test("production host must provide storage/db adapter; no false success on incomplete backend acknowledgement",async()=>{
   const master=await makeImage();
-  const base={appearanceId:"AP008",kind:"portrait",index:2,pngBase64:master.toString("base64"),
+  const base={appearanceId:"AP008",kind:"portrait",index:2,pngBase64:(await makeImage("portrait",{r:90,g:90,b:90})).toString("base64"),
     referenceAnchorSha256:digest(master)};
   await assert.rejects(()=>submitExistingOfficialVariant(base,{}),/adapter_missing/);
   const db=mockBackend(master,{createPendingVariantAtomic:async()=>({status:"not_saved"})});
@@ -78,7 +78,7 @@ test("same content different request key is rejected and corrupted base64 is ref
   const master=await makeImage();
   const db=mockBackend(master);
   const base={appearanceId:"AP008",kind:"portrait",index:2,
-    referenceAnchorSha256:digest(master),pngBase64:master.toString("base64")};
+    referenceAnchorSha256:digest(master),pngBase64:(await makeImage("portrait",{r:70,g:170,b:70})).toString("base64")};
   const r=await submitExistingOfficialVariant(base,db.backend);assert.equal(r.status,"awaiting_review");
   await assert.rejects(()=>submitExistingOfficialVariant({...base,requestKey:"AP008:portrait:bogus"},db.backend),/request_key/);
   assert.throws(()=>decodePngBase64("not*base64"),/invalid_source_base64/);
