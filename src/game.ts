@@ -1,4 +1,5 @@
 import { withKoreanParticle } from "./korean";
+import { calendarWeekIncludes, careerTransition, debtAction, initialEconomy, monthKey, type Economy, type Transaction } from "./economy";
 
 export type Background = "student" | "jobseeker" | "worker";
 export type Palette = "clean" | "warm" | "dark";
@@ -172,7 +173,8 @@ export interface LifeEvent {
   choices: EventChoice[];
 }
 export interface GameState {
-  version: 2;
+  version: 3;
+  economy?: Economy;
   character: Character;
   week: number;
   day: number;
@@ -405,7 +407,7 @@ export function createGame(character: Character, seed = createSeed(`${character.
   const player = { ...character, ...body, weightKg: character.weightKg ?? body.weightKg, affiliation: getPlayerAffiliation(character), portraitId: getPortrait(character.portraitId)?.id ?? choosePortraitId(character.gender, character.age, seed) };
   const contacts = generateContacts(character.background, seed, character.age, player.portraitId ? [player.portraitId] : []).map((person) => ({ ...person, firstMetWeek: 1, lastInteractionWeek: 1, returnCount: 0 }));
   return {
-    version: 2, character: player, week: 1, day: 1, phase: "playing", seed,
+    version: 3, character: player, week: 1, day: 1, phase: "playing", seed, economy: initialEconomy(character),
     evaluatedDays: [], seenEvents: [], npcStoryStages: {}, npcStoryLastWeek: {}, npcStoryChoices: {},
     playerGoals: [],
     stats: { money, energy: 72, stress: 24, mood: 61, focus: 52 },
@@ -435,19 +437,42 @@ export function getWeeklyCashflowPlan(character: Character): WeeklyCashflowPlan 
 function settleWeeklyCashflow(state: GameState): GameState {
   if (state.weeklyCashflow?.week === state.week) return state;
   const plan = getWeeklyCashflowPlan(state.character);
-  const available = state.stats.money + plan.income;
+  const economy = state.economy;
+  const active = Boolean(economy && monthKey(new Date(state.character.year, 0, (state.week - 1) * 7 + 7)) >= economy.activationMonth);
+  const salaryDate = active ? calendarWeekIncludes(state.character, state.week, 25) : undefined;
+  const rentDate = active ? calendarWeekIncludes(state.character, state.week, 1) : undefined;
+  const salaryId = salaryDate ? `salary:${monthKey(salaryDate)}` : "";
+  const rentId = rentDate ? `housing:${monthKey(rentDate)}` : "";
+  const debtId = rentDate ? `debt:${monthKey(rentDate)}` : "";
+  const had = (id: string) => Boolean(id && economy?.transactions.some((entry) => entry.id === id));
+  const salary = salaryDate && !had(salaryId) && economy?.employment.status === "employed" ? economy.employment.monthlySalary : 0;
+  const support = active ? economy?.employment.status === "student" ? 220_000 : economy?.employment.status === "seeking" ? 180_000 : 0
+    : economy && (economy.employment.status === "unemployed" || (economy.employment.status === "employed" && state.character.background !== "worker")) ? 0 : plan.income;
+  const housing = active ? rentDate && !had(rentId) ? plan.housingExpenses * 4 : 0 : plan.housingExpenses;
+  const available = state.stats.money + support + salary;
   const openingUnpaidExpenses = state.weeklyCashflow?.unpaidExpenses ?? 0;
-  const due = plan.expenses + openingUnpaidExpenses;
+  const debtPayment = active && rentDate && !had(debtId) && economy
+    ? Math.min(economy.debt, economy.monthlyDebtPayment, Math.max(0, available - plan.livingExpenses - housing - openingUnpaidExpenses)) : 0;
+  const expenses = plan.livingExpenses + housing + debtPayment;
+  const due = expenses + openingUnpaidExpenses;
   const unpaidExpenses = Math.max(0, due - available);
   const endingBalance = Math.max(0, available - due);
+  const additions: Transaction[] = active ? [
+    { id: `living:${state.week}`, week: state.week, category: "living" as const, amount: -plan.livingExpenses, label: "생활비" },
+    ...(support ? [{ id: `support:${state.week}`, week: state.week, category: "support" as const, amount: support, label: "생활 지원·단기 수입" }] : []),
+    ...(salary ? [{ id: salaryId, week: state.week, category: "salary" as const, amount: salary, label: "월급" }] : []),
+    ...(housing ? [{ id: rentId, week: state.week, category: "housing" as const, amount: -housing, label: "주거비" }] : []),
+    ...(debtPayment ? [{ id: debtId, week: state.week, category: "debt" as const, amount: -debtPayment, label: "부채 상환" }] : []),
+  ].filter((entry) => !had(entry.id)) : [];
   const cashflow: WeeklyCashflow = {
-    week: state.week, income: plan.income + (state.weeklyEarnedIncome ?? 0), expenses: plan.expenses, openingUnpaidExpenses, unpaidExpenses, endingBalance,
+    week: state.week, income: support + salary + (state.weeklyEarnedIncome ?? 0), expenses, openingUnpaidExpenses, unpaidExpenses, endingBalance,
   };
   const line = unpaidExpenses > 0
-    ? `${state.week}주차 정산 · 수입 +${plan.income.toLocaleString("ko-KR")}원 / 지출 ${plan.expenses.toLocaleString("ko-KR")}원 · 미납 ${unpaidExpenses.toLocaleString("ko-KR")}원`
-    : `${state.week}주차 정산 · 수입 +${plan.income.toLocaleString("ko-KR")}원 / 지출 -${plan.expenses.toLocaleString("ko-KR")}원`;
+    ? `${state.week}주차 정산 · 수입 +${(support + salary).toLocaleString("ko-KR")}원 / 지출 ${expenses.toLocaleString("ko-KR")}원 · 미납 ${unpaidExpenses.toLocaleString("ko-KR")}원`
+    : `${state.week}주차 정산 · 수입 +${(support + salary).toLocaleString("ko-KR")}원 / 지출 -${expenses.toLocaleString("ko-KR")}원`;
   return {
     ...state, weeklyCashflow: cashflow,
+    economy: economy ? { ...economy, debt: economy.debt - debtPayment, transactions: [...economy.transactions, ...additions] } : undefined,
     stats: { ...state.stats, money: endingBalance, stress: clamp(state.stats.stress + (unpaidExpenses > 0 ? 5 : 0)) },
     log: [line, ...state.log],
   };
@@ -744,6 +769,7 @@ function nextEligibleEvent(state: GameState): [LifeEvent | undefined, number] {
 export function advanceDay(state: GameState): GameState {
   if (state.phase !== "playing") return state;
   let next = { ...state, evaluatedDays: [...state.evaluatedDays], seenEvents: [...state.seenEvents], log: [...state.log] };
+  if (state.economy?.employment.status === "employed") next.stats = { ...state.stats, energy: clamp(state.stats.energy - 1), stress: clamp(state.stats.stress + 1) };
   if (!next.evaluatedDays.includes(next.day)) {
     next.evaluatedDays.push(next.day);
     const [event, nextSeed] = nextEligibleEvent(next);
@@ -788,7 +814,7 @@ export function takeDailyAction(state: GameState, action: DailyAction, targetCon
   const actionDay = `${state.week}-${state.day}`;
   if ((state.actionDays ?? []).includes(actionDay)) return state;
   if (action === "earn" && ((state.weeklyActions ?? {}).earn ?? 0) >= WEEKLY_EARN_ACTION_LIMIT) return state;
-  const focusLabel = state.character.background === "worker" ? "업무에 집중했다" : state.character.background === "jobseeker" ? "구직 준비에 집중했다" : "공부에 집중했다";
+  const focusLabel = state.economy?.employment.status === "employed" ? "업무에 집중했다" : state.character.background === "student" && state.economy?.employment.status === "student" ? "공부에 집중했다" : "구직 준비에 집중했다";
   const actionEffects: Record<DailyAction, { log: string; effect: Effect; contactIndex?: number }> = {
     focus: { log: focusLabel, effect: { focus: 5, energy: -5, stress: 2 } },
     rest: { log: "일정을 비우고 제대로 쉬었다", effect: { energy: 10, stress: -5, mood: 2 } },
@@ -818,6 +844,7 @@ export function takeDailyAction(state: GameState, action: DailyAction, targetCon
     actionDays: [...(state.actionDays ?? []), actionDay],
     weeklyActions: { ...(state.weeklyActions ?? {}), [action]: ((state.weeklyActions ?? {})[action] ?? 0) + 1 },
     weeklyEarnedIncome: (state.weeklyEarnedIncome ?? 0) + (action === "earn" ? selected.effect.money ?? 0 : 0),
+    economy: state.economy && action === "earn" ? { ...state.economy, transactions: [...state.economy.transactions, { id: `extra:${actionDay}`, week: state.week, category: "extra", amount: selected.effect.money ?? 0, label: selected.log }] } : state.economy,
     stats: {
       money: Math.max(0, state.stats.money + (selected.effect.money ?? 0)),
       energy: clamp(state.stats.energy + (selected.effect.energy ?? 0)),
@@ -830,7 +857,7 @@ export function takeDailyAction(state: GameState, action: DailyAction, targetCon
       : contact),
     log: [actionLog, ...state.log],
   };
-  const goalCategory: GoalCategory = action === "focus" ? (state.character.background === "student" ? "learning" : "career")
+  const goalCategory: GoalCategory = action === "focus" ? (state.economy?.employment.status === "student" ? "learning" : "career")
     : action === "rest" ? "health" : action === "social" ? "relationship" : "finance";
   return advanceDay(progressPlayerGoals(next, goalCategory, 1));
 }
@@ -863,6 +890,7 @@ export function chooseEvent(state: GameState, choiceId: string): GameState {
     pendingEvent: undefined,
     lastChoice: choice.result,
     lastChoiceEffect: effect,
+    economy: state.economy && effect.money ? { ...state.economy, transactions: [...state.economy.transactions, { id: `event:${state.week}:${state.pendingEvent.id}`, week: state.week, category: "event", amount: effect.money, label: state.pendingEvent.title }] } : state.economy,
     seenEvents: [...state.seenEvents, state.pendingEvent.id],
     recentEventIds: [...(state.recentEventIds ?? []), state.pendingEvent.id].slice(-8),
     eventLastSeenWeek: { ...(state.eventLastSeenWeek ?? {}), [state.pendingEvent.id]: state.week },
@@ -1115,12 +1143,13 @@ export function startNextWeek(state: GameState): GameState {
   const agedCharacter = yearTurn ? agePerson(state.character) : state.character;
   const agedContacts = yearTurn ? state.contacts.map(agePerson) : state.contacts;
   const agedArchived = yearTurn ? (state.archivedContacts ?? []).map(agePerson) : state.archivedContacts;
+  const economy = state.economy ? { ...state.economy, employment: { ...state.economy.employment, tenureWeeks: state.economy.employment.status === "employed" ? state.economy.employment.tenureWeeks + 1 : state.economy.employment.tenureWeeks } } : undefined;
   const notableAgeChanges = yearTurn ? [
     agedCharacter.portraitId !== state.character.portraitId ? `${state.character.name}의 모습이 세월에 따라 달라졌다.` : "",
     ...agedContacts.filter((person, index) => person.portraitId !== state.contacts[index]?.portraitId && (person.warmth ?? 0) >= 70).map((person) => `${person.name}의 인상이 세월에 따라 달라졌다.`),
   ].filter(Boolean) : [];
   return {
-    ...state, character: agedCharacter, contacts: agedContacts, archivedContacts: agedArchived, week, day: 1, phase: "playing",
+    ...state, character: agedCharacter, contacts: agedContacts, archivedContacts: agedArchived, economy, week, day: 1, phase: "playing",
     playerGoals,
     evaluatedDays: [], actionDays: [], weeklyActions: {}, weeklyEarnedIncome: 0, weeklyMeetingMomentum: 0, weeklyMeetingContext: undefined, seenEvents: [], lastChoice: undefined, lastChoiceEffect: undefined,
     stats: { ...state.stats, energy: clamp(state.stats.energy + 12), stress: clamp(state.stats.stress - 7) },
@@ -1130,4 +1159,5 @@ export function startNextWeek(state: GameState): GameState {
 export function setPalette(state: GameState, palette: Palette): GameState {
   return { ...state, settings: { ...state.settings, palette } };
 }
+export { careerTransition, debtAction };
 

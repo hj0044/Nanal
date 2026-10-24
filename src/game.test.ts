@@ -614,7 +614,7 @@ describe("first week simulation", () => {
     expect(workerPlan.net).toBeGreaterThan(0);
 
     const base = createGame(character, 501);
-    const atWeekEnd = { ...base, day: 7, evaluatedDays: [7], stats: { ...base.stats, money: 300_000 } };
+    const atWeekEnd = { ...base, economy: undefined, day: 7, evaluatedDays: [7], stats: { ...base.stats, money: 300_000 } };
     const summary = advanceDay(atWeekEnd);
     expect(summary.phase).toBe("summary");
     expect(summary.stats.money).toBe(300_000 + studentPlan.net);
@@ -624,7 +624,7 @@ describe("first week simulation", () => {
     expect(nextWeek.weeklyCashflow).toEqual(summary.weeklyCashflow);
 
     const brokeSeeker = createGame({ ...character, background: "jobseeker", housing: "자취" }, 502);
-    const shortfall = advanceDay({ ...brokeSeeker, day: 7, evaluatedDays: [7], stats: { ...brokeSeeker.stats, money: 0, stress: 20 } });
+    const shortfall = advanceDay({ ...brokeSeeker, economy: undefined, day: 7, evaluatedDays: [7], stats: { ...brokeSeeker.stats, money: 0, stress: 20 } });
     expect(shortfall.stats.money).toBe(0);
     expect(shortfall.weeklyCashflow?.unpaidExpenses).toBe(seekerPlan.expenses - seekerPlan.income);
     expect(shortfall.stats.stress).toBe(25);

@@ -1,4 +1,5 @@
 import type { GameState } from "./game";
+import { migrateEconomy } from "./economy";
 
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
@@ -7,7 +8,7 @@ const stringList = (value: unknown): value is string[] => Array.isArray(value) &
 
 /** Retain the original payload on failure; callers can export it before any replacement. */
 export function parseSave(input: unknown): GameState {
-  if (!object(input) || (input.version !== 1 && input.version !== 2)) throw new Error("지원하지 않는 저장 버전입니다.");
+  if (!object(input) || ![1, 2, 3].includes(Number(input.version))) throw new Error("지원하지 않는 저장 버전입니다.");
   const c = input.character, s = input.stats;
   if (!object(c) || !text(c.name) || !finite(c.age) || c.age < 0 || !finite(c.year) ||
     !["student", "jobseeker", "worker"].includes(String(c.background)) || !["여성", "남성"].includes(String(c.gender)) ||
@@ -26,7 +27,8 @@ export function parseSave(input: unknown): GameState {
   const settings = input.settings;
   const migrated = {
     ...input,
-    version: 2,
+    version: 3,
+    economy: input.version === 3 && object(input.economy) ? input.economy : migrateEconomy(c as unknown as GameState["character"], Number(input.week)),
     evaluatedDays: Array.isArray(input.evaluatedDays) ? input.evaluatedDays : [],
     actionDays: stringList(input.actionDays) ? input.actionDays : [],
     seenEvents: stringList(input.seenEvents) ? input.seenEvents : [],
@@ -47,5 +49,10 @@ export function parseSave(input: unknown): GameState {
   if (object(input.weeklyCashflow) && !finite(input.weeklyCashflow.unpaidExpenses)) {
     throw new Error("주간 정산 데이터가 손상됐습니다.");
   }
+  const e = migrated.economy;
+  if (!object(e) || !object(e.employment) || !["student", "seeking", "employed", "unemployed"].includes(String(e.employment.status)) ||
+    !finite(e.employment.monthlySalary) || !finite(e.employment.tenureWeeks) || !finite(e.debt) || e.debt < 0 ||
+    !finite(e.monthlyDebtPayment) || !finite(e.activationMonth) || !Array.isArray(e.transactions) ||
+    !e.transactions.every((entry) => object(entry) && text(entry.id) && finite(entry.week) && finite(entry.amount) && text(entry.label))) throw new Error("경제 데이터가 손상됐습니다.");
   return migrated as unknown as GameState;
 }

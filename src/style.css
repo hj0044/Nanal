@@ -261,6 +261,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
   .creator-card { padding: 17px; }
   .card-heading { align-items: flex-start; }
 }
+.career-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+.career-actions button { min-height: 44px; }
+.economy-hero strong, .economy-hero small { display: block; }
+.economy-hero small { margin-top: 7px; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
