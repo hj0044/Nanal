@@ -5,6 +5,7 @@ import sharp from "sharp";
 import path from "node:path";
 import { inspectPngBase64 } from "../chatgpt-import/validation.mjs";
 import { immutableWrite, driveBackup } from "./import.mjs";
+import { compareAppearancePngs } from "./visual-consistency.mjs";
 
 const hex64=/^[0-9a-f]{64}$/i;
 const ap=/^AP\d{3,5}$/;
@@ -75,7 +76,23 @@ export async function submitChatGptFile(spec,config={},adapters={}) {
   const hash=digest(bytes);
   if(spec.index===1&&hash!==anchorHash)throw Error("First image does not match official verified master anchor");
   if(!Number.isInteger(spec.index)||spec.index<1||spec.index>999)throw Error("Invalid index");
-  if(spec.dryRun)return {characterId,slot,fileSha256:hash,status:"dry_run"};
+  let visualQa=null;
+  if(spec.referenceFilePath){
+    if(spec.index>1){
+      const referenceBytes=await readFile(spec.referenceFilePath);
+      if(digest(referenceBytes)!==anchorHash)throw Error("Official image reference SHA-256 mismatch");
+      visualQa=await (adapters.compareVisual??compareAppearancePngs)({
+        referencePng:referenceBytes,candidatePng:bytes,role:kind,appearanceId:characterId,
+        lockedProfile:profile
+      });
+      if(visualQa?.approved!==false||visualQa?.automatedIdentityConfirmed!==false)
+        throw Error("Visual QA must not assert unverified identity approval");
+    }
+  }else if(spec.visualQaRequired){
+    throw Error("Official reference PNG required for requested visual QA");
+  }
+  if(spec.dryRun)return {characterId,slot,fileSha256:hash,status:"dry_run",
+    visualQaStatus:visualQa?.recommendedAction??"reference_not_provided"};
   const endpoint=apiBase(config.gameApiOrigin);
   if(typeof config.adminToken!=="string"||config.adminToken.length<32)throw Error("Game DB admin token missing");
   if(!spec.localOnly&&(!config.googleFolderId||
@@ -115,8 +132,13 @@ export async function submitChatGptFile(spec,config={},adapters={}) {
       optimizedWidths.push(variant.width);
     }
   }
+  if(visualQa){
+    const outputPath=path.resolve(spec.privateRoot??".nanal-private","qa",result.assetId+".json");
+    await immutableWrite(outputPath,Buffer.from(JSON.stringify(visualQa,null,2)+"\\n"));
+  }
   return {characterId,slot,assetId:result.assetId,status:result.status,duplicate:result.duplicate===true,
-    driveFileId:driveId,fileSha256:hash,optimizedWidths};
+    driveFileId:driveId,fileSha256:hash,optimizedWidths,
+    visualQaStatus:visualQa?.recommendedAction??"reference_not_provided"};
 }
 
 
