@@ -129,7 +129,18 @@ export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv,
       const identities=await db.prepare("SELECT appearance_id FROM appearance_identities ORDER BY appearance_id").bind().all<Row>();
       const targets=await db.prepare("SELECT appearance_id,slot,target_count,source,profile_sha256,updated_at FROM appearance_image_targets").bind().all<Row>();
       const variants=await db.prepare("SELECT appearance_id,slot,status,file_sha256 FROM appearance_variants").bind().all<Row>();
-      const all=buildAppearanceInventory(identities.results,targets.results,variants.results);
+      const all=buildAppearanceInventory(
+        identities.results.map(r=>({appearance_id:String(r.appearance_id)})),
+        targets.results.map(r=>({
+          appearance_id:String(r.appearance_id),slot:r.slot,
+          target_count:Number(r.target_count),source:String(r.source),
+          profile_sha256:String(r.profile_sha256),updated_at:r.updated_at
+        })),
+        variants.results.map(r=>({
+          appearance_id:String(r.appearance_id),slot:r.slot,status:r.status,
+          file_sha256:String(r.file_sha256)
+        }))
+      );
       if (inventoryRoute[1]) {
         const found=all.find(row=>row.appearanceId===inventoryRoute[1]);
         return found?json({inventory:found}):err("canonical_identity_missing",404);
