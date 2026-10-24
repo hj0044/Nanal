@@ -24,7 +24,7 @@ export async function handoffGeneratedArtifact(payload,adapters={}) {
     },{getReservation:adapters.getReservation,submitReservedImages:adapters.submitReservedImages});
   }
   if(payload.mode==="official-existing-variant"){
-    if(!Buffer.isBuffer(payload.png)||!/^AP\\d{3,5}$/.test(payload.appearanceId??""))
+    if(!Buffer.isBuffer(payload.png)||!/^AP[0-9]{3,5}$/.test(payload.appearanceId??''))
       throw Error("Official existing-ID variant requires canonical AP ID and real PNG Buffer");
     if(!["portrait","fullbody"].includes(payload.kind)||!Number.isInteger(payload.index)||
        payload.index<2||payload.index>999||
