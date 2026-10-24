@@ -48,6 +48,9 @@ function normalizeSave(parsed: GameState): GameState {
   return {
     ...parsed,
     playerGoals: parsed.playerGoals ?? [],
+    storyArcs: parsed.storyArcs ?? {},
+    worldFacts: parsed.worldFacts ?? [],
+    playerRelationships: parsed.playerRelationships ?? Object.fromEntries(parsed.contacts.filter((person) => /가족|부모|사촌|친척|형제|자매/.test(person.role)).map((person) => [person.id, { kind: "family", sinceWeek: 1 }])),
     favoriteContactIds: parsed.favoriteContactIds ?? [],
     character: {
       ...parsed.character, ...playerBody, weightKg: parsed.character.weightKg ?? playerBody.weightKg,
@@ -267,7 +270,7 @@ function App() {
       {showSettings && <Settings game={game} onClose={() => setShowSettings(false)} onPalette={setPalette}
         onUpdate={(patch) => updateGame((current) => ({ ...current, settings: { ...current.settings, ...patch } }))}
         onExport={() => exportSave(game)} onImport={handleImport} importMessage={importMessage} />}
-      {selectedPerson && <PersonDetails person={game.contacts.find((person) => person.id === selectedPerson.id) ?? selectedPerson} records={game.relationshipRecords ?? []} onClose={() => setSelectedPerson(null)} />}
+      {selectedPerson && <PersonDetails person={game.contacts.find((person) => person.id === selectedPerson.id) ?? selectedPerson} records={game.relationshipRecords ?? []} playerRelationship={game.playerRelationships?.[selectedPerson.id]?.kind} onClose={() => setSelectedPerson(null)} />}
       {showPlayerProfile && <PlayerDetails character={game.character} onClose={() => setShowPlayerProfile(false)} />}
     </div>
   );
@@ -372,7 +375,7 @@ function LifeView({ game, onAdvance, onAction, onChoice, onNextWeek, onSelectPer
           ] as [DailyAction, string, string][]).map(([action, title, detail]) => <div className="daily-action-wrap" key={action}><button className="daily-action" disabled={actionUsed || (action === "earn" && earnLimitReached)} onClick={() => { setShowResult(false); onAction(action, action === "social" ? socialTargetId : undefined); }}><strong>{title}</strong><small>{actionUsed ? "오늘 행동을 이미 선택했어요" : action === "earn" && earnLimitReached ? "이번 주 단기 근무 한도를 채웠어요" : detail}</small></button>{action === "social" && <label className="social-target-field"><span>함께 보낼 사람</span><select aria-label="함께 시간을 보낼 사람" value={socialTargetId} disabled={actionUsed} onChange={(event) => setSocialTargetId(event.target.value)}>{game.contacts.map((person) => <option key={person.id} value={person.id}>{person.name} · {person.role}</option>)}</select></label>}</div>)}</div><div className="advance-options"><span className="fast-forward-label">그냥 진행</span>{([1, 3, 7] as const).map((days) => <button className="advance-button secondary-advance" key={days} onClick={() => { setShowResult(false); onAdvance(days); }}><span>{days === 1 ? "하루" : `${days}일`}</span><span className="arrow">→</span></button>)}</div></div>
         </section>
       )}
-      {showResult && game.lastChoice && <section className="choice-result" aria-live="polite"><div className="section-heading"><h2>선택 결과</h2><button onClick={() => setShowResult(false)} aria-label="결과 닫기">×</button></div><p>{game.lastChoice}</p><strong>달라진 점</strong><p>{effectSummary(game.lastChoiceEffect)}</p><small>다음 일정 · {game.phase === "summary" ? "이번 주 정산 확인" : "생활에서 다음 행동 선택"}</small></section>}
+      {showResult && game.lastChoice && <section className="choice-result" aria-live="polite"><div className="section-heading"><h2>선택 결과</h2><button onClick={() => setShowResult(false)} aria-label="결과 닫기">×</button></div><small>원인 · {game.lastChoiceCause ?? "이번 선택"}</small><p>{game.lastChoice}</p><strong>달라진 점</strong><p>{effectSummary(game.lastChoiceEffect)}</p><small>다음 일정 · {game.lastChoiceNextWeek ? `${game.lastChoiceNextWeek}주차 후속 이야기` : game.phase === "summary" ? "이번 주 정산 확인" : "생활에서 다음 행동 선택"}</small></section>}
       {featured && <section className="feed-section"><div className="section-heading"><div><span className="section-kicker">PEOPLE AROUND YOU</span><h2>이번 생활의 인물</h2></div><span className="quiet-label">누르면 상세 정보</span></div><button className="featured-person" onClick={() => onSelectPerson(featured)}><CharacterAvatar name={featured.name} portraitId={featured.portraitId} className="featured-portrait" /><span className="featured-copy"><strong>{featured.name} · {featured.role}</strong><span>{featured.note}</span><small>관계 온도 {featured.warmth} · 자세히 보기</small></span><span className="featured-arrow">›</span></button><div className="recent-log"><div className="section-heading"><h2>최근 이야기</h2><span className="quiet-label">이번 생의 흐름</span></div>{game.log.slice(0, 2).map((line, i) => <div className="feed-item" key={`${line}-${i}`}><span className={i === 0 ? "feed-marker current" : "feed-marker"} /><p>{line}</p><span className="feed-time">{i === 0 ? "방금" : "이전"}</span></div>)}</div></section>}
     </>
   );
@@ -424,7 +427,7 @@ function PeopleView({ game, onSelectPerson, onSelectPlayer, onContactArchived, o
     {(game.archivedContacts?.length ?? 0) > 0 && <section className="panel muted-panel"><h2>한동안 만나지 못한 사람들</h2><div className="archive-list">{[...(game.archivedContacts ?? [])].reverse().map((person) => <div className="archive-row" key={person.id}><strong>{person.name}</strong><span>{person.role} · {person.age}세</span><small>{person.memories?.[0]?.text ?? "함께 보낸 기억이 남아 있어요."}</small><button className="text-button" onClick={() => onContactArchived(person.id)}>먼저 안부 보내기</button></div>)}</div></section>}
   </>;
 }
-function PersonDetails({ person, records, onClose }: { person: Contact; records: NonNullable<GameState["relationshipRecords"]>; onClose: () => void }) {
+function PersonDetails({ person, records, playerRelationship, onClose }: { person: Contact; records: NonNullable<GameState["relationshipRecords"]>; playerRelationship?: "family" | "friend" | "dating"; onClose: () => void }) {
   const history = [
     ...records.filter((record) => record.contactId === person.id).map((record) => ({ id: record.id, week: record.week, text: record.text })),
     ...(person.memories ?? []).map((memory) => ({ id: memory.id, week: memory.week, text: memory.text })),
@@ -432,7 +435,7 @@ function PersonDetails({ person, records, onClose }: { person: Contact; records:
   return <div className="modal-backdrop" role="presentation" onClick={onClose}><section className="person-details-modal" role="dialog" aria-modal="true" aria-labelledby="person-details-title" onClick={(event) => event.stopPropagation()}>
     <div className="person-detail-cover"><button className="icon-button person-detail-close" aria-label="상세 정보 닫기" onClick={onClose}>×</button><CharacterAvatar name={person.name} portraitId={person.portraitId} className="detail-portrait" /></div>
     <div className="person-detail-body"><span className="section-kicker">RELATIONSHIP PROFILE</span><h2 id="person-details-title">{person.name}</h2><p className="person-detail-role">{person.role} · {person.gender ?? "성별 미상"}</p>
-      <div className="profile-facts"><div><small>나이</small><strong>{person.age ?? "미상"}세</strong></div><div><small>키 · 몸무게</small><strong>{person.heightCm ?? "미상"}cm · {person.weightKg ?? "미상"}kg</strong></div><div><small>직업</small><strong>{person.occupation ?? "정보 없음"}</strong></div><div><small>요즘 목표</small><strong>{person.goal ?? "아직 알 수 없음"}</strong></div><div><small>상태</small><strong>{person.mood ?? "평소와 같음"}</strong></div></div>
+      <div className="profile-facts"><div><small>나이</small><strong>{person.age ?? "미상"}세</strong></div><div><small>키 · 몸무게</small><strong>{person.heightCm ?? "미상"}cm · {person.weightKg ?? "미상"}kg</strong></div><div><small>직업</small><strong>{person.occupation ?? "정보 없음"} · {person.employmentStatus === "seeking" ? "구직" : "재직"}</strong></div><div><small>게임 내 자금</small><strong>{formatMoney(person.savings ?? 0)}</strong></div><div><small>주인공과의 관계</small><strong>{playerRelationship === "dating" ? "연애 중" : playerRelationship === "family" ? "가족" : playerRelationship === "friend" ? "친구" : "알아가는 중"}</strong></div><div><small>주변 관계</small><strong>{person.relationshipStatus === "dating" ? "연애 중" : person.relationshipStatus === "family" ? "가족" : "알아가는 중"}</strong></div><div><small>다음 일정</small><strong>{person.nextAppointmentWeek ?? "—"}주차</strong></div><div><small>요즘 목표</small><strong>{person.goal ?? "아직 알 수 없음"}</strong></div><div><small>상태</small><strong>{person.mood ?? "평소와 같음"}</strong></div></div>
       <div className="relationship-score"><span>관계 온도</span><strong>{person.warmth}<small>/100</small></strong></div><div className="warmth-meter detail-meter"><span style={{ width: `${person.warmth}%` }} /></div>
       <section className="relationship-timeline"><h3>함께한 이야기</h3>{history.length ? history.map((entry) => <div key={entry.id}><small>{entry.week}주차</small><p>{entry.text}</p></div>) : <p>아직 함께한 기록이 없어요.</p>}</section>
       <button className="primary-button full" onClick={onClose}>확인</button>
