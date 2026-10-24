@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { synchronizeOfficialImageTargets } from "./official-inventory-sync.mjs";
+import { synchronizeOfficialImageTargets, createGameTargetApiClient } from "./official-inventory-sync.mjs";
 
 const VALID="a".repeat(64);
 const ids=Array.from({length:20},(_,i)=>"AP"+String(i+1).padStart(3,"0"));
@@ -80,4 +80,40 @@ test("missing acknowledgement never claims registered target",async()=>{
  assert.equal(result.complete,false);
  assert.equal(result.entries[0].status,"sync_failed");
  assert.equal(result.entries[0].targetsRecorded,0);
+});
+
+test("privileged HTTPS transport reads canonical game metadata and records target",async()=>{
+ const urls=[],body=[];
+ const client=createGameTargetApiClient({
+   gameApiOrigin:"https://nanal.example/",
+   adminToken:"t".repeat(48),
+   fetchFn:async (url,init)=>{
+     urls.push(url);
+     assert.equal(init.headers.authorization,"Bearer "+"t".repeat(48));
+     assert.equal(init.redirect,"error");
+     if(init.method==="PUT"){
+       body.push(JSON.parse(init.body));
+       return Response.json({appearanceId:"AP008",slot:"fullBody",targetCount:12,status:"recorded"});
+     }
+     return Response.json({appearanceId:"AP008",reviewedOfficialReservation:true,profileSha256:VALID});
+   }
+ });
+ const id=await client.getGameIdentity({appearanceId:"AP008"});
+ assert.equal(id.reviewedOfficialReservation,true);
+ const result=await client.submitGameTarget({appearanceId:"AP008",slot:"fullBody",
+   targetCount:12,source:"verified_official_reservation",profileSha256:VALID});
+ assert.equal(result.status,"recorded");
+ assert.equal(urls.length,2);
+ assert.deepEqual(body,[{slot:"fullBody",targetCount:12,source:"verified_official_reservation",profileSha256:VALID}]);
+});
+test("target transport fails closed on insecure origin or invalid source",async()=>{
+ assert.throws(()=>createGameTargetApiClient({
+   gameApiOrigin:"http://nanal.example/",adminToken:"t".repeat(48)
+ }),/trusted_https_game_origin_required/);
+ const client=createGameTargetApiClient({
+   gameApiOrigin:"https://nanal.example/",adminToken:"t".repeat(48),
+   fetchFn:async()=>{throw Error("must not fetch");}
+ });
+ await assert.rejects(()=>client.submitGameTarget({appearanceId:"AP008",slot:"fullBody",
+   targetCount:12,source:"unverified",profileSha256:VALID}),/invalid_verified_target/);
 });
