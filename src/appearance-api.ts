@@ -1,4 +1,5 @@
 import { buildAppearanceInventory } from "./appearance-inventory.ts";
+import { checkTransparentCharacterPng } from "./appearance-pixel-qa.ts";
 /** ChatGPT image upload API. No image model calls or Nanal application daily quota. */
 export type AppearanceStoreEnv = {
   NANAL_APPEARANCE_DB?: { prepare(sql: string): { bind(...args: unknown[]): {
@@ -237,7 +238,7 @@ export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv,
       let offset=0;
       for(const chunk of chunks){ bytes.set(chunk,offset);offset+=chunk.length; }
       if (!size) return err("image_invalid",422);
-      try { inspectAppearancePng(bytes,slot); }
+      try { inspectAppearancePng(bytes,slot); await checkTransparentCharacterPng(bytes,slot); }
       catch { return err("image_format_invalid",422); }
       const digestValue=await digest(bytes);
       const key=appearanceId+":"+slot+":"+digestValue;
@@ -296,6 +297,7 @@ export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv,
       if (!(file instanceof File) || file.size>MAX_BYTES || file.size<70) return err("image_invalid",413);
       const bytes=new Uint8Array(await file.arrayBuffer());
       inspectAppearancePng(bytes,String(slot));
+      await checkTransparentCharacterPng(bytes,String(slot) as "portrait"|"fullBody");
       const checksum=await digest(bytes);
       const existing=await db.prepare("SELECT asset_id,appearance_id,slot,file_sha256,status FROM appearance_variants WHERE request_key = ?").bind(key).first<Row>();
       if (existing) return existing.appearance_id===variants[1]&&existing.slot===slot&&existing.file_sha256===checksum
@@ -349,6 +351,7 @@ export async function handleAppearanceApi(req: Request, env: AppearanceStoreEnv,
     return err("not_found",404);
   } catch(e) {
     const message=e instanceof Error?e.message:"server_error";
+    if (message.startsWith("image_pixel_qa_")) return err(message,422);
     if (["png_invalid","png_dimensions_invalid","rgba_required","png_truncated","png_incomplete","png_crc_invalid","invalid_json","body_too_large"].includes(message))
       return err(message,400);
     return err("server_error",500);
