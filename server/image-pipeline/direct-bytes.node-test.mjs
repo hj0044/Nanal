@@ -75,8 +75,10 @@ test("absence of generated image bytes fails loudly",async()=>{
 });
 test("background and mismatched shape fail without publishing",async()=>{
   const valid=await makePng("portrait","teal");
-  await assert.rejects(()=>submitChatGptBytes({characterId:"AP008",kind:"portrait",index:2,pngBytes:await makePng("portrait","opaque"),profile,dryRun:true}),/Transparent background/);
-  await assert.rejects(()=>submitChatGptBytes({characterId:"AP008",kind:"portrait",index:2,pngBytes:await makePng("portrait","magenta"),profile,dryRun:true}),/magenta/);
+  const opaque=await makePng("portrait","opaque");
+  const magenta=await makePng("portrait","magenta");
+  await assert.rejects(()=>submitChatGptBytes({characterId:"AP008",kind:"portrait",index:2,pngBytes:opaque,profile,dryRun:true}),/Transparent background/);
+  await assert.rejects(()=>submitChatGptBytes({characterId:"AP008",kind:"portrait",index:2,pngBytes:magenta,profile,dryRun:true}),/magenta/);
   await assert.rejects(()=>submitChatGptBytes({characterId:"AP008",kind:"fullbody",index:2,pngBytes:valid,profile,dryRun:true}),/1024x1536/);
 });
 test("backup is mandatory by default, and remote 503 is not marked success",async()=>work(async(root)=>{
