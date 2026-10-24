@@ -29,3 +29,7 @@ npm run build
 ## Automated original-image backup and ImageKit delivery
 
 Character image candidates can be staged with `npm run images:import`. This archives their original PNG/JPEG/WebP, uploads a verified Drive backup, converts a WebP for ImageKit, and registers a review-pending asset. It does **not** generate images, approve artwork or affect the existing same-origin official appearance API. See [the image pipeline guide](docs/character-image-pipeline.md).
+
+## ChatGPT 이미지 파일 제출 및 캐릭터 전체 일괄 최적화
+
+`npm run images:batch`는 AP ID와 검증된 마스터 SHA-256을 기준으로 로컬 원본을 자동 발견해 Google Drive/로컬 백업, ImageKit WebP 최적화 또는 게임 측 D1/R2 검수대기 제출을 수행합니다. 기본은 dry-run이며 `--apply`를 명시해야 원격 쓰기가 발생합니다. ChatGPT UI에서 생성 PNG 바이트를 직접 전달하는 호스트 연동이나 공식 Nanal 플러그인 DB의 기존 이미지 전체 다운로드는 현재 제공되지 않습니다. 상세: [일괄 이미지 관리](docs/chatgpt-bulk-image-handoff.md).
